@@ -8,6 +8,8 @@ This repository contains the packages responsible for performing global traversa
 
 ## Cloning the repository
 
+```git clone https://github.com/suchetanrs/traversability_mapping```
+
 ## Building the library.
 
 Run the following to execute a shell script that installs all the dependencies and build the library.
