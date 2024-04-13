@@ -1,0 +1,14 @@
+# Choose from ORB3, ISAE
+SLAM_System: "ORB3"
+
+# SLAM Frame normally is the camera frame.
+T_SLAMFrameToLidarFrame:
+  quaternion:
+    x: 0.0
+    y: 0.381
+    z: 0.0
+    w: 0.9246
+  translation:
+    x: 0.527
+    y: 0.0
+    z: 0.662

@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>traversability_mapping_ros</name>
+  <version>1.0.0</version>
+  <description>A package containing ros components of traversability_mapping</description>
+  <maintainer email="rssuchetan@gmail.com">Suchetan Saravanan</maintainer>
+  <license>MIT</license>
+  <author>Suchetan Saravanan</author>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>sensor_msgs</depend>
+  <depend>tf2_ros</depend>
+  <depend>tf2_eigen</depend>
+  <depend>tf2_geometry_msgs</depend>
+  <depend>traversability_mapping_common</depend>
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
