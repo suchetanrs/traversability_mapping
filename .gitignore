@@ -5,3 +5,4 @@ traversability_mapping_common/build
 build/
 install/
 log/
+traversability_ros_interface/traversability_mapping_ros
