@@ -1,0 +1,5 @@
+traversability_node:
+  ros__parameters:
+    additions_topic_name: "traversability_keyframe_additions"
+    updates_topic_name: "traversability_keyframe_updates"
+    pointcloud_topic_name: "/scout_2/velodyne_points"

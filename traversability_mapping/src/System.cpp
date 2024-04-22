@@ -7,7 +7,7 @@ namespace traversability_mapping
 
     System::System()
     {
-        // std::cout << "Called traversability system constructor" << std::endl;
+        std::cout << "Called traversability system constructor" << std::endl;
         pointCloudBuffer_ = std::make_shared<PointCloudBuffer>();
         keyFrameUpdateQueue_ = std::make_shared<UpdateQueue>();
     }
@@ -21,11 +21,18 @@ namespace traversability_mapping
         // Add the keyframe to the local map
         if (localMapsSet_.find(mapID) != localMapsSet_.end())
         {
-            allKeyFramesSet_[kfID] = mapID;
-            localMapsSet_[mapID]->addNewKeyFrame(timestamp, kfID, sensorPointCloud, mapID);
-            // std::cout << "ADDING KEYFRAME TO MAP!!!!" << mapID << std::endl;
-            if (localMapsSet_[mapID] != localMap_)
-                setCurrentMap(mapID);
+            if (allKeyFramesSet_.find(kfID) == allKeyFramesSet_.end())
+            {
+                allKeyFramesSet_[kfID] = mapID;
+                localMapsSet_[mapID]->addNewKeyFrame(timestamp, kfID, sensorPointCloud, mapID);
+                // std::cout << "ADDING KEYFRAME TO MAP!!!!" << mapID << std::endl;
+                if (localMapsSet_[mapID] != localMap_)
+                    setCurrentMap(mapID);
+            }
+            else
+            {
+                std::cout << "They keyframe with this ID: " << kfID << " has already been added. Not adding again" << std::endl;
+            }
         }
         else
         {
@@ -190,12 +197,19 @@ namespace traversability_mapping
 
     void System::addNewLocalMap(long unsigned int mapID)
     {
-        std::cout << "Added new local map with ID: " << mapID << std::endl;
-        auto newLocalMap = std::make_shared<LocalMap>(mapID, keyFrameUpdateQueue_, updateQueueMutex_);
-        std::thread t(&LocalMap::Run, newLocalMap);
-        t.detach();
-        localMapsSet_[mapID] = newLocalMap;
-        setCurrentMap(mapID);
+        if (localMapsSet_.find(mapID) == localMapsSet_.end())
+        {
+            std::cout << "Added new local map with ID: " << mapID << std::endl;
+            auto newLocalMap = std::make_shared<LocalMap>(mapID, keyFrameUpdateQueue_, updateQueueMutex_);
+            std::thread t(&LocalMap::Run, newLocalMap);
+            t.detach();
+            localMapsSet_[mapID] = newLocalMap;
+            setCurrentMap(mapID);
+        }
+        else
+        {
+            std::cout << "Local map with the ID: " << mapID << " has already been made. Not making again" << std::endl;
+        }
     }
 
     void System::setCurrentMap(long unsigned int mapID)
