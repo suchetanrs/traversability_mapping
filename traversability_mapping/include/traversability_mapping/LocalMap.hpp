@@ -55,7 +55,10 @@ namespace traversability_mapping
         std::shared_ptr<TraversabilityTypeConversions> typeConversion_;
         std::shared_ptr<grid_map::GridMap> pGridMap_;
         double half_size_gridmap_ = 17.0;
-        double resolution_ = 0.25;
+        double resolution_ = 0.05;
+
+        // Traversability Params
+        KeyFrameParameters loadedKFParams_;
 
         // Map to store KeyFrame ids and corresponding KeyFrameData pointers
         std::unordered_map<long unsigned int, std::shared_ptr<KeyFrame>> keyFramesMap_;

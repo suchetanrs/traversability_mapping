@@ -12,6 +12,7 @@ find_package(traversability_mapping REQUIRED)
 find_package(traversability_mapping_common REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(grid_map_core REQUIRED)
+find_package(grid_map_ros REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(yaml-cpp REQUIRED)
 find_package(tf2_eigen REQUIRED)
@@ -27,6 +28,7 @@ set(dependencies
     traversability_mapping_common
     sensor_msgs
     grid_map_core
+    grid_map_ros
     nav_msgs
     yaml-cpp
     tf2_eigen
@@ -48,9 +50,19 @@ add_executable(traversability_node src/traversability_node.cpp)
 ament_target_dependencies(traversability_node ${dependencies})
 target_link_libraries(traversability_node ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem type_conversion)
 
+# Add executable
+add_executable(multi_map_merge src/multi_map_merge.cpp)
+ament_target_dependencies(multi_map_merge ${dependencies})
+target_link_libraries(multi_map_merge ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem type_conversion)
+
+# Add executable
+add_executable(local_traversability src/local_traversability.cpp)
+ament_target_dependencies(local_traversability ${dependencies})
+target_link_libraries(local_traversability ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem type_conversion)
+
 # Install executable
 install(TARGETS
-    traversability_node
+    traversability_node multi_map_merge local_traversability
     DESTINATION lib/${PROJECT_NAME}
 )
 

@@ -18,6 +18,16 @@
 
 namespace traversability_mapping
 {
+    struct KeyFrameParameters
+    {
+        double resolution_;
+        double half_size_traversability_;
+        double security_distance_;
+        double ground_clearance_;
+        double max_slope_;
+        double robot_height_;
+    };
+
     class KeyFrame
     {
     public:
@@ -26,7 +36,13 @@ namespace traversability_mapping
                  sensor_msgs::msg::PointCloud2 &pointCloud,
                  std::shared_ptr<grid_map::GridMap> gridMap,
                  long unsigned int mapID,
-                 Eigen::Affine3f Tbv);
+                 Eigen::Affine3f Tbv,
+                 KeyFrameParameters kfParams);
+
+        KeyFrame(long unsigned int kfID,
+                 std::shared_ptr<grid_map::GridMap> gridMap,
+                 Eigen::Affine3f Tbv,
+                 KeyFrameParameters kfParams);
 
         // GETTERS
         const double &getTimestamp();
@@ -72,6 +88,7 @@ namespace traversability_mapping
         std::mutex gridMapMutex_;
         std::shared_ptr<grid_map::GridMap> pGridMap_;
         long unsigned int parentMapID_;
+        KeyFrameParameters kfParams_;
         std::vector<Eigen::Vector2d> markedCells_;
 
         std::mutex poseUpdateQueueMutex_;

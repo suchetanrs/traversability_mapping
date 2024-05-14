@@ -8,14 +8,21 @@ namespace traversability_mapping
           mapID_(mapID),
           keyFrameUpdateQueue_(keyFrameUpdateQueue)
     {
-        typeConversion_ = std::make_shared<TraversabilityTypeConversions>();
-        grid_map::GridMap gridMap_({"hazard", "step_haz", "roughness_haz", "slope_haz", "border_haz", "elevation", "kfid"});
-        gridMap_.setFrameId("map");
-        gridMap_.setGeometry(grid_map::Length(2. * half_size_gridmap_, 2. * half_size_gridmap_), resolution_);
-        pGridMap_ = std::make_shared<grid_map::GridMap>(gridMap_);
-
         // Load YAML file and retrieve parameters
         YAML::Node loaded_node = YAML::LoadFile("/usr/local/params/traversabilityParams.yaml");
+        
+        // Traversability Params
+        half_size_gridmap_ = loaded_node["half_size_local_map"].as<double>();
+        
+        loadedKFParams_.resolution_ = loaded_node["resolution_local_map"].as<double>();
+        resolution_ = loadedKFParams_.resolution_;
+        loadedKFParams_.half_size_traversability_ = loaded_node["half_size_traversability"].as<double>();
+        loadedKFParams_.security_distance_ = loaded_node["security_distance"].as<double>();
+        loadedKFParams_.ground_clearance_ = loaded_node["ground_clearance"].as<double>();
+        loadedKFParams_.max_slope_ = loaded_node["max_slope"].as<double>();
+        loadedKFParams_.robot_height_ = loaded_node["robot_height"].as<double>();
+
+        // Other params
         Eigen::Translation3f translation(
             loaded_node["T_SLAMFrameToLidarFrame"]["translation"]["x"].as<float>(),
             loaded_node["T_SLAMFrameToLidarFrame"]["translation"]["y"].as<float>(),
@@ -28,6 +35,12 @@ namespace traversability_mapping
         Tbv_ = translation * quaternion;
 
         SLAMSystem_ = loaded_node["SLAM_System"].as<std::string>();
+
+        typeConversion_ = std::make_shared<TraversabilityTypeConversions>();
+        grid_map::GridMap gridMap_({"hazard", "step_haz", "roughness_haz", "slope_haz", "border_haz", "elevation", "kfid"});
+        gridMap_.setFrameId("map");
+        gridMap_.setGeometry(grid_map::Length(2. * half_size_gridmap_, 2. * half_size_gridmap_), resolution_);
+        pGridMap_ = std::make_shared<grid_map::GridMap>(gridMap_);
     }
 
     LocalMap::~LocalMap() {}
@@ -85,7 +98,7 @@ namespace traversability_mapping
                                                        sensor_msgs::msg::PointCloud2 &pointCloud,
                                                        long unsigned int mapID)
     {
-        std::shared_ptr<KeyFrame> keyFrame = std::make_shared<KeyFrame>(timestamp, kfID, pointCloud, pGridMap_, mapID, Tbv_);
+        std::shared_ptr<KeyFrame> keyFrame = std::make_shared<KeyFrame>(timestamp, kfID, pointCloud, pGridMap_, mapID, Tbv_, loadedKFParams_);
         std::lock_guard<std::mutex> lock(keyFramesMapMutex);
         keyFramesMap_[kfID] = keyFrame;
         return keyFrame;

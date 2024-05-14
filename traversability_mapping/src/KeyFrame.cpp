@@ -7,13 +7,15 @@ namespace traversability_mapping
                        sensor_msgs::msg::PointCloud2 &pointCloud,
                        std::shared_ptr<grid_map::GridMap> gridMap,
                        long unsigned int mapID,
-                       Eigen::Affine3f Tbv)
+                       Eigen::Affine3f Tbv,
+                       KeyFrameParameters kfParams)
         : timestamp_(timestamp),
           kfID_(kfID),
           pointCloudLidar_(pointCloud),
           pGridMap_(gridMap),
           parentMapID_(mapID),
-          Tbv_(Tbv)
+          Tbv_(Tbv),
+          kfParams_(kfParams)
     {
         // TODO: Make this a parameter
         // auto translation = Eigen::Translation3f(
@@ -26,6 +28,17 @@ namespace traversability_mapping
         //     static_cast<float>(0.381), // y
         //     static_cast<float>(0.0));  // z
         // Tbv_ = translation * quaternion;
+    }
+
+    KeyFrame::KeyFrame(long unsigned int kfID,
+                       std::shared_ptr<grid_map::GridMap> gridMap,
+                       Eigen::Affine3f Tbv,
+                       KeyFrameParameters kfParams)
+        : kfID_(kfID),
+          pGridMap_(gridMap),
+          Tbv_(Tbv),
+          kfParams_(kfParams)
+    {
     }
 
     const double &KeyFrame::getTimestamp()
@@ -94,12 +107,12 @@ namespace traversability_mapping
     void KeyFrame::computeLocalTraversability(sensor_msgs::msg::PointCloud2 &kFpcl)
     {
         // TODO: Load from paramter file.
-        double resolution_ = 0.25;
-        double half_size_traversability_ = 5.5;
-        const double security_distance_ = 0.6;
-        const double ground_clearance_ = 0.2;
-        const double max_slope_ = 0.8;
-        double robot_height_ = 1.5;
+        double resolution_ = kfParams_.resolution_;
+        double half_size_traversability_ = kfParams_.half_size_traversability_;
+        const double security_distance_ = kfParams_.security_distance_;
+        const double ground_clearance_ = kfParams_.ground_clearance_;
+        const double max_slope_ = kfParams_.max_slope_;
+        double robot_height_ = kfParams_.robot_height_;
         Eigen::Vector2d slamPosition;
         slamPosition.x() = poseTraversabilityCoord_->translation().x();
         slamPosition.y() = poseTraversabilityCoord_->translation().y();
@@ -113,55 +126,62 @@ namespace traversability_mapping
                 continue;
             traversabilityMap->insert_data(pt3);
         }
-
-        // Publish as grid map
-        // Create grid map.
-        // map.move(slamPosition);
-        // map.setPosition(slamPosition);
-        int grid_count = 0;
-        // for (grid_map::GridMapIterator it(map); !it.isPastEnd(); ++it)
-        // {
-        //     grid_map::Position position;
-        //     map.getPosition(*it, position);
-        //     Eigen::Vector4d haz = traversabilityMap->get_goodness_m(
-        //         Eigen::Vector2d(position.x(), position.y()),
-        //         security_distance_, ground_clearance_, max_slope_);
-        //     ++grid_count;
-        //     if (haz(0) < 0.)
-        //         continue;
-
-        //     // map.at("hazard", *it) = haz(0);
-        //     // map.at("step_haz", *it) = haz(1);
-        //     // map.at("roughness_haz", *it) = haz(2);
-        //     // map.at("slope_haz", *it) = haz(3);
-        //     map.atPosition("hazard", position) = haz(0);
-        //     // std::cout << "Hazard value is: " << haz(0) << std::endl;
-        //     // map.at("border_haz", *it) = haz(4);
-        //     // map.at("elevation", *it) = haz(5);
-        // }
-        auto travGrid = traversabilityMap->getGrid();
-        for (size_t i = 0; i < travGrid.size(); ++i)
+        try
         {
-            for (size_t j = 0; j < travGrid[i].size(); ++j)
+
+            // Publish as grid map
+            // Create grid map.
+            // map.move(slamPosition);
+            // map.setPosition(slamPosition);
+            int grid_count = 0;
+            // for (grid_map::GridMapIterator it(map); !it.isPastEnd(); ++it)
+            // {
+            //     grid_map::Position position;
+            //     map.getPosition(*it, position);
+            //     Eigen::Vector4d haz = traversabilityMap->get_goodness_m(
+            //         Eigen::Vector2d(position.x(), position.y()),
+            //         security_distance_, ground_clearance_, max_slope_);
+            //     ++grid_count;
+            //     if (haz(0) < 0.)
+            //         continue;
+
+            //     // map.at("hazard", *it) = haz(0);
+            //     // map.at("step_haz", *it) = haz(1);
+            //     // map.at("roughness_haz", *it) = haz(2);
+            //     // map.at("slope_haz", *it) = haz(3);
+            //     map.atPosition("hazard", position) = haz(0);
+            //     // std::cout << "Hazard value is: " << haz(0) << std::endl;
+            //     // map.at("border_haz", *it) = haz(4);
+            //     // map.at("elevation", *it) = haz(5);
+            // }
+            auto travGrid = traversabilityMap->getGrid();
+            for (size_t i = 0; i < travGrid.size(); ++i)
             {
-                Eigen::Vector4d haz = traversabilityMap->get_goodness(
-                    Eigen::Vector2d(i, j),
-                    security_distance_, ground_clearance_, max_slope_);
-                ++grid_count;
-                if (haz(0) < 0.)
-                    continue;
-                std::lock_guard<std::mutex> lock(gridMapMutex_);
-                pGridMap_->atPosition("hazard", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) = haz(0);
-                pGridMap_->atPosition("step_haz", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) = haz(1);
-                // original
-                // pGridMap_->atPosition("roughness_haz", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) = haz(2);
-                // made now for visualization
-                pGridMap_->atPosition("elevation", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) = haz(2);
-                pGridMap_->atPosition("slope_haz", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) = haz(3);
-                // the latest updating kf's id is stored in this position of the gridmap.
-                pGridMap_->atPosition("kfid", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) = static_cast<float>(kfID_);
-                markedCells_.push_back(traversabilityMap->ind2meter(Eigen::Vector2d(i, j)));
+                for (size_t j = 0; j < travGrid[i].size(); ++j)
+                {
+                    Eigen::Vector4d haz = traversabilityMap->get_goodness(
+                        Eigen::Vector2d(i, j),
+                        security_distance_, ground_clearance_, max_slope_);
+                    ++grid_count;
+                    if (haz(0) < 0.)
+                        continue;
+                    std::lock_guard<std::mutex> lock(gridMapMutex_);
+                    pGridMap_->atPosition("hazard", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) = haz(0);
+                    pGridMap_->atPosition("step_haz", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) = haz(1);
+                    // original
+                    // pGridMap_->atPosition("roughness_haz", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) = haz(2);
+                    // made now for visualization
+                    pGridMap_->atPosition("elevation", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) = haz(2);
+                    pGridMap_->atPosition("slope_haz", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) = haz(3);
+                    // the latest updating kf's id is stored in this position of the gridmap.
+                    pGridMap_->atPosition("kfid", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) = static_cast<float>(kfID_);
+                    markedCells_.push_back(traversabilityMap->ind2meter(Eigen::Vector2d(i, j)));
+                }
             }
+        }
+        catch (const std::out_of_range &e)
+        {
+            std::cerr << "Out of range exception caught: " << e.what() << std::endl;
         }
         // std::cout << "Grid count: " << grid_count << " KF ID: " << kfID_;
         // map.setPosition(slamPosition);
