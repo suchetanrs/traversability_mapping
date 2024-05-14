@@ -46,6 +46,8 @@ namespace traversability_mapping
                                 long unsigned int mapID)
     {
         sensor_msgs::msg::PointCloud2 sensorPointCloud = pointCloudBuffer_->getClosestPointCloud(timestamp);
+        if(sensorPointCloud.data.size() == 0)
+            return;
         // std::cout << "Got closest pointcloud for: " << kfID << std::endl;
         auto pcl_sec = sensorPointCloud.header.stamp.sec + (sensorPointCloud.header.stamp.nanosec * pow(10, -9));
         // std::cout << "Difference in closest pcl ts is: " << timestamp - pcl_sec << std::endl;
@@ -75,6 +77,8 @@ namespace traversability_mapping
         long unsigned int kfIDlong = static_cast<long unsigned int>(kfID);
 
         sensor_msgs::msg::PointCloud2 sensorPointCloud = pointCloudBuffer_->getClosestPointCloud(timestampDouble);
+        if(sensorPointCloud.data.size() == 0)
+            return;
         // std::cout << "Got closest pointcloud for: " << kfID << std::endl;
         // auto pcl_sec = sensorPointCloud.header.stamp.sec + (sensorPointCloud.header.stamp.nanosec * pow(10, -9));
         // std::cout << "Difference in closest pcl ts is: " << timestamp - pcl_sec << std::endl;
