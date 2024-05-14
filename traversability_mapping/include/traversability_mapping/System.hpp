@@ -47,11 +47,10 @@ namespace traversability_mapping
                          long unsigned int mapID);
 
     private:
-
         void addNewKeyFrame(const double timestamp,
                             long unsigned int kfID,
                             long unsigned int mapID,
-                            sensor_msgs::msg::PointCloud2& sensorPointCloud);
+                            sensor_msgs::msg::PointCloud2 &sensorPointCloud);
 
         void setCurrentMap(long unsigned int mapID);
 

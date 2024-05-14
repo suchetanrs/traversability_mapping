@@ -48,7 +48,6 @@ public:
         pclPublisher_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("kf_pointcloud", 10);
         posePublisher_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("kf_pose", 10);
 
-
         traversabilitySystem_ = std::make_shared<traversability_mapping::System>();
         traversabilitySystem_->addNewLocalMap(0);
         RCLCPP_INFO(this->get_logger(), "Added new map");
@@ -63,10 +62,10 @@ private:
         {
             // Assuming keyframe data structure contains necessary information for mapping
             // Add the keyframe to the traversability map using pTraversability_
-            if(use_lidar_pointcloud_)
-            traversabilitySystem_->addNewKeyFrame(keyframe.kf_timestamp_in_nanosec, keyframe.kf_id, keyframe.map_id);
+            if (use_lidar_pointcloud_)
+                traversabilitySystem_->addNewKeyFrame(keyframe.kf_timestamp_in_nanosec, keyframe.kf_id, keyframe.map_id);
             else
-            traversabilitySystem_->addNewKeyFrame(keyframe.kf_timestamp_in_nanosec, keyframe.kf_id, keyframe.map_id, keyframe.kf_pointcloud);
+                traversabilitySystem_->addNewKeyFrame(keyframe.kf_timestamp_in_nanosec, keyframe.kf_id, keyframe.map_id, keyframe.kf_pointcloud);
             Eigen::Affine3d keyFramePoseEigen;
             tf2::fromMsg(keyframe.kf_pose, keyFramePoseEigen);
             traversabilitySystem_->updateKeyFrame(keyframe.kf_id, keyFramePoseEigen);

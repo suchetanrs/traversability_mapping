@@ -23,10 +23,10 @@ public:
 
         // Load YAML file and retrieve parameters
         YAML::Node loaded_node = YAML::LoadFile("/usr/local/params/traversabilityParams.yaml");
-        
+
         // Traversability Params
         half_size_gridmap_ = loaded_node["half_size_local_map"].as<double>();
-        
+
         loadedKFParams_.resolution_ = loaded_node["resolution_local_map"].as<double>();
         resolution_ = loadedKFParams_.resolution_;
         loadedKFParams_.half_size_traversability_ = loaded_node["half_size_traversability"].as<double>();
@@ -64,7 +64,7 @@ private:
         auto keyframe_ = std::make_shared<traversability_mapping::KeyFrame>(1, pGridMap_, Tbv_, loadedKFParams_); // Replace with your actual initialization logic
         // Call computeLocalTraversability function from your KeyFrame class
 
-        //set pose
+        // set pose
         Eigen::Translation3f translation(0.2f, 0.3f, 0.0f);
         Eigen::Quaternionf rotation(1.0f, 0.0f, 0.0f, 0.0f);
         Eigen::Affine3f Tmb_ = translation * rotation;
