@@ -10,7 +10,7 @@ mkdir -p build
 cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS=-std=c++14
 make -j2
-make install
+sudo make install
 
 cd ../../..
 
@@ -19,12 +19,13 @@ mkdir -p traversability_mapping_common/build
 cd traversability_mapping_common/build
 cmake ..
 make
-make install
+sudo make install
 
 source /opt/ros/$ROS_DISTRO/setup.bash
 sudo apt-get install -y ros-$ROS_DISTRO-sensor-msgs
 sudo apt-get install -y ros-$ROS_DISTRO-grid-map
 sudo apt-get install -y ros-$ROS_DISTRO-nav-msgs
+source /opt/ros/$ROS_DISTRO/setup.bash
 
 cd ../..
 
@@ -33,4 +34,4 @@ mkdir -p traversability_mapping/build
 cd traversability_mapping/build
 cmake ..
 make
-make install
+sudo make install
