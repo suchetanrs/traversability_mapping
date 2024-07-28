@@ -21,6 +21,8 @@ namespace traversability_mapping
         loadedKFParams_.ground_clearance_ = loaded_node["ground_clearance"].as<double>();
         loadedKFParams_.max_slope_ = loaded_node["max_slope"].as<double>();
         loadedKFParams_.robot_height_ = loaded_node["robot_height"].as<double>();
+        loadedKFParams_.translation_change_threshold_ = loaded_node["translation_change_threshold"].as<double>();
+        loadedKFParams_.rotation_change_threshold_ = loaded_node["rotation_change_threshold"].as<double>();
 
         // Other params
         Eigen::Translation3f translation(
@@ -50,27 +52,27 @@ namespace traversability_mapping
         // Loop runs forever.
         while (1)
         {
-            std::cout << "Keys in the map: " << mapID_ << ": ";
-            for (const auto &entry : keyFramesMap_)
-            {
-                std::cout << entry.first << " ";
-            }
-            std::cout << std::endl
-                      << "Total size: " << keyFramesMap_.size() << std::endl;
+            // std::cout << "Keys in the map: " << mapID_ << ": ";
+            // for (const auto &entry : keyFramesMap_)
+            // {
+            //     std::cout << entry.first << " ";
+            // }
+            // std::cout << std::endl
+            //           << "Total size: " << keyFramesMap_.size() << std::endl;
             processUpdateQueue();
             // if map set to active, the cache is recomputed continously.
             // TODO: Run this only once when update is recieved Instead of every 500 milli.
             while (activeMap_)
             {
-                std::cout << "Keys in the map: " << mapID_ << ": ";
-                for (const auto &entry : keyFramesMap_)
-                {
-                    std::cout << entry.first << " ";
-                }
-                std::cout << std::endl
-                          << "Total size: " << keyFramesMap_.size() << std::endl;
+                // std::cout << "Keys in the map: " << mapID_ << ": ";
+                // for (const auto &entry : keyFramesMap_)
+                // {
+                //     std::cout << entry.first << " ";
+                // }
+                // std::cout << std::endl
+                //           << "Total size: " << keyFramesMap_.size() << std::endl;
                 processUpdateQueue();
-                std::cout << "Currently running active map id: " << mapID_ << " and the update queue size is: " << keyFrameUpdateQueue_->size() << std::endl;
+                // std::cout << "Currently running active map id: " << mapID_ << " and the update queue size is: " << keyFrameUpdateQueue_->size() << std::endl;
                 for (auto &pair : keyFramesMap_)
                 {
                     auto keyFramePtr = pair.second;
@@ -172,7 +174,7 @@ namespace traversability_mapping
 
     void LocalMap::processUpdateQueue()
     {
-        std::cout << mapID_ << " Processing queue with size: " << keyFrameUpdateQueue_->size() << std::endl;
+        // std::cout << mapID_ << " Processing queue with size: " << keyFrameUpdateQueue_->size() << std::endl;
         for (auto it = keyFrameUpdateQueue_->begin(); it != keyFrameUpdateQueue_->end();)
         {
             // Check if the long unsigned int value is equal to 100

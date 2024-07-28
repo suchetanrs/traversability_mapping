@@ -12,6 +12,9 @@ cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS=-std=c++14
 make -j2
 sudo make install
 
+source /opt/ros/$ROS_DISTRO/setup.bash
+sudo apt-get install -y ros-$ROS_DISTRO-grid-map-ros
+sudo apt-get install -y ros-$ROS_DISTRO-grid-map-rviz-plugin
 cd ../../..
 
 # Common

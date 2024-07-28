@@ -79,13 +79,32 @@ namespace traversability_mapping
     void KeyFrame::setPose(const Eigen::Affine3f &pose)
     {
         std::lock_guard<std::mutex> lock(poseMutex_);
+        bool newPose = false;
         if (!poseTraversabilityCoord_)
+        {
             poseTraversabilityCoord_ = std::make_unique<Eigen::Affine3f>(pose);
+            newPose = true;
+        }
         else
-            *poseTraversabilityCoord_ = pose;
-        poseUpdateQueueMutex_.lock();
-        poseUpdates_.push_back(pose);
-        poseUpdateQueueMutex_.unlock();
+        {
+            // Measure if the pose has significantly changed wrt the the thresholds.
+            Eigen::Vector3f eulerAnglesDiff = poseTraversabilityCoord_->rotation().eulerAngles(0, 1, 2) - pose.rotation().eulerAngles(0, 1, 2);
+            Eigen::Vector3f translationDiff = poseTraversabilityCoord_->translation() - pose.translation();
+            std::cout << "Max angle:" << eulerAnglesDiff.maxCoeff() << std::endl;
+            std::cout << "Max adist:" << translationDiff.maxCoeff() << std::endl;
+            if (eulerAnglesDiff.maxCoeff() > kfParams_.rotation_change_threshold_ ||
+                translationDiff.maxCoeff() > kfParams_.translation_change_threshold_)
+            {
+                *poseTraversabilityCoord_ = pose;
+                newPose = true;
+            }
+        }
+        if (newPose)
+        {
+            poseUpdateQueueMutex_.lock();
+            poseUpdates_.push_back(pose);
+            poseUpdateQueueMutex_.unlock();
+        }
     }
 
     void KeyFrame::setSLAMPose(const Sophus::SE3f &pose)
@@ -199,6 +218,7 @@ namespace traversability_mapping
         auto Tmb_ = poseUpdates_[poseUpdates_.size() - 1];
         poseUpdates_.clear();
         poseUpdateQueueMutex_.unlock();
+
         auto start_time = std::chrono::high_resolution_clock::now();
         // std::cout << "Recompute cache for KF with ID: " << kfID_ << std::endl;
         // Transform the pointCloudLidar_ to map frame.

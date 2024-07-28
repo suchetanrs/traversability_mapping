@@ -26,6 +26,8 @@ namespace traversability_mapping
         double ground_clearance_;
         double max_slope_;
         double robot_height_;
+        double translation_change_threshold_;
+        double rotation_change_threshold_;
     };
 
     class KeyFrame
