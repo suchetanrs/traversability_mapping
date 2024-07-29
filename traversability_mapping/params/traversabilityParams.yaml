@@ -3,7 +3,7 @@ SLAM_System: "ORB3"
 
 half_size_local_map: 17.0
 
-resolution_local_map: 0.20
+resolution_local_map: 0.10
 half_size_traversability: 5.5
 security_distance: 0.6
 ground_clearance: 0.2
