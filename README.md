@@ -6,11 +6,20 @@ This repository contains the packages responsible for performing global traversa
 |-------------------------|-------------------------|
 | Traversability Map generated with the 3D PointCloud and SLAM | Gazebo world of the map|
 
-## Cloning the repository
+## Running the library with ORB-SLAM3 and a Gazebo simulation.
+
+Setup the Gazebo simulation from this repository [Gazebo sim](https://github.com/suchetanrs/scout-husky-gazebo-ros2)
+
+**Important note: Before setting up the below repository. Make sure you checkout on the ```traversability_integration``` branch. This will setup the wrapper along with the traversability mapping during the image build.**
+
+Setup the ORB-SLAM3 Wrapper and the traversability system from this repository [ORB-SLAM3] (https://github.com/suchetanrs/ORB-SLAM3-ROS2-Docker)
+
+## Running the library with your own SLAM package.
+### Cloning the repository
 
 ```git clone https://github.com/suchetanrs/traversability_mapping```
 
-## Building the library.
+### Building the library.
 
 Run the following to execute a shell script that installs all the dependencies and build the library.
 ```bash
@@ -18,13 +27,13 @@ cd <cloned repository>
 ./build.sh
 ```
 
-## Adjusting the parameters
+### Adjusting the parameters
 The parameter file for the library is in ```traversability_mapping/params```
 
 In this, you need to provide the transform between the lidar frame and camera (SLAM) frame.
 **NOTE: In case you do not intend to provide a LiDAR pointcloud and wish to send your own pointcloud in camera frame, set this transform to 0**
 
-## CMakeLists
+### CMakeLists
 You can include this library in the ```CMakeLists.txt``` of your SLAM by doing the following.
 Here we assume your SLAM system is named as ```${PROJECT_NAME}```. Change this as you desire.
 
@@ -47,8 +56,8 @@ if(traversability_mapping_FOUND)
 endif(traversability_mapping_FOUND)
 ```
 
-## Using the Traversability Mapping Library
-### Include headers
+### Using the Traversability Mapping Library
+#### Include headers
 -----------------------------
 ```c++
 #ifdef WITH_TRAVERSABILITY_MAP
@@ -56,7 +65,7 @@ endif(traversability_mapping_FOUND)
 #endif
 ```
 
-### Create an instance (You can also use the smart pointers in C++)
+#### Create an instance (You can also use the smart pointers in C++)
 -----------------------------
 **NOTE: THERE SHOULD BE ONLY ONE INSTANCE OF THIS CLASS CREATED**
 
@@ -72,7 +81,7 @@ traversability_mapping::System* pTraversability_;
 pTraversability_ = new traversability_mapping::System();
 ```
 
-### Creating a new map for traversability mapping.
+#### Creating a new map for traversability mapping.
 -----------------------------
 **NOTE: Only one map needs to be created for a single traversability instance. You can create multiple maps in case the SLAM handles loss of tracking by creating a new map.**
 
@@ -81,7 +90,7 @@ long unsigned int mapid = 0;
 pTraversability_->addNewLocalMap(mapid);
 ```
 
-### Adding PointClouds to the Buffer.
+#### Adding PointClouds to the Buffer.
 -----------------------------
 The library provides a buffer to store the 3D pointclouds. In case you initialize a KeyFrame without the 3D Pointcloud, it handles it by assigning the Pointcloud with the closest timestamp to the keyframe.
 It is better to do this in the PointCloud callback.
@@ -93,7 +102,7 @@ It is better to do this in the PointCloud callback.
 pTraversability_->pushToBuffer(pcl); 
 ```
 
-### Adding a new KeyFrame.
+#### Adding a new KeyFrame.
 -----------------------------
 Once a map is created, you can add keyframes to the map to generate traversability. This is done by giving a keyframe ID along with the timestamp and an already created map ID.
 
@@ -110,7 +119,7 @@ In case you also want to assign a pointcloud directly to the keyframe instead of
 pTraversability_->addNewKeyFrame(timestamp, kFID, mapid, pointCloud);
 ```
 
-### Updating the pose of the KeyFrame.
+#### Updating the pose of the KeyFrame.
 -----------------------------
 The poses can be passed either as ```Eigen::Affine3d``` or ```Sophus::SE3f```.
 
@@ -122,8 +131,8 @@ pTraversability_->updateKeyFrame(kFID, pose);
 These poses can be updated continously during optimization and loop closing.
 
 
-## Visualization
-### Visualizing the Occupancy Grid
+### Visualization
+#### Visualizing the Occupancy Grid
 -----------------------------
 You can do this after every keyframe update step.
 
@@ -136,7 +145,7 @@ if(pTraversability_->getLocalMap() != nullptr)
 }
 ```
 
-### Visualizing the full GridMap.
+#### Visualizing the full GridMap.
 -----------------------------
 You can do this after every keyframe update step.
 
