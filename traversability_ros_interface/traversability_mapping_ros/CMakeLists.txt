@@ -60,9 +60,14 @@ add_executable(local_traversability src/local_traversability.cpp)
 ament_target_dependencies(local_traversability ${dependencies})
 target_link_libraries(local_traversability ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem type_conversion)
 
+# Add executable
+add_executable(threshold_occupancy src/threshold_occupancy.cpp)
+ament_target_dependencies(threshold_occupancy ${dependencies})
+target_link_libraries(threshold_occupancy ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem type_conversion)
+
 # Install executable
 install(TARGETS
-    traversability_node multi_map_merge local_traversability
+    traversability_node multi_map_merge local_traversability threshold_occupancy
     DESTINATION lib/${PROJECT_NAME}
 )
 

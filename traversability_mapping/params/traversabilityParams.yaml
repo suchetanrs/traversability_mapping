@@ -1,9 +1,9 @@
 # Choose from ORB3, ISAE
-SLAM_System: "ORB3"
+SLAM_System: "ISAE"
 
-half_size_local_map: 17.0
+half_size_local_map: 180.0
 
-resolution_local_map: 0.10
+resolution_local_map: 0.25
 half_size_traversability: 5.5
 security_distance: 0.6
 ground_clearance: 0.2
@@ -12,17 +12,20 @@ robot_height: 1.5
 rotation_change_threshold: 0.30
 translation_change_threshold: 0.25
 
+is_kf_optimization_enabled: false
+use_pointcloud_buffer: false
+
 # SLAM Frame normally is the camera frame.
-T_SLAMFrameToLidarFrame:
-  quaternion:
-    x: 0.0
-    y: 0.381
-    z: 0.0
-    w: 0.9246
-  translation:
-    x: 0.6
-    y: 0.0
-    z: 0.8
+# T_SLAMFrameToLidarFrame:
+#   quaternion:
+#     x: 0.0
+#     y: 0.381
+#     z: 0.0
+#     w: 0.9246
+#   translation:
+#     x: 0.6
+#     y: 0.0
+#     z: 0.8
 
 # T_SLAMFrameToLidarFrame:
 #   quaternion:
@@ -46,3 +49,14 @@ T_SLAMFrameToLidarFrame:
 #     x: 0.06685475
 #     y: 0.07019467
 #     z: 0.01072864
+
+T_SLAMFrameToLidarFrame:
+  quaternion:
+    x: 0.0
+    y: 0.2474
+    z: 0.0
+    w: 0.9689
+  translation:
+    x: 0.0
+    y: 0.0
+    z: 0.6

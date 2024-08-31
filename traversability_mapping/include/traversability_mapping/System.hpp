@@ -14,19 +14,19 @@ namespace traversability_mapping
     public:
         System();
 
-        void addNewKeyFrame(const double timestamp,
-                            long unsigned int kfID,
-                            long unsigned int mapID);
+        void addNewKeyFrameTsDouble(const double timestamp,
+                                    long unsigned int kfID,
+                                    long unsigned int mapID);
 
-        void addNewKeyFrame(const unsigned long long timestamp,
-                            int kfID,
-                            long unsigned int mapID);
+        void addNewKeyFrameTsULong(const unsigned long long timestamp,
+                                   long unsigned int kfID,
+                                   long unsigned int mapID);
 
         // Use this function if you dont want the buffer. Push own custom pointcloud msg for the KF.
-        void addNewKeyFrame(const unsigned long long timestamp,
-                            int kfID,
-                            long unsigned int mapID,
-                            sensor_msgs::msg::PointCloud2 sensorPointCloud);
+        void addNewKeyFrameWithPCL(const unsigned long long timestamp,
+                                   int kfID,
+                                   long unsigned int mapID,
+                                   sensor_msgs::msg::PointCloud2 sensorPointCloud);
 
         void updateKeyFrame(long unsigned int kfID,
                             Sophus::SE3f &poseSLAM);
@@ -47,10 +47,10 @@ namespace traversability_mapping
                          long unsigned int mapID);
 
     private:
-        void addNewKeyFrame(const double timestamp,
-                            long unsigned int kfID,
-                            long unsigned int mapID,
-                            sensor_msgs::msg::PointCloud2 &sensorPointCloud);
+        void addNewKeyFrameToMap(const double timestamp,
+                                 long unsigned int kfID,
+                                 long unsigned int mapID,
+                                 sensor_msgs::msg::PointCloud2 &sensorPointCloud);
 
         void setCurrentMap(long unsigned int mapID);
 

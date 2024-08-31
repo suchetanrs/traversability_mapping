@@ -232,6 +232,11 @@ namespace traversability_mapping
         clearStrayValuesInGrid();
         // recompute values and mark on map.
         computeLocalTraversability(*pointCloudMap_);
+        if(!kfParams_.is_kf_optimization_enabled_)
+        {
+            pointCloudMap_.reset();
+            pointCloudLidar_.data.clear();
+        }
     }
 
     void KeyFrame::updateGridAfterMapChange()

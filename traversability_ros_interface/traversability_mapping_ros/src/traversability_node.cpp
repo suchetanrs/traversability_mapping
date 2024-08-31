@@ -37,13 +37,14 @@ public:
 
         keyFrameUpdatesSubscriber_ = this->create_subscription<traversability_msgs::msg::KeyFrameUpdates>(
             updates_topic_name_, 10, std::bind(&TraversabilityNode::keyFrameUpdatesCallback, this, std::placeholders::_1));
-
-        lidarPointCloudSubscriber_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-            pointcloud_topic_name_, 10, std::bind(&TraversabilityNode::pointCloudCallback, this, std::placeholders::_1));
+        
+        if (use_lidar_pointcloud_)
+            lidarPointCloudSubscriber_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
+                pointcloud_topic_name_, 10, std::bind(&TraversabilityNode::pointCloudCallback, this, std::placeholders::_1));
 
         publishTimer_ = this->create_wall_timer(std::chrono::milliseconds(100), std::bind(&TraversabilityNode::publishTraversabilityData, this));
 
-        occupancy_grid_publisher_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("local_traversability_map", 10);
+        occupancy_grid_publisher_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("global_traversability_map", 10);
         traversabilityPub_ = this->create_publisher<grid_map_msgs::msg::GridMap>("RTQuadtree_struct", rclcpp::QoS(1).transient_local());
         pclPublisher_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("kf_pointcloud", 10);
         posePublisher_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("kf_pose", 10);
@@ -63,17 +64,17 @@ private:
             // Assuming keyframe data structure contains necessary information for mapping
             // Add the keyframe to the traversability map using pTraversability_
             if (use_lidar_pointcloud_)
-                traversabilitySystem_->addNewKeyFrame(keyframe.kf_timestamp_in_nanosec, keyframe.kf_id, keyframe.map_id);
+                traversabilitySystem_->addNewKeyFrameTsULong(keyframe.kf_timestamp_in_nanosec, keyframe.kf_id, keyframe.map_id);
             else
-                traversabilitySystem_->addNewKeyFrame(keyframe.kf_timestamp_in_nanosec, keyframe.kf_id, keyframe.map_id, keyframe.kf_pointcloud);
+                traversabilitySystem_->addNewKeyFrameWithPCL(keyframe.kf_timestamp_in_nanosec, keyframe.kf_id, keyframe.map_id, keyframe.kf_pointcloud);
             Eigen::Affine3d keyFramePoseEigen;
             tf2::fromMsg(keyframe.kf_pose, keyFramePoseEigen);
             traversabilitySystem_->updateKeyFrame(keyframe.kf_id, keyFramePoseEigen);
 
-            pclPublisher_->publish(keyframe.kf_pointcloud);
+            // pclPublisher_->publish(keyframe.kf_pointcloud);
 
             geometry_msgs::msg::PoseStamped kf_pose_stamped;
-            kf_pose_stamped.header.frame_id = "world";
+            kf_pose_stamped.header.frame_id = "map";
             kf_pose_stamped.pose = keyframe.kf_pose;
             posePublisher_->publish(kf_pose_stamped);
         }
@@ -105,23 +106,12 @@ private:
         auto localMap = traversabilitySystem_->getLocalMap();
         if (localMap != nullptr)
         {
-            auto keyFramesMap_ = traversabilitySystem_->getLocalMap()->getKeyFramesMap();
-            for (auto &pair : keyFramesMap_)
+            auto trav_done = traversabilitySystem_->getLocalMap()->getGridMap();
+            auto gridmap_done = traversabilitySystem_->getLocalMap()->getOccupancyMap();
+            if (trav_done)
             {
-                auto keyFramePtr = pair.second;
-
-                // Check if the pointer is valid before calling recomputeCache
-                if (keyFramePtr)
-                {
-                    auto kfPCL = keyFramePtr->getPointCloud();
-                    auto trav_done = traversabilitySystem_->getLocalMap()->getGridMap();
-                    auto gridmap_done = traversabilitySystem_->getLocalMap()->getOccupancyMap();
-                    if (trav_done)
-                    {
-                        traversabilitymap = trav_done;
-                        gridmap = gridmap_done;
-                    }
-                }
+                traversabilitymap = trav_done;
+                gridmap = gridmap_done;
             }
             if (traversabilitymap && gridmap)
             {

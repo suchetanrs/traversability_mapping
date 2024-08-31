@@ -8,16 +8,19 @@ namespace traversability_mapping
     System::System()
     {
         std::cout << "Called traversability system constructor" << std::endl;
-        pointCloudBuffer_ = std::make_shared<PointCloudBuffer>();
+        YAML::Node loaded_node = YAML::LoadFile("/usr/local/params/traversabilityParams.yaml");
+        if (loaded_node["use_pointcloud_buffer"].as<bool>())
+            pointCloudBuffer_ = std::make_shared<PointCloudBuffer>();
         keyFrameUpdateQueue_ = std::make_shared<UpdateQueue>();
     }
 
-    void System::addNewKeyFrame(const double timestamp,
-                                long unsigned int kfID,
-                                long unsigned int mapID,
-                                sensor_msgs::msg::PointCloud2 &sensorPointCloud)
+    void System::addNewKeyFrameToMap(const double timestamp,
+                                     long unsigned int kfID,
+                                     long unsigned int mapID,
+                                     sensor_msgs::msg::PointCloud2 &sensorPointCloud)
     {
-        // std::cout << "traversability_mapping::System::addNewKeyFrame with id: " << kfID << " and ts: " << timestamp << std::endl;
+        std::cout << "addNewKeyFrameToMap" << std::endl;
+        // std::cout << "traversability_mapping::System::addNewKeyFrameToMap with id: " << kfID << " and ts: " << timestamp << std::endl;
         // Add the keyframe to the local map
         if (localMapsSet_.find(mapID) != localMapsSet_.end())
         {
@@ -41,17 +44,21 @@ namespace traversability_mapping
         // std::cout << "Added new KeyFrame with ID: " << kfID << std::endl;
     }
 
-    void System::addNewKeyFrame(const double timestamp,
-                                long unsigned int kfID,
-                                long unsigned int mapID)
+    void System::addNewKeyFrameTsDouble(const double timestamp,
+                                        long unsigned int kfID,
+                                        long unsigned int mapID)
     {
+        std::cout << "addNewKeyFrame2" << std::endl;
         sensor_msgs::msg::PointCloud2 sensorPointCloud = pointCloudBuffer_->getClosestPointCloud(timestamp);
+        std::cout << "Removing pcl before " << timestamp - 20.0 << std::endl;
+        pointCloudBuffer_->deletePointsBefore(timestamp - 20.0);
         if (sensorPointCloud.data.size() == 0)
             return;
         // std::cout << "Got closest pointcloud for: " << kfID << std::endl;
         auto pcl_sec = sensorPointCloud.header.stamp.sec + (sensorPointCloud.header.stamp.nanosec * pow(10, -9));
-        // std::cout << "Difference in closest pcl ts is: " << timestamp - pcl_sec << std::endl;
-        addNewKeyFrame(timestamp, kfID, mapID, sensorPointCloud);
+        std::cout << "pcl ts is: " << pcl_sec << std::endl;
+        std::cout << "Difference in closest pcl ts is: " << timestamp - pcl_sec << std::endl;
+        addNewKeyFrameToMap(timestamp, kfID, mapID, sensorPointCloud);
 
         /**
         //test
@@ -62,13 +69,14 @@ namespace traversability_mapping
         */
     }
 
-    void System::addNewKeyFrame(const unsigned long long timestamp,
-                                int kfID,
-                                long unsigned int mapID)
+    void System::addNewKeyFrameTsULong(const unsigned long long timestamp,
+                                       long unsigned int kfID,
+                                       long unsigned int mapID)
     {
+        std::cout << "addNewKeyFrame3" << std::endl;
         const unsigned long long timestampSecond = timestamp / 1e9;
         const unsigned long long timestampNanoSec = timestamp % (unsigned long long)1e9;
-        double timestampDouble = timestampSecond * 1e9 + timestampNanoSec;
+        double timestampDouble = timestampSecond + (timestampNanoSec * 1e-9);
         if (kfID < 0)
         {
             std::string errorMsg = "The given KF ID was negative. Please make sure the keyFrame IDs are positive. KF ID: " + std::to_string(kfID);
@@ -77,29 +85,35 @@ namespace traversability_mapping
         long unsigned int kfIDlong = static_cast<long unsigned int>(kfID);
 
         sensor_msgs::msg::PointCloud2 sensorPointCloud = pointCloudBuffer_->getClosestPointCloud(timestampDouble);
+        std::cout << "Removing pcl before " << timestampDouble - 20.0 << std::endl;
+        pointCloudBuffer_->deletePointsBefore(timestampDouble - 20.0);
         if (sensorPointCloud.data.size() == 0)
             return;
+        auto pcl_sec = sensorPointCloud.header.stamp.sec + (sensorPointCloud.header.stamp.nanosec * 1e-9);
+        std::cout << "pcl ts is: " << pcl_sec << std::endl;
+        std::cout << "Difference in closest pcl ts is: " << timestampDouble - pcl_sec << std::endl;
         // std::cout << "Got closest pointcloud for: " << kfID << std::endl;
         // auto pcl_sec = sensorPointCloud.header.stamp.sec + (sensorPointCloud.header.stamp.nanosec * pow(10, -9));
         // std::cout << "Difference in closest pcl ts is: " << timestamp - pcl_sec << std::endl;
-        addNewKeyFrame(timestampDouble, kfIDlong, mapID, sensorPointCloud);
+        addNewKeyFrameToMap(timestampDouble, kfIDlong, mapID, sensorPointCloud);
     }
 
-    void System::addNewKeyFrame(const unsigned long long timestamp,
-                                int kfID,
-                                long unsigned int mapID,
-                                sensor_msgs::msg::PointCloud2 sensorPointCloud)
+    void System::addNewKeyFrameWithPCL(const unsigned long long timestamp,
+                                       int kfID,
+                                       long unsigned int mapID,
+                                       sensor_msgs::msg::PointCloud2 sensorPointCloud)
     {
+        std::cout << "addNewKeyFrame4" << std::endl;
         const unsigned long long timestampSecond = timestamp / 1e9;
         const unsigned long long timestampNanoSec = timestamp % (unsigned long long)1e9;
-        double timestampDouble = timestampSecond * 1e9 + timestampNanoSec;
+        double timestampDouble = timestampSecond + (timestampNanoSec * 1e-9);
         if (kfID < 0)
         {
             std::string errorMsg = "The given KF ID was negative. Please make sure the keyFrame IDs are positive. KF ID: " + std::to_string(kfID);
             throw std::runtime_error(errorMsg);
         }
         long unsigned int kfIDlong = static_cast<long unsigned int>(kfID);
-        addNewKeyFrame(timestampDouble, kfIDlong, mapID, sensorPointCloud);
+        addNewKeyFrameToMap(timestampDouble, kfIDlong, mapID, sensorPointCloud);
     }
 
     void System::updateKeyFrame(long unsigned int kfID,

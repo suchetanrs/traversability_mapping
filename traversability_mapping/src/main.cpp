@@ -7,7 +7,7 @@ public:
         const double ts1 = 100.0;
         long unsigned int mnId = 0;
         systemPtr_->addNewLocalMap(1);
-        systemPtr_->addNewKeyFrame(ts1, mnId, 1);
+        systemPtr_->addNewKeyFrameTsDouble(ts1, mnId, 1);
         // systemPtr_->addNewKeyFrame(323.45, 2);
         // systemPtr_->addNewKeyFrame(523.45, 3);
     }

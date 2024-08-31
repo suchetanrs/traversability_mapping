@@ -23,6 +23,7 @@ namespace traversability_mapping
         loadedKFParams_.robot_height_ = loaded_node["robot_height"].as<double>();
         loadedKFParams_.translation_change_threshold_ = loaded_node["translation_change_threshold"].as<double>();
         loadedKFParams_.rotation_change_threshold_ = loaded_node["rotation_change_threshold"].as<double>();
+        loadedKFParams_.is_kf_optimization_enabled_ = loaded_node["is_kf_optimization_enabled"].as<bool>();
 
         // Other params
         Eigen::Translation3f translation(
@@ -42,6 +43,10 @@ namespace traversability_mapping
         grid_map::GridMap gridMap_({"hazard", "step_haz", "roughness_haz", "slope_haz", "border_haz", "elevation", "kfid"});
         gridMap_.setFrameId("map");
         gridMap_.setGeometry(grid_map::Length(2. * half_size_gridmap_, 2. * half_size_gridmap_), resolution_);
+        Eigen::Vector2d slamPosition;
+        slamPosition.x() = 120.0;
+        slamPosition.y() = 70.0;
+        gridMap_.setPosition(slamPosition);
         pGridMap_ = std::make_shared<grid_map::GridMap>(gridMap_);
     }
 

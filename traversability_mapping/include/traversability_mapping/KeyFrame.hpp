@@ -28,6 +28,7 @@ namespace traversability_mapping
         double robot_height_;
         double translation_change_threshold_;
         double rotation_change_threshold_;
+        bool is_kf_optimization_enabled_;
     };
 
     class KeyFrame

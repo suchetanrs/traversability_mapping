@@ -19,7 +19,7 @@ public:
         // Subscribe to the PointCloud2 topic
         rclcpp::QoS qos_profile = rclcpp::SensorDataQoS().best_effort().durability_volatile();
         pcl_subscriber_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-            "/ouster/points", qos_profile, std::bind(&LocalTraversabilityNode::pointCloudCallback, this, std::placeholders::_1));
+            "/lidar_front_points", qos_profile, std::bind(&LocalTraversabilityNode::pointCloudCallback, this, std::placeholders::_1));
 
         // Load YAML file and retrieve parameters
         YAML::Node loaded_node = YAML::LoadFile("/usr/local/params/traversabilityParams.yaml");
@@ -48,7 +48,7 @@ public:
         Tbv_ = translation * quaternion;
 
         grid_map::GridMap gridMap_({"hazard", "step_haz", "roughness_haz", "slope_haz", "border_haz", "elevation", "kfid"});
-        gridMap_.setFrameId("os_sensor");
+        gridMap_.setFrameId("map");
         gridMap_.setGeometry(grid_map::Length(2. * half_size_gridmap_, 2. * half_size_gridmap_), resolution_);
         pGridMap_ = std::make_shared<grid_map::GridMap>(gridMap_);
         RCLCPP_INFO_STREAM(this->get_logger(), "Constructor ended.");
@@ -81,7 +81,7 @@ private:
         nav_msgs::msg::OccupancyGrid occupancyGrid_msg;
         traversability_mapping::gridMapToOccupancyGrid(*pGridMap_, "hazard", 0., 1., occupancyGrid_msg);
         gridMapOccupancy_ = std::make_shared<nav_msgs::msg::OccupancyGrid>(occupancyGrid_msg);
-        gridMapOccupancy_->header.frame_id = "os_sensor";
+        gridMapOccupancy_->header.frame_id = "map";
         gridMapOccupancy_->header.stamp = msg->header.stamp;
         occupancy_grid_publisher_->publish(*gridMapOccupancy_);
 
