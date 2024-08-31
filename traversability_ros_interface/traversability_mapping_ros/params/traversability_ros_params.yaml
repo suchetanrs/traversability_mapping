@@ -3,5 +3,13 @@
     ros__parameters:
       additions_topic_name: "traversability_keyframe_additions"
       updates_topic_name: "traversability_keyframe_updates"
-      pointcloud_topic_name: "/lidar_front_points"
+      pointcloud_topic_name: "lidar/points"
       use_lidar_pointcloud: false
+
+  local_traversability_node:
+    ros__parameters:
+      pointcloud_topic_name: "lidar/points"
+
+  traversability_threshold_node:
+    ros__parameters:
+      lethal_obstacle_threshold: 85 # between 0 to 100

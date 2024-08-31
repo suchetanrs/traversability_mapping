@@ -8,44 +8,24 @@ namespace traversability_mapping
           mapID_(mapID),
           keyFrameUpdateQueue_(keyFrameUpdateQueue)
     {
-        // Load YAML file and retrieve parameters
-        YAML::Node loaded_node = YAML::LoadFile("/usr/local/params/traversabilityParams.yaml");
-        
-        // Traversability Params
-        half_size_gridmap_ = loaded_node["half_size_local_map"].as<double>();
-        
-        loadedKFParams_.resolution_ = loaded_node["resolution_local_map"].as<double>();
-        resolution_ = loadedKFParams_.resolution_;
-        loadedKFParams_.half_size_traversability_ = loaded_node["half_size_traversability"].as<double>();
-        loadedKFParams_.security_distance_ = loaded_node["security_distance"].as<double>();
-        loadedKFParams_.ground_clearance_ = loaded_node["ground_clearance"].as<double>();
-        loadedKFParams_.max_slope_ = loaded_node["max_slope"].as<double>();
-        loadedKFParams_.robot_height_ = loaded_node["robot_height"].as<double>();
-        loadedKFParams_.translation_change_threshold_ = loaded_node["translation_change_threshold"].as<double>();
-        loadedKFParams_.rotation_change_threshold_ = loaded_node["rotation_change_threshold"].as<double>();
-        loadedKFParams_.is_kf_optimization_enabled_ = loaded_node["is_kf_optimization_enabled"].as<bool>();
-
-        // Other params
         Eigen::Translation3f translation(
-            loaded_node["T_SLAMFrameToLidarFrame"]["translation"]["x"].as<float>(),
-            loaded_node["T_SLAMFrameToLidarFrame"]["translation"]["y"].as<float>(),
-            loaded_node["T_SLAMFrameToLidarFrame"]["translation"]["z"].as<float>());
+            parameterInstance.getValue<float>("T_SLAMFrameToLidarFrame/translation/x"),
+            parameterInstance.getValue<float>("T_SLAMFrameToLidarFrame/translation/y"),
+            parameterInstance.getValue<float>("T_SLAMFrameToLidarFrame/translation/z"));
         Eigen::Quaternion<float> quaternion(
-            loaded_node["T_SLAMFrameToLidarFrame"]["quaternion"]["w"].as<float>(),
-            loaded_node["T_SLAMFrameToLidarFrame"]["quaternion"]["x"].as<float>(),
-            loaded_node["T_SLAMFrameToLidarFrame"]["quaternion"]["y"].as<float>(),
-            loaded_node["T_SLAMFrameToLidarFrame"]["quaternion"]["z"].as<float>());
+            parameterInstance.getValue<float>("T_SLAMFrameToLidarFrame/quaternion/w"),
+            parameterInstance.getValue<float>("T_SLAMFrameToLidarFrame/quaternion/x"),
+            parameterInstance.getValue<float>("T_SLAMFrameToLidarFrame/quaternion/y"),
+            parameterInstance.getValue<float>("T_SLAMFrameToLidarFrame/quaternion/z"));
         Tbv_ = translation * quaternion;
-
-        SLAMSystem_ = loaded_node["SLAM_System"].as<std::string>();
 
         typeConversion_ = std::make_shared<TraversabilityTypeConversions>();
         grid_map::GridMap gridMap_({"hazard", "step_haz", "roughness_haz", "slope_haz", "border_haz", "elevation", "kfid"});
         gridMap_.setFrameId("map");
-        gridMap_.setGeometry(grid_map::Length(2. * half_size_gridmap_, 2. * half_size_gridmap_), resolution_);
+        gridMap_.setGeometry(grid_map::Length(2. * parameterInstance.getValue<double>("half_size_local_map"), 2. * parameterInstance.getValue<double>("half_size_local_map")), parameterInstance.getValue<double>("resolution_local_map"));
         Eigen::Vector2d slamPosition;
-        slamPosition.x() = 120.0;
-        slamPosition.y() = 70.0;
+        slamPosition.x() = parameterInstance.getValue<double>("grid_center_x");
+        slamPosition.y() = parameterInstance.getValue<double>("grid_center_y");
         gridMap_.setPosition(slamPosition);
         pGridMap_ = std::make_shared<grid_map::GridMap>(gridMap_);
     }
@@ -105,7 +85,7 @@ namespace traversability_mapping
                                                        sensor_msgs::msg::PointCloud2 &pointCloud,
                                                        long unsigned int mapID)
     {
-        std::shared_ptr<KeyFrame> keyFrame = std::make_shared<KeyFrame>(timestamp, kfID, pointCloud, pGridMap_, mapID, Tbv_, loadedKFParams_);
+        std::shared_ptr<KeyFrame> keyFrame = std::make_shared<KeyFrame>(timestamp, kfID, pointCloud, pGridMap_, mapID, Tbv_);
         std::lock_guard<std::mutex> lock(keyFramesMapMutex);
         keyFramesMap_[kfID] = keyFrame;
         return keyFrame;
@@ -190,11 +170,11 @@ namespace traversability_mapping
 
                 std::cout << "NEW CONVERSION!" << std::endl;
 
-                if (SLAMSystem_ == "ORB3")
+                if (parameterInstance.getValue<std::string>("SLAM_System") == "ORB3")
                 {
                     keyFramesMap_[it->first]->setPose(typeConversion_->se3ToAffine<Eigen::Affine3f>(it->second, true));
                 }
-                else if (SLAMSystem_ == "ISAE")
+                else if (parameterInstance.getValue<std::string>("SLAM_System") == "ISAE")
                 {
                     keyFramesMap_[it->first]->setPose(typeConversion_->se3ToAffine<Eigen::Affine3f>(it->second, false));
                 }

@@ -13,6 +13,9 @@ public:
             "global_traversability_map", 10, std::bind(&TraversabilityThresholdNode::callback, this, std::placeholders::_1)
         );
 
+        this->declare_parameter("lethal_obstacle_threshold", rclcpp::ParameterValue(85));
+        this->get_parameter("lethal_obstacle_threshold", lethal_threshold_);
+
         // Publisher for the thresholded occupancy map
         publisher_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("traversability_thresholded", rclcpp::QoS(rclcpp::KeepLast(10)).transient_local());
     }
@@ -27,7 +30,7 @@ private:
         // Trinarize the occupancy grid
         for (auto& value : msg->data)
         {
-            if (value >= 85)
+            if (value >= lethal_threshold_)
             {
                 thresholded_msg->data.push_back(100);  // Lethal obstacle
             }
@@ -47,6 +50,7 @@ private:
 
     rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr subscription_;
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr publisher_;
+    int lethal_threshold_;
 };
 
 int main(int argc, char* argv[])

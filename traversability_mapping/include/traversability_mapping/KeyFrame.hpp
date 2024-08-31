@@ -15,22 +15,10 @@
 
 #include "traversability_mapping/TraversabilityGrid.hpp"
 #include "traversability_mapping/Helpers.hpp"
+#include "traversability_mapping/Parameters.hpp"
 
 namespace traversability_mapping
 {
-    struct KeyFrameParameters
-    {
-        double resolution_;
-        double half_size_traversability_;
-        double security_distance_;
-        double ground_clearance_;
-        double max_slope_;
-        double robot_height_;
-        double translation_change_threshold_;
-        double rotation_change_threshold_;
-        bool is_kf_optimization_enabled_;
-    };
-
     class KeyFrame
     {
     public:
@@ -39,13 +27,11 @@ namespace traversability_mapping
                  sensor_msgs::msg::PointCloud2 &pointCloud,
                  std::shared_ptr<grid_map::GridMap> gridMap,
                  long unsigned int mapID,
-                 Eigen::Affine3f Tbv,
-                 KeyFrameParameters kfParams);
+                 Eigen::Affine3f Tbv);
 
         KeyFrame(long unsigned int kfID,
                  std::shared_ptr<grid_map::GridMap> gridMap,
-                 Eigen::Affine3f Tbv,
-                 KeyFrameParameters kfParams);
+                 Eigen::Affine3f Tbv);
 
         // GETTERS
         const double &getTimestamp();
@@ -91,7 +77,6 @@ namespace traversability_mapping
         std::mutex gridMapMutex_;
         std::shared_ptr<grid_map::GridMap> pGridMap_;
         long unsigned int parentMapID_;
-        KeyFrameParameters kfParams_;
         std::vector<Eigen::Vector2d> markedCells_;
 
         std::mutex poseUpdateQueueMutex_;

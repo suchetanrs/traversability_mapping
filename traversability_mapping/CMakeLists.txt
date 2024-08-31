@@ -19,6 +19,7 @@ ADD_DEFINITIONS("-DWITH_TRAVERSABILITY_MAP2")
 
 # Create library target
 add_library(traversabilitySystem SHARED
+              src/Parameters.cpp
               src/Helpers.cpp
               src/TraversabilityGrid.cpp
               src/KeyFrame.cpp

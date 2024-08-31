@@ -22,12 +22,11 @@ def generate_launch_description():
 
     name_argument = DeclareLaunchArgument(
         "robot_ns",
-        default_value="ns12322",
+        default_value="robot_0",
         description="Robot namespace",
     )
 
     namespace = LaunchConfiguration("robot_ns")
-    use_gt_pose = LaunchConfiguration('use_gt_pose')
     
 #---------------------------------------------
 
@@ -39,32 +38,14 @@ def generate_launch_description():
             default_value=os.path.join(traversability_mapping_ros_pkg, 'params', 'traversability_ros_params.yaml'),
             description='Full path to the ROS2 parameters file to use for all launched nodes')
 
-        declare_use_gt_pose_cmd = DeclareLaunchArgument(
-            'use_gt_pose', default_value='True',
-            description='Use ground truth poses if True')
-
         traversability_mapping_ros = Node(
             package='traversability_mapping_ros',
-            executable='traversability_node',
+            executable='local_traversability',
             namespace=namespace,
             output='screen',
             parameters=[params_file])
         
-        threshold_traversability_ros = Node(
-            package='traversability_mapping_ros',
-            executable='threshold_occupancy',
-            namespace=namespace,
-            output='screen',
-            parameters=[params_file])
-
-        slam_keyframe_pcl_simulator = Node(
-            condition=IfCondition(use_gt_pose),
-            package='ground_truth_kfs',
-            executable='slam_keyframe_pcl_simulator',
-            namespace=namespace,
-            output='screen')
-        
-        return [declare_params_file_cmd, declare_use_gt_pose_cmd, traversability_mapping_ros, threshold_traversability_ros, slam_keyframe_pcl_simulator]
+        return [declare_params_file_cmd, traversability_mapping_ros]
 
     opaque_function = OpaqueFunction(function=all_nodes_launch)
 #---------------------------------------------

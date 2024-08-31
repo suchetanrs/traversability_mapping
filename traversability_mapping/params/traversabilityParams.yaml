@@ -1,18 +1,20 @@
 # Choose from ORB3, ISAE
 SLAM_System: "ISAE"
 
-half_size_local_map: 180.0
+half_size_local_map: 180.0 # size of the entire local map. The individual maps will be stitched in this space.
+grid_center_x: 120.0
+grid_center_y: 70.0
 
 resolution_local_map: 0.25
-half_size_traversability: 5.5
+half_size_traversability: 5.5 # size of the map around the robot to consider for computing on the go traversability.
 security_distance: 0.6
 ground_clearance: 0.2
 max_slope: 0.8
 robot_height: 1.5
-rotation_change_threshold: 0.30
 translation_change_threshold: 0.25
+rotation_change_threshold: 0.30
 
-is_kf_optimization_enabled: false
+is_kf_optimization_enabled: false # if this is set to true, the pointclouds are stored in memory. Large pointclouds can lead to fast memory exhaustion.
 use_pointcloud_buffer: false
 
 # SLAM Frame normally is the camera frame.

@@ -7,15 +7,13 @@ namespace traversability_mapping
                        sensor_msgs::msg::PointCloud2 &pointCloud,
                        std::shared_ptr<grid_map::GridMap> gridMap,
                        long unsigned int mapID,
-                       Eigen::Affine3f Tbv,
-                       KeyFrameParameters kfParams)
+                       Eigen::Affine3f Tbv)
         : timestamp_(timestamp),
           kfID_(kfID),
           pointCloudLidar_(pointCloud),
           pGridMap_(gridMap),
           parentMapID_(mapID),
-          Tbv_(Tbv),
-          kfParams_(kfParams)
+          Tbv_(Tbv)
     {
         // TODO: Make this a parameter
         // auto translation = Eigen::Translation3f(
@@ -32,12 +30,10 @@ namespace traversability_mapping
 
     KeyFrame::KeyFrame(long unsigned int kfID,
                        std::shared_ptr<grid_map::GridMap> gridMap,
-                       Eigen::Affine3f Tbv,
-                       KeyFrameParameters kfParams)
+                       Eigen::Affine3f Tbv)
         : kfID_(kfID),
           pGridMap_(gridMap),
-          Tbv_(Tbv),
-          kfParams_(kfParams)
+          Tbv_(Tbv)
     {
     }
 
@@ -92,8 +88,8 @@ namespace traversability_mapping
             Eigen::Vector3f translationDiff = poseTraversabilityCoord_->translation() - pose.translation();
             std::cout << "Max angle:" << eulerAnglesDiff.maxCoeff() << std::endl;
             std::cout << "Max adist:" << translationDiff.maxCoeff() << std::endl;
-            if (eulerAnglesDiff.maxCoeff() > kfParams_.rotation_change_threshold_ ||
-                translationDiff.maxCoeff() > kfParams_.translation_change_threshold_)
+            if (eulerAnglesDiff.maxCoeff() > parameterInstance.getValue<double>("rotation_change_threshold") ||
+                translationDiff.maxCoeff() > parameterInstance.getValue<double>("translation_change_threshold"))
             {
                 *poseTraversabilityCoord_ = pose;
                 newPose = true;
@@ -126,12 +122,12 @@ namespace traversability_mapping
     void KeyFrame::computeLocalTraversability(sensor_msgs::msg::PointCloud2 &kFpcl)
     {
         // TODO: Load from paramter file.
-        double resolution_ = kfParams_.resolution_;
-        double half_size_traversability_ = kfParams_.half_size_traversability_;
-        const double security_distance_ = kfParams_.security_distance_;
-        const double ground_clearance_ = kfParams_.ground_clearance_;
-        const double max_slope_ = kfParams_.max_slope_;
-        double robot_height_ = kfParams_.robot_height_;
+        double resolution_ = parameterInstance.getValue<double>("resolution_local_map");
+        double half_size_traversability_ = parameterInstance.getValue<double>("half_size_traversability");
+        const double security_distance_ = parameterInstance.getValue<double>("security_distance");
+        const double ground_clearance_ = parameterInstance.getValue<double>("ground_clearance");
+        const double max_slope_ = parameterInstance.getValue<double>("max_slope");
+        double robot_height_ = parameterInstance.getValue<double>("robot_height");
         Eigen::Vector2d slamPosition;
         slamPosition.x() = poseTraversabilityCoord_->translation().x();
         slamPosition.y() = poseTraversabilityCoord_->translation().y();
@@ -232,7 +228,7 @@ namespace traversability_mapping
         clearStrayValuesInGrid();
         // recompute values and mark on map.
         computeLocalTraversability(*pointCloudMap_);
-        if(!kfParams_.is_kf_optimization_enabled_)
+        if(!parameterInstance.getValue<bool>("is_kf_optimization_enabled"))
         {
             pointCloudMap_.reset();
             pointCloudLidar_.data.clear();

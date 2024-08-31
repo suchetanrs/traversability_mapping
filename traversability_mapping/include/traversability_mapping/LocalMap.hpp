@@ -4,10 +4,10 @@
 #include <map>
 #include <memory>
 #include <filesystem>
-#include <yaml-cpp/yaml.h>
 #include "traversability_mapping/KeyFrame.hpp"
 #include "traversability_mapping_common/type_conversion.hpp"
 #include "traversability_mapping/Helpers.hpp"
+#include "traversability_mapping/Parameters.hpp"
 
 using UpdateQueue = std::vector<std::pair<long unsigned int, Sophus::SE3f>>;
 
@@ -54,11 +54,6 @@ namespace traversability_mapping
         std::mutex &updateQueueMutex_;
         std::shared_ptr<TraversabilityTypeConversions> typeConversion_;
         std::shared_ptr<grid_map::GridMap> pGridMap_;
-        double half_size_gridmap_ = 17.0;
-        double resolution_ = 0.05;
-
-        // Traversability Params
-        KeyFrameParameters loadedKFParams_;
 
         // Map to store KeyFrame ids and corresponding KeyFrameData pointers
         std::unordered_map<long unsigned int, std::shared_ptr<KeyFrame>> keyFramesMap_;
@@ -68,7 +63,6 @@ namespace traversability_mapping
         bool activeMap_ = false;
 
         Eigen::Affine3f Tbv_;
-        std::string SLAMSystem_;
     };
 }
 
