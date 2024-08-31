@@ -6,9 +6,19 @@ This repository contains the packages responsible for performing global traversa
 |-------------------------|-------------------------|
 | Traversability Map generated with the 3D PointCloud and SLAM | Gazebo world of the map|
 
+## Running the library independent of SLAM and with Ground truth poses.
+
+Setup the Gazebo simulation from this repository [Gazebo sim](https://github.com/suchetanrs/gz-sim-environment)
+
+Set the ```use_gt_pose``` launch argument in ```multirobot_traversability.launch.py``` to ```true```.
+
+To launch the traversability mapping, run ```ros2 launch traversability_mapping_ros multirobot_traversability.launch.py```
+
+You can now visualize the gridmap and the occupancy map via RViz.
+
 ## Running the library with ORB-SLAM3 and a Gazebo simulation.
 
-Setup the Gazebo simulation from this repository [Gazebo sim](https://github.com/suchetanrs/scout-husky-gazebo-ros2)
+Setup the Gazebo simulation from this repository [Gazebo sim](https://github.com/suchetanrs/gz-sim-environment)
 
 **Important note: Before setting up the below repository. Make sure you checkout on the ```traversability_integration``` branch. This will setup the wrapper along with the traversability mapping during the image build.**
 

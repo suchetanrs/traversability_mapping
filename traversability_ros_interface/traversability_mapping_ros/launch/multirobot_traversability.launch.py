@@ -23,7 +23,7 @@ def generate_launch_description():
                 os.path.join(pkg_project_gazebo, "launch", "global_traversability_mapping.launch.py")
             ),
             launch_arguments={"robot_ns": f"robot_{i}/",
-                              "use_gt_pose": "true"}.items(),
+                              "use_gt_pose": "false"}.items(),
         )
         for i in range(0, 1)
     ]
