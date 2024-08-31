@@ -49,24 +49,24 @@ namespace traversability_mapping
                                         long unsigned int mapID)
     {
         std::cout << "addNewKeyFrame2" << std::endl;
+        if (kfID < 0)
+        {
+            std::string errorMsg = "The given KF ID was negative. Please make sure the keyFrame IDs are positive. KF ID: " + std::to_string(kfID);
+            throw std::runtime_error(errorMsg);
+        }
+        long unsigned int kfIDlong = static_cast<long unsigned int>(kfID);
         sensor_msgs::msg::PointCloud2 sensorPointCloud = pointCloudBuffer_->getClosestPointCloud(timestamp);
         std::cout << "Removing pcl before " << timestamp - 20.0 << std::endl;
         pointCloudBuffer_->deletePointsBefore(timestamp - 20.0);
         if (sensorPointCloud.data.size() == 0)
             return;
-        // std::cout << "Got closest pointcloud for: " << kfID << std::endl;
-        auto pcl_sec = sensorPointCloud.header.stamp.sec + (sensorPointCloud.header.stamp.nanosec * pow(10, -9));
+        auto pcl_sec = sensorPointCloud.header.stamp.sec + (sensorPointCloud.header.stamp.nanosec * 1e-9);
         std::cout << "pcl ts is: " << pcl_sec << std::endl;
         std::cout << "Difference in closest pcl ts is: " << timestamp - pcl_sec << std::endl;
-        addNewKeyFrameToMap(timestamp, kfID, mapID, sensorPointCloud);
-
-        /**
-        //test
-        std::cout << "Testing ADD" << std::endl;
-        unsigned long long sec = static_cast<unsigned long long>(std::floor(timestamp));
-        unsigned long long nanosec = static_cast<unsigned long long>((timestamp - sec) * pow(10, 9));
-        addNewKeyFrame(sec + nanosec, static_cast<int>(kfID), mapID);
-        */
+        // std::cout << "Got closest pointcloud for: " << kfID << std::endl;
+        // auto pcl_sec = sensorPointCloud.header.stamp.sec + (sensorPointCloud.header.stamp.nanosec * pow(10, -9));
+        // std::cout << "Difference in closest pcl ts is: " << timestamp - pcl_sec << std::endl;
+        addNewKeyFrameToMap(timestamp, kfIDlong, mapID, sensorPointCloud);
     }
 
     void System::addNewKeyFrameTsULong(const unsigned long long timestamp,

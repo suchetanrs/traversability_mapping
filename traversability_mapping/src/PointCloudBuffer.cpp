@@ -14,7 +14,7 @@ namespace traversability_mapping
     {
         auto pair = std::make_pair(timestamp, pointCloud);
         buffer_.push_back(pair);
-        std::cout << "The size of buffer is: " << buffer_.size() << std::endl;
+        // std::cout << "The size of buffer is: " << buffer_.size() << std::endl;
     }
 
     // Function to find the closest point cloud to the queried timestamp

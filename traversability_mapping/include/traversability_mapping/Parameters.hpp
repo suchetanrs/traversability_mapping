@@ -11,13 +11,13 @@
 #include <mutex>
 #include <random>
 #include <ctime>
-#include <any>
 
 #include <iomanip>
 #include <sstream>
 #include <ctime>
 #include <stdexcept>
 #include <yaml-cpp/yaml.h>
+#include <boost/any.hpp>
 
 class ParameterHandler
 {
@@ -38,9 +38,9 @@ class ParameterHandler
         if (parameter_map_.find(parameterKey) != parameter_map_.end())
         {
             // std::cout << "\e[0;106m" << "Got request for: " << parameterKey << "\e[m" << std::endl;
-            // std::cout << "\e[0;106m" << "Returning value " << std::any_cast<T>(parameter_map_[parameterKey]) << " for parameter " << parameterKey
+            // std::cout << "\e[0;106m" << "Returning value " << boost::any_cast<T>(parameter_map_[parameterKey]) << " for parameter " << parameterKey
             //           << "\e[m" << std::endl;
-            return std::any_cast<T>(parameter_map_[parameterKey]);
+            return boost::any_cast<T>(parameter_map_[parameterKey]);
         }
         else
         {
@@ -54,7 +54,7 @@ class ParameterHandler
     ParameterHandler& operator=(const ParameterHandler&) = delete;
     static std::unique_ptr<ParameterHandler> parameterHandlerPtr_;
     static std::mutex instanceMutex_;
-    std::unordered_map<std::string, std::any> parameter_map_;
+    std::unordered_map<std::string, boost::any> parameter_map_;
 };
 
 inline ParameterHandler& parameterInstance = ParameterHandler::getInstance();

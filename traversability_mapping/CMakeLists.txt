@@ -8,6 +8,7 @@ endif()
 
 find_package(Sophus REQUIRED)
 find_package(Eigen3 3.1.0 REQUIRED)
+find_package(Boost REQUIRED)
 # find_package(PCL)
 find_package(traversability_mapping_common REQUIRED)
 find_package(sensor_msgs REQUIRED)
@@ -34,6 +35,7 @@ target_include_directories(traversabilitySystem
         $<INSTALL_INTERFACE:include>
         ${Sophus_INCLUDE_DIRS}
         ${EIGEN3_INCLUDE_DIR}
+        ${Boost_INCLUDE_DIRS}
         # ${PCL_INCLUDE_DIRS}
         ${traversability_mapping_common_INCLUDE_DIRS}
         ${sensor_msgs_INCLUDE_DIRS}
@@ -46,6 +48,7 @@ target_include_directories(traversabilitySystem
 target_link_libraries(traversabilitySystem
     PRIVATE ${Sophus_LIBRARIES}
     PRIVATE ${EIGEN3_LIBS}
+    PRIVATE ${Boost_LIBRARIES}
     # PRIVATE ${PCL_LIBRARIES}
     # PRIVATE ${sensor_msgs_LIBRARIES}
     PRIVATE ${grid_map_core_LIBRARIES}
