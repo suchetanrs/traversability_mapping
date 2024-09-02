@@ -22,7 +22,7 @@ Setup the Gazebo simulation from this repository [Gazebo sim](https://github.com
 
 **Important note: Before setting up the below repository. Make sure you checkout on the ```traversability_integration``` branch. This will setup the wrapper along with the traversability mapping during the image build.**
 
-Setup the ORB-SLAM3 Wrapper and the traversability system from this repository [ORB-SLAM3] (https://github.com/suchetanrs/ORB-SLAM3-ROS2-Docker)
+Setup the ORB-SLAM3 Wrapper and the traversability system from this repository [ORB-SLAM3](https://github.com/suchetanrs/ORB-SLAM3-ROS2-Docker/tree/traversability_integration))
 
 ## Other information:
 
