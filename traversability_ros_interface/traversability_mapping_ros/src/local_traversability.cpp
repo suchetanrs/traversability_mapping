@@ -11,6 +11,12 @@
 #include <grid_map_ros/grid_map_ros.hpp>
 #include <grid_map_cv/grid_map_cv.hpp>
 
+#include <tf2/exceptions.h>
+#include <tf2_ros/transform_listener.h>
+#include <tf2_ros/buffer.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+#include <tf2/utils.h>
+
 class LocalTraversabilityNode : public rclcpp::Node
 {
 public:
@@ -19,10 +25,18 @@ public:
         RCLCPP_INFO_STREAM(this->get_logger(), "Constructor started.");
         // Subscribe to the PointCloud2 topic
         rclcpp::QoS qos_profile = rclcpp::SensorDataQoS().best_effort().durability_volatile();
-        
+
         this->declare_parameter("pointcloud_topic_name", rclcpp::ParameterValue("/ouster/points"));
         this->get_parameter("pointcloud_topic_name", pointcloud_topic_name_);
-        
+
+        this->declare_parameter("expected_frequency", rclcpp::ParameterValue(4.0));
+        this->get_parameter("expected_frequency", expected_frequency_);
+
+        callback_interval_ = 1.0 / expected_frequency_;
+
+        this->declare_parameter("publish_local_gridmap", rclcpp::ParameterValue(false));
+        this->get_parameter("publish_local_gridmap", publish_local_gridmap_);
+
         pcl_subscriber_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
             pointcloud_topic_name_, qos_profile, std::bind(&LocalTraversabilityNode::pointCloudCallback, this, std::placeholders::_1));
 
@@ -40,24 +54,43 @@ public:
 
         grid_map::GridMap gridMap_({"hazard", "step_haz", "roughness_haz", "slope_haz", "border_haz", "elevation", "kfid"});
         gridMap_.setFrameId("map");
-        gridMap_.setGeometry(grid_map::Length(2. * parameterInstance.getValue<double>("half_size_local_map"), 2. * parameterInstance.getValue<double>("half_size_local_map")), parameterInstance.getValue<double>("resolution_local_map"));
+        gridMap_.setGeometry(grid_map::Length(2. * parameterInstance.getValue<double>("half_size_traversability"), 2. * parameterInstance.getValue<double>("half_size_traversability")), parameterInstance.getValue<double>("resolution_local_map"));
         pGridMap_ = std::make_shared<grid_map::GridMap>(gridMap_);
         RCLCPP_INFO_STREAM(this->get_logger(), "Constructor ended.");
-        occupancy_grid_publisher_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("local_traversability_map", 10);
+        occupancy_grid_publisher_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("local_traversability_map", rclcpp::QoS(1).transient_local());
         traversabilityPub_ = this->create_publisher<grid_map_msgs::msg::GridMap>("RTQuadtree_struct", rclcpp::QoS(1).transient_local());
+        last_callback_time_ = std::chrono::high_resolution_clock::now();
+
+        tf_buffer_ptr_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+        tf_listener_ptr_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_ptr_);
     }
 
 private:
     void pointCloudCallback(sensor_msgs::msg::PointCloud2::SharedPtr msg)
     {
+        auto current_time = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed = current_time - last_callback_time_;
+        if (elapsed.count() < callback_interval_)
+            return;
+        last_callback_time_ = current_time;
         // RCLCPP_INFO_STREAM(this->get_logger(), "PCL callback.");
         // Initialize your KeyFrame class
         auto keyframe_ = std::make_shared<traversability_mapping::KeyFrame>(1, pGridMap_, Tbv_); // Replace with your actual initialization logic
         // Call computeLocalTraversability function from your KeyFrame class
 
         // set pose
+        geometry_msgs::msg::TransformStamped transformStamped;
+        try
+        {
+            transformStamped = tf_buffer_ptr_->lookupTransform("map", static_cast<std::string>(this->get_namespace()).substr(1) + "/base_footprint", tf2::TimePointZero);
+        }
+        catch (tf2::TransformException &ex)
+        {
+            RCLCPP_WARN(this->get_logger(), "Could not transform from map to base_footprint: %s", ex.what());
+            return;
+        }
         Eigen::Translation3f translation(0.2f, 0.3f, 0.0f);
-        Eigen::Quaternionf rotation(1.0f, 0.0f, 0.0f, 0.0f);
+        Eigen::Quaternionf rotation(transformStamped.transform.rotation.w, transformStamped.transform.rotation.x, transformStamped.transform.rotation.y, transformStamped.transform.rotation.z);
         Eigen::Affine3f Tmb_ = translation * rotation;
         keyframe_->setPose(Tmb_);
 
@@ -72,12 +105,18 @@ private:
         nav_msgs::msg::OccupancyGrid occupancyGrid_msg;
         traversability_mapping::gridMapToOccupancyGrid(*pGridMap_, "hazard", 0., 1., occupancyGrid_msg);
         gridMapOccupancy_ = std::make_shared<nav_msgs::msg::OccupancyGrid>(occupancyGrid_msg);
-        gridMapOccupancy_->header.frame_id = static_cast<std::string>(this->get_namespace()) + "/base_footprint";
+        gridMapOccupancy_->info.origin.position.x = transformStamped.transform.translation.x - parameterInstance.getValue<double>("half_size_traversability");
+        gridMapOccupancy_->info.origin.position.y = transformStamped.transform.translation.y - parameterInstance.getValue<double>("half_size_traversability");
+        // gridMapOccupancy_->info.origin.orientation = transformStamped.transform.rotation;
+        gridMapOccupancy_->header.frame_id = "map";
         gridMapOccupancy_->header.stamp = msg->header.stamp;
         occupancy_grid_publisher_->publish(*gridMapOccupancy_);
 
-        auto message = *grid_map::GridMapRosConverter::toMessage(*pGridMap_);
-        traversabilityPub_->publish(message);
+        if (publish_local_gridmap_)
+        {
+            auto message = *grid_map::GridMapRosConverter::toMessage(*pGridMap_);
+            traversabilityPub_->publish(message);
+        }
         keyframe_->clearStrayValuesInGrid();
     }
 
@@ -88,6 +127,12 @@ private:
     std::shared_ptr<grid_map::GridMap> pGridMap_;
     std::shared_ptr<nav_msgs::msg::OccupancyGrid> gridMapOccupancy_;
     Eigen::Affine3f Tbv_;
+    double expected_frequency_;
+    double callback_interval_;
+    bool publish_local_gridmap_;
+    std::chrono::high_resolution_clock::time_point last_callback_time_;
+    std::unique_ptr<tf2_ros::Buffer> tf_buffer_ptr_; //!< Unique pointer to a buffer of Map to BaseLink tfs
+    std::shared_ptr<tf2_ros::TransformListener> tf_listener_ptr_; //!< Shared pointer to a TransformListener, used to listen to Map To BaseLink transforms
 };
 
 int main(int argc, char **argv)

@@ -28,11 +28,12 @@ namespace traversability_mapping
         slamPosition.y() = parameterInstance.getValue<double>("grid_center_y");
         gridMap_.setPosition(slamPosition);
         pGridMap_ = std::make_shared<grid_map::GridMap>(gridMap_);
+        masterGridMapMutex_ = std::make_shared<std::mutex>();
     }
 
     LocalMap::~LocalMap() {}
 
-    void LocalMap::Run()
+    void LocalMap::RunUpdateQueue()
     {
         // Loop runs forever.
         while (1)
@@ -57,7 +58,20 @@ namespace traversability_mapping
                 // std::cout << std::endl
                 //           << "Total size: " << keyFramesMap_.size() << std::endl;
                 processUpdateQueue();
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 // std::cout << "Currently running active map id: " << mapID_ << " and the update queue size is: " << keyFrameUpdateQueue_->size() << std::endl;
+            }
+            std::this_thread::sleep_for(std::chrono::seconds(5));
+        }
+    }
+
+    void LocalMap::RunTraversability()
+    {
+        int sleep = 100;
+        while(1)
+        {
+            while (activeMap_)
+            {
                 for (auto &pair : keyFramesMap_)
                 {
                     auto keyFramePtr = pair.second;
@@ -67,16 +81,44 @@ namespace traversability_mapping
                     {
                         keyFramePtr->recomputeCache();
                     }
+                    std::this_thread::sleep_for(std::chrono::milliseconds(sleep));
                 }
-                nav_msgs::msg::OccupancyGrid occupancyGrid_msg;
-                traversability_mapping::gridMapToOccupancyGrid(*pGridMap_, "hazard", 0., 1., occupancyGrid_msg);
-                gridMapOccupancy_ = std::make_shared<nav_msgs::msg::OccupancyGrid>(occupancyGrid_msg);
+                std::cout << "**** Global adjustment complete ****" << std::endl;
+                std::cout << "**** Will take \"atleast\" " << sleep * keyFramesMap_.size() << " ms for next adjustment****" << std::endl;
                 std::this_thread::sleep_for(std::chrono::milliseconds(500));
                 // auto end_time = std::chrono::high_resolution_clock::now();
                 // auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
                 // std::cout << "Processing time: " << duration.count() / 1e3 << " seconds.";
             }
-            std::this_thread::sleep_for(std::chrono::seconds(1));
+            std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+        }
+    }
+
+    void LocalMap::RunLocalKeyFrames()
+    {
+        while(1)
+        {
+            while(1)
+            {
+                localKeyFramesMutex.lock();
+                if(mLocalKeyFrames_.size() == 0)
+                {
+                    localKeyFramesMutex.unlock();
+                    break;
+                }
+                auto kfPtr = mLocalKeyFrames_.back();
+                mLocalKeyFrames_.pop_back();
+                if (mLocalKeyFrames_.size() > 10) 
+                {
+                    // Remove the oldest element
+                    mLocalKeyFrames_.pop_front();
+                }
+                localKeyFramesMutex.unlock();
+                kfPtr->recomputeCache();
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+            std::cout << "No Local Keyframes present ..." << std::endl;
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         }
     }
 
@@ -85,9 +127,12 @@ namespace traversability_mapping
                                                        sensor_msgs::msg::PointCloud2 &pointCloud,
                                                        long unsigned int mapID)
     {
-        std::shared_ptr<KeyFrame> keyFrame = std::make_shared<KeyFrame>(timestamp, kfID, pointCloud, pGridMap_, mapID, Tbv_);
+        std::shared_ptr<KeyFrame> keyFrame = std::make_shared<KeyFrame>(timestamp, kfID, pointCloud, pGridMap_, masterGridMapMutex_, mapID, Tbv_);
         std::lock_guard<std::mutex> lock(keyFramesMapMutex);
         keyFramesMap_[kfID] = keyFrame;
+        localKeyFramesMutex.lock();
+        mLocalKeyFrames_.push_back(keyFrame);
+        localKeyFramesMutex.unlock();
         return keyFrame;
     }
 
@@ -141,18 +186,20 @@ namespace traversability_mapping
     //     // std::cout << "Element: " << kfID << " in map, so pushing to queue." << std::endl;
     // }
 
-    std::unordered_map<long unsigned int, std::shared_ptr<KeyFrame>> &LocalMap::getKeyFramesMap()
+    const std::unordered_map<long unsigned int, std::shared_ptr<KeyFrame>> &LocalMap::getKeyFramesMap() const
     {
-        std::lock_guard<std::mutex> lock(keyFramesMapMutex);
         return keyFramesMap_;
     }
 
-    const std::shared_ptr<nav_msgs::msg::OccupancyGrid> &LocalMap::getOccupancyMap()
+    const std::shared_ptr<nav_msgs::msg::OccupancyGrid> LocalMap::getOccupancyMap()
     {
+        nav_msgs::msg::OccupancyGrid occupancyGrid_msg;
+        traversability_mapping::gridMapToOccupancyGrid(*pGridMap_, "hazard", 0., 1., occupancyGrid_msg);
+        gridMapOccupancy_ = std::make_shared<nav_msgs::msg::OccupancyGrid>(occupancyGrid_msg);
         return gridMapOccupancy_;
     }
 
-    std::shared_ptr<grid_map::GridMap> LocalMap::getGridMap()
+    const std::shared_ptr<grid_map::GridMap> LocalMap::getGridMap() const
     {
         return pGridMap_;
     }
@@ -160,39 +207,40 @@ namespace traversability_mapping
     void LocalMap::processUpdateQueue()
     {
         // std::cout << mapID_ << " Processing queue with size: " << keyFrameUpdateQueue_->size() << std::endl;
-        for (auto it = keyFrameUpdateQueue_->begin(); it != keyFrameUpdateQueue_->end();)
+        while(1)
         {
-            // Check if the long unsigned int value is equal to 100
-            std::lock_guard<std::mutex> lock(keyFramesMapMutex);
-            if (keyFramesMap_.count(it->first) > 0)
+            updateQueueMutex_.lock();
+            if(keyFrameUpdateQueue_->size() == 0)
             {
-                keyFramesMap_[it->first]->setSLAMPose(it->second);
+                updateQueueMutex_.unlock();
+                break;
+            }
+            auto kfPoseToUpdate = keyFrameUpdateQueue_->front();
+            keyFrameUpdateQueue_->pop();
+            updateQueueMutex_.unlock();
+            std::shared_ptr<KeyFrame> kfPtrToUpdate = nullptr;
+            {
+                std::lock_guard<std::mutex> lock(keyFramesMapMutex);
+                if (keyFramesMap_.count(kfPoseToUpdate.first) > 0)
+                {
+                    kfPtrToUpdate = keyFramesMap_[kfPoseToUpdate.first];
+                }
+            }
+            if(kfPtrToUpdate)
+            {
+                kfPtrToUpdate->setSLAMPose(kfPoseToUpdate.second);
 
-                std::cout << "NEW CONVERSION!" << std::endl;
+                // std::cout << "NEW CONVERSION!" << std::endl;
 
                 if (parameterInstance.getValue<std::string>("SLAM_System") == "ORB3")
                 {
-                    keyFramesMap_[it->first]->setPose(typeConversion_->se3ToAffine<Eigen::Affine3f>(it->second, true));
+                    kfPtrToUpdate->setPose(typeConversion_->se3ToAffine<Eigen::Affine3f>(kfPoseToUpdate.second, true));
                 }
                 else if (parameterInstance.getValue<std::string>("SLAM_System") == "ISAE")
                 {
-                    keyFramesMap_[it->first]->setPose(typeConversion_->se3ToAffine<Eigen::Affine3f>(it->second, false));
+                    kfPtrToUpdate->setPose(typeConversion_->se3ToAffine<Eigen::Affine3f>(kfPoseToUpdate.second, false));
                 }
-                // updateQueueLock_.lock();
-                std::lock_guard<std::mutex> lock(updateQueueMutex_);
-                it = keyFrameUpdateQueue_->erase(it);
-                // std::cout << "Removing element: " << it->first << " from queue." << std::endl;
-                // updateQueueLock_.unlock();
-            }
-            else
-            {
-                // Move to the next element
-                ++it;
-                // std::cout << "Cant find element: " << it->first << " in map," << mapID_ << "going to remain in queue." << std::endl;
             }
         }
     }
 }
-
-// make pcl transformer gpt queried
-// invlove gridmap after this and making of local map.

@@ -12,14 +12,20 @@ namespace traversability_mapping
 
     void PointCloudBuffer::addPointCloud(sensor_msgs::msg::PointCloud2 &pointCloud, double timestamp)
     {
+        std::lock_guard<std::recursive_mutex> lock(bufferMutex_);
         auto pair = std::make_pair(timestamp, pointCloud);
         buffer_.push_back(pair);
+        if(abs(buffer_.front().first - buffer_.back().first) > 25.0)
+        {
+            deletePointsBefore(timestamp - 5.0);
+        }
         // std::cout << "The size of buffer is: " << buffer_.size() << std::endl;
     }
 
     // Function to find the closest point cloud to the queried timestamp
     sensor_msgs::msg::PointCloud2 PointCloudBuffer::getClosestPointCloud(const double &query_time)
     {
+        std::lock_guard<std::recursive_mutex> lock(bufferMutex_);
         // std::cout << "PointCloudBuffer::getClosestPointCloud" << std::endl;
         // Check if buffer is empty
         if (buffer_.empty())
@@ -41,6 +47,7 @@ namespace traversability_mapping
     // Function to delete all points before the queried timestamp in the buffer
     void PointCloudBuffer::deletePointsBefore(const double &query_time)
     {
+        std::lock_guard<std::recursive_mutex> lock(bufferMutex_);
         buffer_.erase(std::remove_if(buffer_.begin(), buffer_.end(),
                                      [&query_time](const auto &entry)
                                      {

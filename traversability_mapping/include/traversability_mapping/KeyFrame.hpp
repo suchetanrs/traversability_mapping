@@ -26,12 +26,16 @@ namespace traversability_mapping
                  long unsigned int kfID,
                  sensor_msgs::msg::PointCloud2 &pointCloud,
                  std::shared_ptr<grid_map::GridMap> gridMap,
+                 std::shared_ptr<std::mutex> masterGridMapMutex,
                  long unsigned int mapID,
                  Eigen::Affine3f Tbv);
 
         KeyFrame(long unsigned int kfID,
                  std::shared_ptr<grid_map::GridMap> gridMap,
+                 std::shared_ptr<std::mutex> masterGridMapMutex,
                  Eigen::Affine3f Tbv);
+        
+        ~KeyFrame();
 
         // GETTERS
         const double &getTimestamp();
@@ -42,14 +46,12 @@ namespace traversability_mapping
 
         const Sophus::SE3f &getSLAMPose();
 
-        const std::shared_ptr<sensor_msgs::msg::PointCloud2> &getPointCloud();
-
         // SETTERS
         void setPose(const Eigen::Affine3f &pose);
 
         void setSLAMPose(const Sophus::SE3f &pose);
 
-        void setMap(long unsigned int mapID, std::shared_ptr<grid_map::GridMap> gridMap);
+        void setMap(long unsigned int mapID, std::shared_ptr<grid_map::GridMap> gridMap, std::shared_ptr<std::mutex> masterGridMapMutex);
 
         // TRAVERSABILITY FUNCTION
         void computeLocalTraversability(sensor_msgs::msg::PointCloud2 &kFpcl);
@@ -64,26 +66,24 @@ namespace traversability_mapping
         void clearStrayValuesInGrid();
 
     private:
-        // set only one time in constructor.
+        // set only one time in constructor. thread safety not needed since it is only read.
         double timestamp_;
         long unsigned int kfID_;
         sensor_msgs::msg::PointCloud2 pointCloudLidar_;
+        Eigen::Affine3f Tbv_;
 
         std::mutex poseMutex_;
         std::unique_ptr<Sophus::SE3f> poseSLAMCoord_;
         std::unique_ptr<Eigen::Affine3f> poseTraversabilityCoord_;
         
-        
-        std::mutex gridMapMutex_;
+        std::mutex gridMapMutex_; // this mutex prevents access of pGridMap_ when pGridMap_ itself is changing.
+        std::shared_ptr<std::mutex> masterGridMapMutex_; // this mutex prevents concurrency between kfs.
         std::shared_ptr<grid_map::GridMap> pGridMap_;
         long unsigned int parentMapID_;
         std::vector<Eigen::Vector2d> markedCells_;
 
         std::mutex poseUpdateQueueMutex_;
         std::deque<Eigen::Affine3f> poseUpdates_; //< Vector to store the pose updates to be processed later.
-        
-        Eigen::Affine3f Tbv_;
-        std::shared_ptr<sensor_msgs::msg::PointCloud2> pointCloudMap_; //< Temporary pointcloud to return. Can delete later.
     };
 }
 

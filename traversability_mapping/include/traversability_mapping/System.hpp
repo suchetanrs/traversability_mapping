@@ -58,14 +58,15 @@ namespace traversability_mapping
 
         void setLocalMap(std::shared_ptr<LocalMap> pLocalMap);
 
-        std::shared_ptr<LocalMap> localMap_ = nullptr;
         std::shared_ptr<PointCloudBuffer> pointCloudBuffer_ = nullptr;
+
+        std::recursive_mutex localMapMutex_;
         std::unordered_map<long unsigned int, std::shared_ptr<LocalMap>> localMapsSet_;
         std::unordered_map<long unsigned int, long unsigned int> allKeyFramesSet_;
-        std::mutex localMapMutex_;
+        std::shared_ptr<LocalMap> localMap_ = nullptr;
+
         std::mutex updateQueueMutex_;
         std::shared_ptr<UpdateQueue> keyFrameUpdateQueue_;
-        int tempCounter = 0;
     };
 }
 

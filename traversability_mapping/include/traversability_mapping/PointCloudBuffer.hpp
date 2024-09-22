@@ -6,6 +6,7 @@
 #include <chrono>
 #include <iostream>
 #include <sensor_msgs/msg/point_cloud2.hpp>
+#include <mutex>
 
 using namespace std::chrono_literals;
 
@@ -26,6 +27,7 @@ namespace traversability_mapping
 
     private:
         std::deque<std::pair<double, sensor_msgs::msg::PointCloud2>> buffer_;
+        std::recursive_mutex bufferMutex_;
     };
 }
 

@@ -22,6 +22,7 @@ namespace traversability_mapping
         std::cout << "addNewKeyFrameToMap" << std::endl;
         // std::cout << "traversability_mapping::System::addNewKeyFrameToMap with id: " << kfID << " and ts: " << timestamp << std::endl;
         // Add the keyframe to the local map
+        std::lock_guard<std::recursive_mutex> lock(localMapMutex_);
         if (localMapsSet_.find(mapID) != localMapsSet_.end())
         {
             if (allKeyFramesSet_.find(kfID) == allKeyFramesSet_.end())
@@ -56,8 +57,8 @@ namespace traversability_mapping
         }
         long unsigned int kfIDlong = static_cast<long unsigned int>(kfID);
         sensor_msgs::msg::PointCloud2 sensorPointCloud = pointCloudBuffer_->getClosestPointCloud(timestamp);
-        std::cout << "Removing pcl before " << timestamp - 20.0 << std::endl;
-        pointCloudBuffer_->deletePointsBefore(timestamp - 20.0);
+        // std::cout << "Removing pcl before " << timestamp - 20.0 << std::endl;
+        // pointCloudBuffer_->deletePointsBefore(timestamp - 20.0);
         if (sensorPointCloud.data.size() == 0)
             return;
         auto pcl_sec = sensorPointCloud.header.stamp.sec + (sensorPointCloud.header.stamp.nanosec * 1e-9);
@@ -85,8 +86,8 @@ namespace traversability_mapping
         long unsigned int kfIDlong = static_cast<long unsigned int>(kfID);
 
         sensor_msgs::msg::PointCloud2 sensorPointCloud = pointCloudBuffer_->getClosestPointCloud(timestampDouble);
-        std::cout << "Removing pcl before " << timestampDouble - 20.0 << std::endl;
-        pointCloudBuffer_->deletePointsBefore(timestampDouble - 20.0);
+        // std::cout << "Removing pcl before " << timestampDouble - 20.0 << std::endl;
+        // pointCloudBuffer_->deletePointsBefore(timestampDouble - 20.0);
         if (sensorPointCloud.data.size() == 0)
             return;
         auto pcl_sec = sensorPointCloud.header.stamp.sec + (sensorPointCloud.header.stamp.nanosec * 1e-9);
@@ -121,11 +122,13 @@ namespace traversability_mapping
     {
         // std::cout << "traversability_mapping::System::updateKeyFrame with id: " << kfID << std::endl;
         // Add the keyframe to the local map
+        std::lock_guard<std::recursive_mutex> lock(localMapMutex_);
         if (allKeyFramesSet_.find(kfID) != allKeyFramesSet_.end())
         {
             // std::cout << "System::updateKeyFrame kfid: " << kfID << std::endl;
-            std::lock_guard<std::mutex> lock(updateQueueMutex_);
-            keyFrameUpdateQueue_->push_back(std::make_pair(kfID, poseSLAM));
+            updateQueueMutex_.lock();
+            keyFrameUpdateQueue_->push(std::make_pair(kfID, poseSLAM));
+            updateQueueMutex_.unlock();
             // std::cout << "UPDATING KEYFRAME TO MAP!!!!" << mapID << std::endl;
         }
         else
@@ -156,16 +159,17 @@ namespace traversability_mapping
     void System::updateKeyFrame(unsigned long long kfID,
                                 Eigen::Affine3d &poseAffine)
     {
-
         Sophus::SE3f poseSLAM(poseAffine.cast<float>().rotation(), poseAffine.cast<float>().translation());
 
         // std::cout << "traversability_mapping::System::updateKeyFrame with id: " << static_cast<long unsigned int>(kfID) << std::endl;
         // Add the keyframe to the local map
+        std::lock_guard<std::recursive_mutex> lock(localMapMutex_);
         if (allKeyFramesSet_.find(static_cast<long unsigned int>(kfID)) != allKeyFramesSet_.end())
         {
             // std::cout << "System::updateKeyFrame kfid: " << static_cast<long unsigned int>(kfID) << std::endl;
-            std::lock_guard<std::mutex> lock(updateQueueMutex_);
-            keyFrameUpdateQueue_->push_back(std::make_pair(static_cast<long unsigned int>(kfID), poseSLAM));
+            updateQueueMutex_.lock();
+            keyFrameUpdateQueue_->push(std::make_pair(static_cast<long unsigned int>(kfID), poseSLAM));
+            updateQueueMutex_.unlock();
             // std::cout << "UPDATING KEYFRAME TO MAP!!!!" << mapID << std::endl;
         }
         else
@@ -180,6 +184,7 @@ namespace traversability_mapping
     {
         // std::cout << "Incoming: kf: " << kfID << " mapID: " << mapID << std::endl;
         // std::cout << "Exisiting: kf: " << kfID << " mapID: " << allKeyFramesSet_[kfID] << std::endl;
+        std::lock_guard<std::recursive_mutex> lock(localMapMutex_);
         if (allKeyFramesSet_.count(kfID) > 0)
         {
             if (localMapsSet_.count(mapID) > 0)
@@ -188,8 +193,8 @@ namespace traversability_mapping
                 {
                     // to access keyframe from old map localMapsSet_[allKeyFramesSet_[kfID]]
                     // to access keyframe from new map localMapsSet_[mapID]
-                    auto keyFramePtr = localMapsSet_[allKeyFramesSet_[kfID]]->getKeyFramesMap()[kfID];
-                    keyFramePtr->setMap(mapID, localMapsSet_[mapID]->getGridMap());
+                    auto keyFramePtr = localMapsSet_[allKeyFramesSet_[kfID]]->getKeyFramesMap().at(kfID);
+                    keyFramePtr->setMap(mapID, localMapsSet_[mapID]->getGridMap(), localMapsSet_[mapID]->getGridMapMutex());
                     localMapsSet_[mapID]->addAlreadyDeclaredKF(keyFramePtr);
                     localMapsSet_[allKeyFramesSet_[kfID]]->deleteKeyFrame(kfID);
                     allKeyFramesSet_[kfID] = mapID;
@@ -215,12 +220,17 @@ namespace traversability_mapping
 
     void System::addNewLocalMap(long unsigned int mapID)
     {
+        std::lock_guard<std::recursive_mutex> lock(localMapMutex_);
         if (localMapsSet_.find(mapID) == localMapsSet_.end())
         {
             std::cout << "Added new local map with ID: " << mapID << std::endl;
             auto newLocalMap = std::make_shared<LocalMap>(mapID, keyFrameUpdateQueue_, updateQueueMutex_);
-            std::thread t(&LocalMap::Run, newLocalMap);
+            std::thread t(&LocalMap::RunUpdateQueue, newLocalMap);
             t.detach();
+            std::thread t2(&LocalMap::RunTraversability, newLocalMap);
+            t2.detach();
+            std::thread t3(&LocalMap::RunLocalKeyFrames, newLocalMap);
+            t3.detach();
             localMapsSet_[mapID] = newLocalMap;
             setCurrentMap(mapID);
         }
@@ -232,6 +242,7 @@ namespace traversability_mapping
 
     void System::setCurrentMap(long unsigned int mapID)
     {
+        std::lock_guard<std::recursive_mutex> lock(localMapMutex_);
         makeAllMapsInactive();
         if (localMapsSet_.find(mapID) != localMapsSet_.end())
         {
@@ -258,13 +269,13 @@ namespace traversability_mapping
 
     std::shared_ptr<LocalMap> System::getLocalMap()
     {
-        std::lock_guard<std::mutex> lock(localMapMutex_);
+        std::lock_guard<std::recursive_mutex> lock(localMapMutex_);
         return localMap_;
     }
 
     void System::setLocalMap(std::shared_ptr<LocalMap> pLocalMap)
     {
-        std::lock_guard<std::mutex> lock(localMapMutex_);
+        std::lock_guard<std::recursive_mutex> lock(localMapMutex_);
         localMap_ = pLocalMap;
     }
 

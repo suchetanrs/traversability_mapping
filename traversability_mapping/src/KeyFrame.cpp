@@ -6,12 +6,14 @@ namespace traversability_mapping
                        long unsigned int kfID,
                        sensor_msgs::msg::PointCloud2 &pointCloud,
                        std::shared_ptr<grid_map::GridMap> gridMap,
+                       std::shared_ptr<std::mutex> masterGridMapMutex,
                        long unsigned int mapID,
                        Eigen::Affine3f Tbv)
         : timestamp_(timestamp),
           kfID_(kfID),
           pointCloudLidar_(pointCloud),
           pGridMap_(gridMap),
+          masterGridMapMutex_(masterGridMapMutex),
           parentMapID_(mapID),
           Tbv_(Tbv)
     {
@@ -30,11 +32,19 @@ namespace traversability_mapping
 
     KeyFrame::KeyFrame(long unsigned int kfID,
                        std::shared_ptr<grid_map::GridMap> gridMap,
+                       std::shared_ptr<std::mutex> masterGridMapMutex,
                        Eigen::Affine3f Tbv)
         : kfID_(kfID),
           pGridMap_(gridMap),
+          masterGridMapMutex_(masterGridMapMutex),
           Tbv_(Tbv)
     {
+    }
+
+    KeyFrame::~KeyFrame()
+    {
+        std::cout << "keyframe with Id: " << kfID_ << " destructed" << std::endl;
+        clearStrayValuesInGrid();
     }
 
     const double &KeyFrame::getTimestamp()
@@ -47,10 +57,10 @@ namespace traversability_mapping
         return kfID_;
     }
 
-    const std::shared_ptr<sensor_msgs::msg::PointCloud2> &KeyFrame::getPointCloud()
-    {
-        return pointCloudMap_;
-    }
+    // const std::shared_ptr<sensor_msgs::msg::PointCloud2> &KeyFrame::getPointCloud()
+    // {
+    //     return pointCloudMap_;
+    // }
 
     const Eigen::Affine3f &KeyFrame::getPose()
     {
@@ -84,10 +94,10 @@ namespace traversability_mapping
         else
         {
             // Measure if the pose has significantly changed wrt the the thresholds.
-            Eigen::Vector3f eulerAnglesDiff = poseTraversabilityCoord_->rotation().eulerAngles(0, 1, 2) - pose.rotation().eulerAngles(0, 1, 2);
+            Eigen::Vector3f eulerAnglesDiff = (poseTraversabilityCoord_->rotation() * pose.rotation().transpose()).eulerAngles(2, 0, 1);
             Eigen::Vector3f translationDiff = poseTraversabilityCoord_->translation() - pose.translation();
-            std::cout << "Max angle:" << eulerAnglesDiff.maxCoeff() << std::endl;
-            std::cout << "Max adist:" << translationDiff.maxCoeff() << std::endl;
+            // std::cout << "Max angle:" << eulerAnglesDiff.maxCoeff() << std::endl;
+            // std::cout << "Max adist:" << translationDiff.maxCoeff() << std::endl;
             if (eulerAnglesDiff.maxCoeff() > parameterInstance.getValue<double>("rotation_change_threshold") ||
                 translationDiff.maxCoeff() > parameterInstance.getValue<double>("translation_change_threshold"))
             {
@@ -112,9 +122,10 @@ namespace traversability_mapping
             *poseSLAMCoord_ = pose;
     }
 
-    void KeyFrame::setMap(long unsigned int mapID, std::shared_ptr<grid_map::GridMap> gridMap)
+    void KeyFrame::setMap(long unsigned int mapID, std::shared_ptr<grid_map::GridMap> gridMap, std::shared_ptr<std::mutex> masterGridMapMutex)
     {
         std::lock_guard<std::mutex> lock(gridMapMutex_);
+        masterGridMapMutex_ = masterGridMapMutex;
         parentMapID_ = mapID;
         pGridMap_ = gridMap;
     }
@@ -181,6 +192,7 @@ namespace traversability_mapping
                     if (haz(0) < 0.)
                         continue;
                     std::lock_guard<std::mutex> lock(gridMapMutex_);
+                    std::lock_guard<std::mutex> lock2(*masterGridMapMutex_);
                     pGridMap_->atPosition("hazard", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) = haz(0);
                     pGridMap_->atPosition("step_haz", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) = haz(1);
                     // original
@@ -221,7 +233,7 @@ namespace traversability_mapping
         auto Tmv_ = Tmb_ * Tbv_;
         sensor_msgs::msg::PointCloud2 pointCloudCorrected_;
         traversability_mapping::doTransformPCL(pointCloudLidar_, pointCloudCorrected_, Tmv_);
-        pointCloudMap_ = std::make_shared<sensor_msgs::msg::PointCloud2>(pointCloudCorrected_);
+        auto pointCloudMap_ = std::make_shared<sensor_msgs::msg::PointCloud2>(pointCloudCorrected_);
         pointCloudMap_->header.frame_id = "map";
 
         // clear stray values
@@ -248,6 +260,7 @@ namespace traversability_mapping
     void KeyFrame::clearStrayValuesInGrid()
     {
         std::lock_guard<std::mutex> lock(gridMapMutex_);
+        std::lock_guard<std::mutex> lock2(*masterGridMapMutex_);
         for (const auto &cell : markedCells_)
         {
             if (pGridMap_->atPosition("kfid", cell) == static_cast<float>(kfID_))

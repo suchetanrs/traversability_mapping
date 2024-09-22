@@ -16,6 +16,9 @@ find_package(grid_map_ros REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(yaml-cpp REQUIRED)
 find_package(tf2_eigen REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
 
 set(dependencies
     ament_cmake
@@ -32,6 +35,9 @@ set(dependencies
     nav_msgs
     yaml-cpp
     tf2_eigen
+    tf2
+    tf2_ros
+    tf2_geometry_msgs
 )
 
 include_directories(
