@@ -5,6 +5,7 @@
       updates_topic_name: "traversability_keyframe_updates"
       pointcloud_topic_name: "lidar/points"
       use_lidar_pointcloud: false
+      publish_traversability_grid: false
 
   local_traversability_node:
     ros__parameters:
@@ -13,4 +14,4 @@
 
   traversability_threshold_node:
     ros__parameters:
-      lethal_obstacle_threshold: 85 # between 0 to 100
+      lethal_obstacle_threshold: 70 # between 0 to 100

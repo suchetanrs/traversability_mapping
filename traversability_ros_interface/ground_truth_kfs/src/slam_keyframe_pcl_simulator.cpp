@@ -50,8 +50,9 @@ private:
         std::chrono::duration<double> elapsed_time = std::chrono::high_resolution_clock::now() - prev_time;
         double dt = elapsed_time.count();
 
-        if(dt > 1.0)
+        if(dt > 0.4)
         {
+            // RCLCPP_INFO(this->get_logger(), "Time difference: %f seconds", dt);
             ++current_kf_id_;
             // RCLCPP_WARN_STREAM(this->get_logger(), "Publishing with KF ID:" << current_kf_id_);
             auto keyframePose = convertOdomToPose(*odom_msg);

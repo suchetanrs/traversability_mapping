@@ -30,6 +30,9 @@ public:
 
         this->declare_parameter("use_lidar_pointcloud", rclcpp::ParameterValue(false));
         this->get_parameter("use_lidar_pointcloud", use_lidar_pointcloud_);
+
+        this->declare_parameter("publish_traversability_grid", rclcpp::ParameterValue(false));
+        this->get_parameter("publish_traversability_grid", publish_traversability_grid_);
         RCLCPP_WARN_STREAM(this->get_logger(), "Using lidar pointcloud? " << use_lidar_pointcloud_);
 
         keyFrameAdditionsSubscriber_ = this->create_subscription<traversability_msgs::msg::KeyFrameAdditions>(
@@ -115,9 +118,12 @@ private:
             }
             if (traversabilitymap && gridmap)
             {
-                auto message = *grid_map::GridMapRosConverter::toMessage(*traversabilitymap);
                 occupancy_grid_publisher_->publish(*gridmap);
-                traversabilityPub_->publish(message);
+                if(publish_traversability_grid_)
+                {
+                    auto message = *grid_map::GridMapRosConverter::toMessage(*traversabilitymap);
+                    traversabilityPub_->publish(message);
+                }
                 return;
             }
             else
@@ -136,6 +142,7 @@ private:
     std::string updates_topic_name_;
     std::string pointcloud_topic_name_;
     bool use_lidar_pointcloud_;
+    bool publish_traversability_grid_;
     rclcpp::TimerBase::SharedPtr publishTimer_;
 
     rclcpp::Subscription<traversability_msgs::msg::KeyFrameAdditions>::SharedPtr keyFrameAdditionsSubscriber_;

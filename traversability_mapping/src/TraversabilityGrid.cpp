@@ -71,8 +71,11 @@ namespace traversability_mapping
                     cellsSumSquared.noalias() += sumSquared;
                     P3Ds.push_back(center);
                     cellsNumPoints += _grid.at(i).at(j).N;
-                    zM = std::max(zM, _grid.at(i).at(j).z_max);
-                    zm = std::min(zm, _grid.at(i).at(j).z_min);
+                    if(abs(i - ind.x()) < _resolution * 2 && abs(j - ind.y()) < _resolution * 2)
+                    {
+                        zM = std::max(zM, _grid.at(i).at(j).z_max);
+                        zm = std::min(zm, _grid.at(i).at(j).z_min);
+                    }
                 }
             }
         }

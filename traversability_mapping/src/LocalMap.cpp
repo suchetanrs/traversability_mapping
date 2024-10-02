@@ -20,7 +20,7 @@ namespace traversability_mapping
         Tbv_ = translation * quaternion;
 
         typeConversion_ = std::make_shared<TraversabilityTypeConversions>();
-        grid_map::GridMap gridMap_({"hazard", "step_haz", "roughness_haz", "slope_haz", "border_haz", "elevation", "kfid"});
+        grid_map::GridMap gridMap_({"num_additions", "hazard", "step_haz", "roughness_haz", "slope_haz", "border_haz", "elevation", "kfid"});
         gridMap_.setFrameId("map");
         gridMap_.setGeometry(grid_map::Length(2. * parameterInstance.getValue<double>("half_size_local_map"), 2. * parameterInstance.getValue<double>("half_size_local_map")), parameterInstance.getValue<double>("resolution_local_map"));
         Eigen::Vector2d slamPosition;
@@ -108,7 +108,7 @@ namespace traversability_mapping
                 }
                 auto kfPtr = mLocalKeyFrames_.back();
                 mLocalKeyFrames_.pop_back();
-                if (mLocalKeyFrames_.size() > 10) 
+                if (mLocalKeyFrames_.size() > parameterInstance.getValue<double>("num_local_keyframes")) 
                 {
                     // Remove the oldest element
                     mLocalKeyFrames_.pop_front();

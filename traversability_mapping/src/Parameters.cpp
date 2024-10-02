@@ -22,8 +22,11 @@ ParameterHandler::ParameterHandler()
     parameter_map_["robot_height"] = loaded_node["robot_height"].as<double>();
     parameter_map_["translation_change_threshold"] = loaded_node["translation_change_threshold"].as<double>();
     parameter_map_["rotation_change_threshold"] = loaded_node["rotation_change_threshold"].as<double>();
+    parameter_map_["num_local_keyframes"] = loaded_node["num_local_keyframes"].as<double>();
     parameter_map_["is_kf_optimization_enabled"] = loaded_node["is_kf_optimization_enabled"].as<bool>();
     parameter_map_["use_pointcloud_buffer"] = loaded_node["use_pointcloud_buffer"].as<bool>();
+    parameter_map_["use_averaging"] = loaded_node["use_averaging"].as<bool>();
+    parameter_map_["average_persistence"] = loaded_node["average_persistence"].as<double>();
 
     parameter_map_["T_SLAMFrameToLidarFrame/translation/x"] = loaded_node["T_SLAMFrameToLidarFrame"]["translation"]["x"].as<float>();
     parameter_map_["T_SLAMFrameToLidarFrame/translation/y"] = loaded_node["T_SLAMFrameToLidarFrame"]["translation"]["y"].as<float>();

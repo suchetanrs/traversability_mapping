@@ -52,7 +52,7 @@ public:
             parameterInstance.getValue<float>("T_SLAMFrameToLidarFrame/quaternion/z"));
         Tbv_ = translation * quaternion;
 
-        grid_map::GridMap gridMap_({"hazard", "step_haz", "roughness_haz", "slope_haz", "border_haz", "elevation", "kfid"});
+        grid_map::GridMap gridMap_({"num_additions", "hazard", "step_haz", "roughness_haz", "slope_haz", "border_haz", "elevation", "kfid"});
         gridMap_.setFrameId("map");
         gridMap_.setGeometry(grid_map::Length(2. * parameterInstance.getValue<double>("half_size_traversability"), 2. * parameterInstance.getValue<double>("half_size_traversability")), parameterInstance.getValue<double>("resolution_local_map"));
         pGridMap_ = std::make_shared<grid_map::GridMap>(gridMap_);
@@ -75,7 +75,8 @@ private:
         last_callback_time_ = current_time;
         // RCLCPP_INFO_STREAM(this->get_logger(), "PCL callback.");
         // Initialize your KeyFrame class
-        auto keyframe_ = std::make_shared<traversability_mapping::KeyFrame>(1, pGridMap_, Tbv_); // Replace with your actual initialization logic
+        std::shared_ptr<std::mutex> mapMutex_ = std::make_shared<std::mutex>();
+        auto keyframe_ = std::make_shared<traversability_mapping::KeyFrame>(1, pGridMap_, mapMutex_, Tbv_); // Replace with your actual initialization logic
         // Call computeLocalTraversability function from your KeyFrame class
 
         // set pose
@@ -89,7 +90,7 @@ private:
             RCLCPP_WARN(this->get_logger(), "Could not transform from map to base_footprint: %s", ex.what());
             return;
         }
-        Eigen::Translation3f translation(0.2f, 0.3f, 0.0f);
+        Eigen::Translation3f translation(0.0f, 0.0f, 0.0f);
         Eigen::Quaternionf rotation(transformStamped.transform.rotation.w, transformStamped.transform.rotation.x, transformStamped.transform.rotation.y, transformStamped.transform.rotation.z);
         Eigen::Affine3f Tmb_ = translation * rotation;
         keyframe_->setPose(Tmb_);

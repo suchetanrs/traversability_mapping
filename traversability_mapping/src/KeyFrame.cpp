@@ -193,7 +193,31 @@ namespace traversability_mapping
                         continue;
                     std::lock_guard<std::mutex> lock(gridMapMutex_);
                     std::lock_guard<std::mutex> lock2(*masterGridMapMutex_);
-                    pGridMap_->atPosition("hazard", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) = haz(0);
+                    if(parameterInstance.getValue<bool>("use_averaging"))
+                    {
+                        auto num_additions = 0.0;
+                        if(std::isnan(pGridMap_->atPosition("num_additions", traversabilityMap->ind2meter(Eigen::Vector2d(i, j)))))
+                        {
+                            pGridMap_->atPosition("num_additions", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) = 0.0;
+                            pGridMap_->atPosition("hazard", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) = 0.0;
+                        }
+                        num_additions = pGridMap_->atPosition("num_additions", traversabilityMap->ind2meter(Eigen::Vector2d(i, j)));
+                        if(haz(0) > pGridMap_->atPosition("hazard", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))))
+                        {
+                            if(num_additions > parameterInstance.getValue<double>("average_persistence"))
+                            {
+                                pGridMap_->atPosition("num_additions", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) = 1.0;
+                                num_additions = 1.0;
+                                pGridMap_->atPosition("hazard", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) = haz(0);
+                            }
+                            pGridMap_->atPosition("num_additions", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) += 1.0;
+                            pGridMap_->atPosition("hazard", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) = ((pGridMap_->atPosition("hazard", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) * num_additions) + haz(0)) / (num_additions + 1.0);
+                        }
+                    }
+                    else
+                    {
+                        pGridMap_->atPosition("hazard", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) = haz(0);
+                    }
                     pGridMap_->atPosition("step_haz", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) = haz(1);
                     // original
                     // pGridMap_->atPosition("roughness_haz", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) = haz(2);
@@ -265,6 +289,7 @@ namespace traversability_mapping
         {
             if (pGridMap_->atPosition("kfid", cell) == static_cast<float>(kfID_))
             {
+                pGridMap_->atPosition("num_additions", cell) = std::numeric_limits<float>::quiet_NaN();
                 pGridMap_->atPosition("hazard", cell) = std::numeric_limits<float>::quiet_NaN();
                 pGridMap_->atPosition("step_haz", cell) = std::numeric_limits<float>::quiet_NaN();
                 pGridMap_->atPosition("roughness_haz", cell) = std::numeric_limits<float>::quiet_NaN();
