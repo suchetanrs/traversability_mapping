@@ -14,10 +14,11 @@ robot_height: 1.5
 translation_change_threshold: 0.25
 rotation_change_threshold: 0.30
 
-num_local_keyframes: 3
+num_local_keyframes: 10
 is_kf_optimization_enabled: true # if this is set to true, the pointclouds are stored in memory. Large pointclouds can lead to fast memory exhaustion.
 use_pointcloud_buffer: true
-use_averaging: true
+use_probabilistic_update: true
+use_averaging: false
 average_persistence: 10.0 #if a cell is averaged 20 times, it is reset to start a new averaging instance.
 
 # SLAM Frame normally is the camera frame.

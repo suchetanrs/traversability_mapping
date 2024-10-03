@@ -13,8 +13,8 @@ make -j2
 sudo make install
 
 source /opt/ros/$ROS_DISTRO/setup.bash
-sudo apt-get install -y ros-$ROS_DISTRO-grid-map-ros
-sudo apt-get install -y ros-$ROS_DISTRO-grid-map-rviz-plugin
+#sudo apt-get install -y ros-$ROS_DISTRO-grid-map-ros
+#sudo apt-get install -y ros-$ROS_DISTRO-grid-map-rviz-plugin
 cd ../../..
 
 # Common
@@ -25,9 +25,9 @@ make
 sudo make install
 
 source /opt/ros/$ROS_DISTRO/setup.bash
-sudo apt-get install -y ros-$ROS_DISTRO-sensor-msgs
-sudo apt-get install -y ros-$ROS_DISTRO-grid-map
-sudo apt-get install -y ros-$ROS_DISTRO-nav-msgs
+#sudo apt-get install -y ros-$ROS_DISTRO-sensor-msgs
+#sudo apt-get install -y ros-$ROS_DISTRO-grid-map
+#sudo apt-get install -y ros-$ROS_DISTRO-nav-msgs
 source /opt/ros/$ROS_DISTRO/setup.bash
 
 cd ../..

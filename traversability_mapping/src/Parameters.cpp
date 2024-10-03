@@ -26,6 +26,7 @@ ParameterHandler::ParameterHandler()
     parameter_map_["is_kf_optimization_enabled"] = loaded_node["is_kf_optimization_enabled"].as<bool>();
     parameter_map_["use_pointcloud_buffer"] = loaded_node["use_pointcloud_buffer"].as<bool>();
     parameter_map_["use_averaging"] = loaded_node["use_averaging"].as<bool>();
+    parameter_map_["use_probabilistic_update"] = loaded_node["use_probabilistic_update"].as<bool>();
     parameter_map_["average_persistence"] = loaded_node["average_persistence"].as<double>();
 
     parameter_map_["T_SLAMFrameToLidarFrame/translation/x"] = loaded_node["T_SLAMFrameToLidarFrame"]["translation"]["x"].as<float>();
@@ -35,4 +36,9 @@ ParameterHandler::ParameterHandler()
     parameter_map_["T_SLAMFrameToLidarFrame/quaternion/x"] = loaded_node["T_SLAMFrameToLidarFrame"]["quaternion"]["x"].as<float>();
     parameter_map_["T_SLAMFrameToLidarFrame/quaternion/y"] = loaded_node["T_SLAMFrameToLidarFrame"]["quaternion"]["y"].as<float>();
     parameter_map_["T_SLAMFrameToLidarFrame/quaternion/z"] = loaded_node["T_SLAMFrameToLidarFrame"]["quaternion"]["z"].as<float>();
+
+    if(getValue<bool>("use_averaging") && getValue<bool>("use_probabilistic_update"))
+    {
+        throw std::runtime_error("Cannot use both probabilistic update and average. Make either one true, not both.");
+    }
 }

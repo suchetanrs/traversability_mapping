@@ -214,6 +214,17 @@ namespace traversability_mapping
                             pGridMap_->atPosition("hazard", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) = ((pGridMap_->atPosition("hazard", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) * num_additions) + haz(0)) / (num_additions + 1.0);
                         }
                     }
+                    else if(parameterInstance.getValue<bool>("use_probabilistic_update"))
+                    {
+                        // in this case, num additions becomes the log odds.
+                        // TODO: rename the key in the gridmap.
+                        if(haz(0) == 0)
+                            haz(0) = 0.1;
+                        if(haz(0) == 1)
+                            haz(0) = 0.9;
+                        double updated_probability = updateCellLogOdds(pGridMap_->atPosition("num_additions", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))), haz(0));
+                        pGridMap_->atPosition("hazard", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) = updated_probability;
+                    }
                     else
                     {
                         pGridMap_->atPosition("hazard", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) = haz(0);
