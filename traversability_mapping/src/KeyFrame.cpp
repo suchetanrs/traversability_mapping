@@ -115,11 +115,18 @@ namespace traversability_mapping
 
     void KeyFrame::setSLAMPose(const Sophus::SE3f &pose)
     {
-        std::lock_guard<std::mutex> lock(poseMutex_);
-        if (!poseSLAMCoord_)
-            poseSLAMCoord_ = std::make_unique<Sophus::SE3f>(pose);
-        else
-            *poseSLAMCoord_ = pose;
+        try
+        {
+            std::lock_guard<std::mutex> lock(poseMutex_);
+            if (!poseSLAMCoord_)
+                poseSLAMCoord_ = std::make_unique<Sophus::SE3f>(pose);
+            else
+                *poseSLAMCoord_ = pose;
+        }
+        catch (const std::exception& e)
+        {
+            throw std::runtime_error("Code should crash now");
+        }
     }
 
     void KeyFrame::setMap(long unsigned int mapID, std::shared_ptr<grid_map::GridMap> gridMap, std::shared_ptr<std::mutex> masterGridMapMutex)

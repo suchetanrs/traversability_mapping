@@ -67,7 +67,7 @@ namespace traversability_mapping
 
     void LocalMap::RunTraversability()
     {
-        int sleep = 100;
+        int sleep = parameterInstance.getValue<int>("global_adjustment_sleep");
         while(1)
         {
             while (activeMap_)

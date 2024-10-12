@@ -36,6 +36,7 @@ ParameterHandler::ParameterHandler()
     parameter_map_["T_SLAMFrameToLidarFrame/quaternion/x"] = loaded_node["T_SLAMFrameToLidarFrame"]["quaternion"]["x"].as<float>();
     parameter_map_["T_SLAMFrameToLidarFrame/quaternion/y"] = loaded_node["T_SLAMFrameToLidarFrame"]["quaternion"]["y"].as<float>();
     parameter_map_["T_SLAMFrameToLidarFrame/quaternion/z"] = loaded_node["T_SLAMFrameToLidarFrame"]["quaternion"]["z"].as<float>();
+    parameter_map_["global_adjustment_sleep"] = loaded_node["global_adjustment_sleep"].as<int>();
 
     if(getValue<bool>("use_averaging") && getValue<bool>("use_probabilistic_update"))
     {
