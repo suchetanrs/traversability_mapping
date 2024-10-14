@@ -49,6 +49,11 @@ class ParameterHandler
         }
     }
 
+    template <typename T>
+    void setValue(const std::string& parameterKey, const T& value) {
+        parameter_map_[parameterKey] = value;
+    }
+
   private:
     ParameterHandler(const ParameterHandler&) = delete;
     ParameterHandler& operator=(const ParameterHandler&) = delete;

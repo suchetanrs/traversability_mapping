@@ -63,6 +63,8 @@ public:
 
         tf_buffer_ptr_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
         tf_listener_ptr_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_ptr_);
+        parameterInstance.setValue<bool>("use_averaging", true);
+        parameterInstance.setValue<bool>("use_probabilistic_update", false);
     }
 
 private:
