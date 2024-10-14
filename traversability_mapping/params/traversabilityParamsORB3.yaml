@@ -1,12 +1,14 @@
 # Choose from ORB3, ISAE
 SLAM_System: "ORB3"
 
-half_size_local_map: 180.0 # size of the entire local map. The individual maps will be stitched in this space.
-grid_center_x: 120.0
-grid_center_y: 70.0
-
+# --- Gridmap related ---
+half_size_local_map: 50.0 # size of the entire local map. The individual maps will be stitched in this space.
+grid_center_x: 0.1
+grid_center_y: 0.1
 resolution_local_map: 0.25
 half_size_traversability: 5.5 # size of the map around the robot to consider for computing on the go traversability.
+
+# --- Traversability related ---
 security_distance: 0.6
 ground_clearance: 0.2
 max_slope: 0.8
@@ -14,11 +16,14 @@ robot_height: 1.5
 translation_change_threshold: 0.25
 rotation_change_threshold: 0.30
 
-num_local_keyframes: 3
+# --- Mapping related ---
+num_local_keyframes: 10
 is_kf_optimization_enabled: true # if this is set to true, the pointclouds are stored in memory. Large pointclouds can lead to fast memory exhaustion.
 use_pointcloud_buffer: true
-use_averaging: true
+use_probabilistic_update: true
+use_averaging: false
 average_persistence: 10.0 #if a cell is averaged 20 times, it is reset to start a new averaging instance.
+global_adjustment_sleep: 10 #time between processing every keyframe outside the local window (ms)
 
 # SLAM Frame normally is the camera frame.
 # T_SLAMFrameToLidarFrame:

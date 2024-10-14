@@ -5,7 +5,7 @@
       updates_topic_name: "traversability_keyframe_updates"
       pointcloud_topic_name: "lidar/points"
       use_lidar_pointcloud: false
-      publish_traversability_grid: false
+      publish_traversability_grid: true
 
   local_traversability_node:
     ros__parameters:

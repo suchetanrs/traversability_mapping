@@ -22,7 +22,7 @@ def generate_launch_description():
 
     name_argument = DeclareLaunchArgument(
         "robot_ns",
-        default_value="ns12322",
+        default_value="robot_0",
         description="Robot namespace",
     )
 
