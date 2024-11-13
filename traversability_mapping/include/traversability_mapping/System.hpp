@@ -28,11 +28,15 @@ namespace traversability_mapping
                                    long unsigned int mapID,
                                    sensor_msgs::msg::PointCloud2 sensorPointCloud);
 
+        void informLoopClosure();
+
         void updateKeyFrame(long unsigned int kfID,
                             Sophus::SE3f &poseSLAM);
 
         void updateKeyFrame(unsigned long long kfID,
                             Eigen::Affine3d &poseAffine);
+
+        void deleteKeyFrame(unsigned long long kfID);
 
         void addNewLocalMap(long unsigned int mapID);
 

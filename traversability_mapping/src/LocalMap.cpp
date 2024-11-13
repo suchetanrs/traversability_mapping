@@ -72,8 +72,19 @@ namespace traversability_mapping
         {
             while (activeMap_)
             {
-                for (auto &pair : keyFramesMap_)
+                std::unordered_map<long unsigned int, std::shared_ptr<KeyFrame>> keyFramesMapCopy_;
+                // create copy to avoid concurrent access and maintain RT mapping.
                 {
+                    std::lock_guard<std::mutex> lock(keyFramesMapMutex);
+                    keyFramesMapCopy_ = keyFramesMap_;
+                }
+                for (auto &pair : keyFramesMapCopy_)
+                {
+                    if(!activeMap_)
+                    {
+                        globalMappingRunning_ = false;
+                        break;
+                    }
                     auto keyFramePtr = pair.second;
 
                     // Check if the pointer is valid before calling recomputeCache
@@ -90,7 +101,7 @@ namespace traversability_mapping
                 // auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
                 // std::cout << "Processing time: " << duration.count() / 1e3 << " seconds.";
             }
-            std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         }
     }
 
@@ -101,9 +112,10 @@ namespace traversability_mapping
             while(1)
             {
                 localKeyFramesMutex.lock();
-                if(mLocalKeyFrames_.size() == 0)
+                if(mLocalKeyFrames_.size() == 0 || !activeMap_)
                 {
                     localKeyFramesMutex.unlock();
+                    localMappingRunning_ = false;
                     break;
                 }
                 auto kfPtr = mLocalKeyFrames_.back();
@@ -120,6 +132,35 @@ namespace traversability_mapping
             std::cout << "No Local Keyframes present ..." << std::endl;
             std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         }
+    }
+
+    void LocalMap::clearEntireMap()
+    {
+        activeMap_ = false;
+        globalMappingRunning_ = true;
+        localMappingRunning_ = true;
+        while(globalMappingRunning_ || localMappingRunning_)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            std::cout << "Waiting for local and global mapping to stop" << std::endl;
+        }
+        std::unordered_map<long unsigned int, std::shared_ptr<KeyFrame>> keyFramesMapCopy_;
+        // create copy to avoid concurrent access and maintain RT mapping.
+        {
+            std::lock_guard<std::mutex> lock(keyFramesMapMutex);
+            keyFramesMapCopy_ = keyFramesMap_;
+        }
+        for (auto &pair : keyFramesMapCopy_)
+        {
+            auto keyFramePtr = pair.second;
+
+            // Check if the pointer is valid before calling recomputeCache
+            if (keyFramePtr)
+            {
+                keyFramePtr->clearStrayValuesInGrid();
+            }
+        }
+        activeMap_ = true;
     }
 
     std::shared_ptr<KeyFrame> LocalMap::addNewKeyFrame(double timestamp,
@@ -148,6 +189,7 @@ namespace traversability_mapping
         auto it = keyFramesMap_.find(kfID);
         if (it != keyFramesMap_.end())
         {
+            it->second->clearStrayValuesInGrid();
             keyFramesMap_.erase(it); // Erase the key-value pair
             // std::cout << "Value associated with key " << kfID << " deleted from map: " << mapID_ << std::endl;
         }

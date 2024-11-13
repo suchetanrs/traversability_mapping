@@ -29,6 +29,8 @@ namespace traversability_mapping
 
         void RunLocalKeyFrames();
 
+        void clearEntireMap();
+
         // Function to add a new keyframe to the map
         std::shared_ptr<KeyFrame> addNewKeyFrame(double timestamp,
                                                  long unsigned int kfID,
@@ -77,6 +79,8 @@ namespace traversability_mapping
 
         std::shared_ptr<nav_msgs::msg::OccupancyGrid> gridMapOccupancy_;
         bool activeMap_ = false;
+        bool globalMappingRunning_ = false;
+        bool localMappingRunning_ = false;
     };
 }
 

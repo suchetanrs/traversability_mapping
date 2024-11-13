@@ -117,6 +117,11 @@ namespace traversability_mapping
         addNewKeyFrameToMap(timestampDouble, kfIDlong, mapID, sensorPointCloud);
     }
 
+    void System::informLoopClosure()
+    {
+        localMapsSet_[0]->clearEntireMap();
+    }
+
     void System::updateKeyFrame(long unsigned int kfID,
                                 Sophus::SE3f &poseSLAM)
     {
@@ -214,7 +219,21 @@ namespace traversability_mapping
         }
         else
         {
-            std::cout << "The keyframe with ID " << kfID << " is not made yet. What are you moving?" << std::endl;
+            std::cout << "The keyframe with ID " << kfID << " is not made yet. What are you moving? It may also be deleted." << std::endl;
+        }
+    }
+
+    void System::deleteKeyFrame(unsigned long long kfID)
+    {
+        std::lock_guard<std::recursive_mutex> lock(localMapMutex_);
+        if (allKeyFramesSet_.count(kfID) == 0)
+        {
+            localMapsSet_[allKeyFramesSet_[kfID]]->deleteKeyFrame(kfID);
+            allKeyFramesSet_.erase(kfID);
+        }
+        else
+        {
+            std::cout << "Cannot delete KF. Not found.." << std::endl;
         }
     }
 
