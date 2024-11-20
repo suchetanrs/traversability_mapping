@@ -312,6 +312,7 @@ namespace traversability_mapping
 
     void KeyFrame::updateGridAfterMapChange()
     {
+        clearStrayValuesInGrid();
         poseUpdateQueueMutex_.lock();
         if (poseUpdates_.size() == 0)
         {

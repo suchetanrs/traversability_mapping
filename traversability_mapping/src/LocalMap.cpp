@@ -190,7 +190,7 @@ namespace traversability_mapping
         auto it = keyFramesMap_.find(kfID);
         if (it != keyFramesMap_.end())
         {
-            it->second->clearStrayValuesInGrid();
+            // it->second->clearStrayValuesInGrid();
             keyFramesMap_.erase(it); // Erase the key-value pair
             // std::cout << "Value associated with key " << kfID << " deleted from map: " << mapID_ << std::endl;
         }
