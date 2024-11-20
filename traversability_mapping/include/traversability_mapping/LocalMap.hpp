@@ -10,7 +10,19 @@
 #include "traversability_mapping/Helpers.hpp"
 #include "traversability_mapping/Parameters.hpp"
 
-using UpdateQueue = std::queue<std::pair<long unsigned int, Sophus::SE3f>>;
+struct KeyFrameUpdateData
+{
+    long unsigned int id;
+    Sophus::SE3f pose;
+    long unsigned int numConnections;
+
+    KeyFrameUpdateData() : id(0), pose(Sophus::SE3f()), numConnections(0) {}
+    
+    KeyFrameUpdateData(long unsigned int id, Sophus::SE3f p, long unsigned int connections) 
+        : id(id), pose(p), numConnections(connections) {}
+};
+
+using UpdateQueue = std::queue<KeyFrameUpdateData>;
 
 namespace traversability_mapping
 {
@@ -66,7 +78,7 @@ namespace traversability_mapping
         Eigen::Affine3f Tbv_;
 
         std::mutex &updateQueueMutex_;
-        std::shared_ptr<std::queue<std::pair<long unsigned int, Sophus::SE3f>>> keyFrameUpdateQueue_;
+        std::shared_ptr<UpdateQueue> keyFrameUpdateQueue_;
         
         std::shared_ptr<std::mutex> masterGridMapMutex_;
         std::shared_ptr<grid_map::GridMap> pGridMap_;

@@ -28,6 +28,7 @@ namespace traversability_mapping
         //     static_cast<float>(0.381), // y
         //     static_cast<float>(0.0));  // z
         // Tbv_ = translation * quaternion;
+        numConnections_ = 0;
     }
 
     KeyFrame::KeyFrame(long unsigned int kfID,
@@ -39,6 +40,7 @@ namespace traversability_mapping
           masterGridMapMutex_(masterGridMapMutex),
           Tbv_(Tbv)
     {
+        numConnections_ = 0;
     }
 
     KeyFrame::~KeyFrame()
@@ -82,6 +84,12 @@ namespace traversability_mapping
         return *poseSLAMCoord_;
     }
 
+    const long unsigned int &KeyFrame::getConnections()
+    {
+        std::lock_guard<std::mutex> lock(connectionMutex_);
+        return numConnections_;
+    }
+
     void KeyFrame::setPose(const Eigen::Affine3f &pose)
     {
         std::lock_guard<std::mutex> lock(poseMutex_);
@@ -93,17 +101,18 @@ namespace traversability_mapping
         }
         else
         {
-            // Measure if the pose has significantly changed wrt the the thresholds.
-            Eigen::Vector3f eulerAnglesDiff = (poseTraversabilityCoord_->rotation() * pose.rotation().transpose()).eulerAngles(2, 0, 1);
-            Eigen::Vector3f translationDiff = poseTraversabilityCoord_->translation() - pose.translation();
-            // std::cout << "Max angle:" << eulerAnglesDiff.maxCoeff() << std::endl;
-            // std::cout << "Max adist:" << translationDiff.maxCoeff() << std::endl;
-            if (eulerAnglesDiff.maxCoeff() > parameterInstance.getValue<double>("rotation_change_threshold") ||
-                translationDiff.maxCoeff() > parameterInstance.getValue<double>("translation_change_threshold"))
-            {
-                *poseTraversabilityCoord_ = pose;
-                newPose = true;
-            }
+            // // Measure if the pose has significantly changed wrt the the thresholds.
+            // Eigen::Vector3f eulerAnglesDiff = (poseTraversabilityCoord_->rotation() * pose.rotation().transpose()).eulerAngles(2, 0, 1);
+            // Eigen::Vector3f translationDiff = poseTraversabilityCoord_->translation() - pose.translation();
+            // // std::cout << "Max angle:" << eulerAnglesDiff.maxCoeff() << std::endl;
+            // // std::cout << "Max adist:" << translationDiff.maxCoeff() << std::endl;
+            // if (eulerAnglesDiff.maxCoeff() > parameterInstance.getValue<double>("rotation_change_threshold") ||
+            //     translationDiff.maxCoeff() > parameterInstance.getValue<double>("translation_change_threshold"))
+            // {
+            // }
+            
+            *poseTraversabilityCoord_ = pose;
+            newPose = true;
         }
         if (newPose)
         {
@@ -135,6 +144,12 @@ namespace traversability_mapping
         masterGridMapMutex_ = masterGridMapMutex;
         parentMapID_ = mapID;
         pGridMap_ = gridMap;
+    }
+
+    void KeyFrame::setConnections(long unsigned int numConnections)
+    {
+        std::lock_guard<std::mutex> lock(connectionMutex_);
+        numConnections_ = numConnections;
     }
 
     void KeyFrame::computeLocalTraversability(sensor_msgs::msg::PointCloud2 &kFpcl)
@@ -188,6 +203,8 @@ namespace traversability_mapping
             //     // map.at("elevation", *it) = haz(5);
             // }
             auto travGrid = traversabilityMap->getGrid();
+            std::lock_guard<std::mutex> lock(gridMapMutex_);
+            std::lock_guard<std::mutex> lock2(*masterGridMapMutex_);
             for (size_t i = 0; i < travGrid.size(); ++i)
             {
                 for (size_t j = 0; j < travGrid[i].size(); ++j)
@@ -198,8 +215,6 @@ namespace traversability_mapping
                     ++grid_count;
                     if (haz(0) < 0.)
                         continue;
-                    std::lock_guard<std::mutex> lock(gridMapMutex_);
-                    std::lock_guard<std::mutex> lock2(*masterGridMapMutex_);
                     if(parameterInstance.getValue<bool>("use_averaging"))
                     {
                         auto num_additions = 0.0;
@@ -256,7 +271,7 @@ namespace traversability_mapping
         // map.setPosition(slamPosition);
     }
 
-    void KeyFrame::recomputeCache()
+    void KeyFrame::recomputeCache(bool useHashGrid)
     {
         poseUpdateQueueMutex_.lock();
         if (poseUpdates_.size() == 0)
@@ -269,6 +284,12 @@ namespace traversability_mapping
         poseUpdates_.clear();
         poseUpdateQueueMutex_.unlock();
 
+        if(!spatialHashGridInstance_.updateKeyframe(kfID_, Tmb_, getConnections()))
+        {
+            if(useHashGrid)
+                return;
+        }
+
         auto start_time = std::chrono::high_resolution_clock::now();
         // std::cout << "Recompute cache for KF with ID: " << kfID_ << std::endl;
         // Transform the pointCloudLidar_ to map frame.
@@ -279,7 +300,7 @@ namespace traversability_mapping
         pointCloudMap_->header.frame_id = "map";
 
         // clear stray values
-        clearStrayValuesInGrid();
+        // clearStrayValuesInGrid();
         // recompute values and mark on map.
         computeLocalTraversability(*pointCloudMap_);
         if(!parameterInstance.getValue<bool>("is_kf_optimization_enabled"))

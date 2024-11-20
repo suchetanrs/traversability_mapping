@@ -61,7 +61,7 @@ namespace traversability_mapping
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 // std::cout << "Currently running active map id: " << mapID_ << " and the update queue size is: " << keyFrameUpdateQueue_->size() << std::endl;
             }
-            std::this_thread::sleep_for(std::chrono::seconds(5));
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
     }
 
@@ -90,7 +90,7 @@ namespace traversability_mapping
                     // Check if the pointer is valid before calling recomputeCache
                     if (keyFramePtr)
                     {
-                        keyFramePtr->recomputeCache();
+                        keyFramePtr->recomputeCache(true);
                     }
                     std::this_thread::sleep_for(std::chrono::milliseconds(sleep));
                 }
@@ -101,6 +101,7 @@ namespace traversability_mapping
                 // auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
                 // std::cout << "Processing time: " << duration.count() / 1e3 << " seconds.";
             }
+            globalMappingRunning_ = false;
             std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         }
     }
@@ -126,7 +127,7 @@ namespace traversability_mapping
                     mLocalKeyFrames_.pop_front();
                 }
                 localKeyFramesMutex.unlock();
-                kfPtr->recomputeCache();
+                kfPtr->recomputeCache(false);
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
             }
             std::cout << "No Local Keyframes present ..." << std::endl;
@@ -141,8 +142,8 @@ namespace traversability_mapping
         localMappingRunning_ = true;
         while(globalMappingRunning_ || localMappingRunning_)
         {
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
-            std::cout << "Waiting for local and global mapping to stop" << std::endl;
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+            std::cout << "Waiting for local (" << localMappingRunning_ << ") and global mapping (" << globalMappingRunning_ << ")to stop" << std::endl;
         }
         std::unordered_map<long unsigned int, std::shared_ptr<KeyFrame>> keyFramesMapCopy_;
         // create copy to avoid concurrent access and maintain RT mapping.
@@ -263,24 +264,25 @@ namespace traversability_mapping
             std::shared_ptr<KeyFrame> kfPtrToUpdate = nullptr;
             {
                 std::lock_guard<std::mutex> lock(keyFramesMapMutex);
-                if (keyFramesMap_.count(kfPoseToUpdate.first) > 0)
+                if (keyFramesMap_.find(kfPoseToUpdate.id) != keyFramesMap_.end())
                 {
-                    kfPtrToUpdate = keyFramesMap_[kfPoseToUpdate.first];
+                    kfPtrToUpdate = keyFramesMap_[kfPoseToUpdate.id];
                 }
             }
             if(kfPtrToUpdate)
             {
-                kfPtrToUpdate->setSLAMPose(kfPoseToUpdate.second);
+                kfPtrToUpdate->setSLAMPose(kfPoseToUpdate.pose);
+                kfPtrToUpdate->setConnections(kfPoseToUpdate.numConnections);
 
                 // std::cout << "NEW CONVERSION!" << std::endl;
 
                 if (parameterInstance.getValue<std::string>("SLAM_System") == "ORB3")
                 {
-                    kfPtrToUpdate->setPose(typeConversion_->se3ToAffine<Eigen::Affine3f>(kfPoseToUpdate.second, true));
+                    kfPtrToUpdate->setPose(typeConversion_->se3ToAffine<Eigen::Affine3f>(kfPoseToUpdate.pose, true));
                 }
                 else if (parameterInstance.getValue<std::string>("SLAM_System") == "ISAE")
                 {
-                    kfPtrToUpdate->setPose(typeConversion_->se3ToAffine<Eigen::Affine3f>(kfPoseToUpdate.second, false));
+                    kfPtrToUpdate->setPose(typeConversion_->se3ToAffine<Eigen::Affine3f>(kfPoseToUpdate.pose, false));
                 }
             }
         }

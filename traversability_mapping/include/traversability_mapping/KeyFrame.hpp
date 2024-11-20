@@ -16,6 +16,7 @@
 #include "traversability_mapping/TraversabilityGrid.hpp"
 #include "traversability_mapping/Helpers.hpp"
 #include "traversability_mapping/Parameters.hpp"
+#include "traversability_mapping/HashGrid.hpp"
 
 namespace traversability_mapping
 {
@@ -46,6 +47,8 @@ namespace traversability_mapping
 
         const Sophus::SE3f &getSLAMPose();
 
+        const long unsigned int &getConnections();
+
         // SETTERS
         void setPose(const Eigen::Affine3f &pose);
 
@@ -53,11 +56,13 @@ namespace traversability_mapping
 
         void setMap(long unsigned int mapID, std::shared_ptr<grid_map::GridMap> gridMap, std::shared_ptr<std::mutex> masterGridMapMutex);
 
+        void setConnections(long unsigned int numConnections);
+
         // TRAVERSABILITY FUNCTION
         void computeLocalTraversability(sensor_msgs::msg::PointCloud2 &kFpcl);
 
         // CACHE RECOMPUTE
-        void recomputeCache();
+        void recomputeCache(bool useHashGrid);
 
         void processUpdateQueue();
 
@@ -71,6 +76,9 @@ namespace traversability_mapping
         long unsigned int kfID_;
         sensor_msgs::msg::PointCloud2 pointCloudLidar_;
         Eigen::Affine3f Tbv_;
+
+        std::mutex connectionMutex_;
+        long unsigned int numConnections_;
 
         std::mutex poseMutex_;
         std::unique_ptr<Sophus::SE3f> poseSLAMCoord_;

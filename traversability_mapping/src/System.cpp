@@ -19,7 +19,7 @@ namespace traversability_mapping
                                      long unsigned int mapID,
                                      sensor_msgs::msg::PointCloud2 &sensorPointCloud)
     {
-        std::cout << "addNewKeyFrameToMap" << std::endl;
+        // std::cout << "addNewKeyFrameToMap" << std::endl;
         // std::cout << "traversability_mapping::System::addNewKeyFrameToMap with id: " << kfID << " and ts: " << timestamp << std::endl;
         // Add the keyframe to the local map
         std::lock_guard<std::recursive_mutex> lock(localMapMutex_);
@@ -49,7 +49,7 @@ namespace traversability_mapping
                                         long unsigned int kfID,
                                         long unsigned int mapID)
     {
-        std::cout << "addNewKeyFrame2" << std::endl;
+        // std::cout << "addNewKeyFrame2" << std::endl;
         if (kfID < 0)
         {
             std::string errorMsg = "The given KF ID was negative. Please make sure the keyFrame IDs are positive. KF ID: " + std::to_string(kfID);
@@ -62,8 +62,8 @@ namespace traversability_mapping
         if (sensorPointCloud.data.size() == 0)
             return;
         auto pcl_sec = sensorPointCloud.header.stamp.sec + (sensorPointCloud.header.stamp.nanosec * 1e-9);
-        std::cout << "pcl ts is: " << pcl_sec << std::endl;
-        std::cout << "Difference in closest pcl ts is: " << timestamp - pcl_sec << std::endl;
+        // std::cout << "pcl ts is: " << pcl_sec << std::endl;
+        // std::cout << "Difference in closest pcl ts is: " << timestamp - pcl_sec << std::endl;
         // std::cout << "Got closest pointcloud for: " << kfID << std::endl;
         // auto pcl_sec = sensorPointCloud.header.stamp.sec + (sensorPointCloud.header.stamp.nanosec * pow(10, -9));
         // std::cout << "Difference in closest pcl ts is: " << timestamp - pcl_sec << std::endl;
@@ -74,7 +74,7 @@ namespace traversability_mapping
                                        long unsigned int kfID,
                                        long unsigned int mapID)
     {
-        std::cout << "addNewKeyFrame3" << std::endl;
+        // std::cout << "addNewKeyFrame3" << std::endl;
         const unsigned long long timestampSecond = timestamp / 1e9;
         const unsigned long long timestampNanoSec = timestamp % (unsigned long long)1e9;
         double timestampDouble = timestampSecond + (timestampNanoSec * 1e-9);
@@ -91,8 +91,8 @@ namespace traversability_mapping
         if (sensorPointCloud.data.size() == 0)
             return;
         auto pcl_sec = sensorPointCloud.header.stamp.sec + (sensorPointCloud.header.stamp.nanosec * 1e-9);
-        std::cout << "pcl ts is: " << pcl_sec << std::endl;
-        std::cout << "Difference in closest pcl ts is: " << timestampDouble - pcl_sec << std::endl;
+        // std::cout << "pcl ts is: " << pcl_sec << std::endl;
+        // std::cout << "Difference in closest pcl ts is: " << timestampDouble - pcl_sec << std::endl;
         // std::cout << "Got closest pointcloud for: " << kfID << std::endl;
         // auto pcl_sec = sensorPointCloud.header.stamp.sec + (sensorPointCloud.header.stamp.nanosec * pow(10, -9));
         // std::cout << "Difference in closest pcl ts is: " << timestamp - pcl_sec << std::endl;
@@ -104,7 +104,7 @@ namespace traversability_mapping
                                        long unsigned int mapID,
                                        sensor_msgs::msg::PointCloud2 sensorPointCloud)
     {
-        std::cout << "addNewKeyFrame4" << std::endl;
+        // std::cout << "addNewKeyFrame4" << std::endl;
         const unsigned long long timestampSecond = timestamp / 1e9;
         const unsigned long long timestampNanoSec = timestamp % (unsigned long long)1e9;
         double timestampDouble = timestampSecond + (timestampNanoSec * 1e-9);
@@ -123,16 +123,17 @@ namespace traversability_mapping
     }
 
     void System::updateKeyFrame(long unsigned int kfID,
-                                Sophus::SE3f &poseSLAM)
+                                Sophus::SE3f &poseSLAM,
+                                long unsigned int numConnections)
     {
-        // std::cout << "traversability_mapping::System::updateKeyFrame with id: " << kfID << std::endl;
+        std::cout << "traversability_mapping::System::updateKeyFrame with id: " << kfID << std::endl;
         // Add the keyframe to the local map
         std::lock_guard<std::recursive_mutex> lock(localMapMutex_);
         if (allKeyFramesSet_.find(kfID) != allKeyFramesSet_.end())
         {
             // std::cout << "System::updateKeyFrame kfid: " << kfID << std::endl;
             updateQueueMutex_.lock();
-            keyFrameUpdateQueue_->push(std::make_pair(kfID, poseSLAM));
+            keyFrameUpdateQueue_->push(KeyFrameUpdateData(kfID, poseSLAM, 0));
             updateQueueMutex_.unlock();
             // std::cout << "UPDATING KEYFRAME TO MAP!!!!" << mapID << std::endl;
         }
@@ -162,7 +163,8 @@ namespace traversability_mapping
     }
 
     void System::updateKeyFrame(unsigned long long kfID,
-                                Eigen::Affine3d &poseAffine)
+                                Eigen::Affine3d &poseAffine,
+                                long unsigned int numConnections)
     {
         Sophus::SE3f poseSLAM(poseAffine.cast<float>().rotation(), poseAffine.cast<float>().translation());
 
@@ -173,7 +175,7 @@ namespace traversability_mapping
         {
             // std::cout << "System::updateKeyFrame kfid: " << static_cast<long unsigned int>(kfID) << std::endl;
             updateQueueMutex_.lock();
-            keyFrameUpdateQueue_->push(std::make_pair(static_cast<long unsigned int>(kfID), poseSLAM));
+            keyFrameUpdateQueue_->push(KeyFrameUpdateData(static_cast<long unsigned int>(kfID), poseSLAM, 0));
             updateQueueMutex_.unlock();
             // std::cout << "UPDATING KEYFRAME TO MAP!!!!" << mapID << std::endl;
         }
@@ -190,9 +192,9 @@ namespace traversability_mapping
         // std::cout << "Incoming: kf: " << kfID << " mapID: " << mapID << std::endl;
         // std::cout << "Exisiting: kf: " << kfID << " mapID: " << allKeyFramesSet_[kfID] << std::endl;
         std::lock_guard<std::recursive_mutex> lock(localMapMutex_);
-        if (allKeyFramesSet_.count(kfID) > 0)
+        if (allKeyFramesSet_.find(kfID) != allKeyFramesSet_.end())
         {
-            if (localMapsSet_.count(mapID) > 0)
+            if (localMapsSet_.find(mapID) != localMapsSet_.end())
             {
                 if (allKeyFramesSet_[kfID] != mapID)
                 {
@@ -226,14 +228,16 @@ namespace traversability_mapping
     void System::deleteKeyFrame(unsigned long long kfID)
     {
         std::lock_guard<std::recursive_mutex> lock(localMapMutex_);
-        if (allKeyFramesSet_.count(kfID) == 0)
+        auto kf_c = static_cast<long unsigned int>(kfID);
+        if (allKeyFramesSet_.find(kf_c) != allKeyFramesSet_.end())
         {
-            localMapsSet_[allKeyFramesSet_[kfID]]->deleteKeyFrame(kfID);
-            allKeyFramesSet_.erase(kfID);
+            localMapsSet_[allKeyFramesSet_[kf_c]]->deleteKeyFrame(kf_c);
+            allKeyFramesSet_.erase(kf_c);
+            spatialHashGridInstance_.deleteKeyframe(kf_c);
         }
         else
         {
-            std::cout << "Cannot delete KF. Not found.." << std::endl;
+            std::cout << "Cannot delete KF" << kf_c << ". Not found.." << std::endl;
         }
     }
 

@@ -74,7 +74,7 @@ private:
                 traversabilitySystem_->addNewKeyFrameWithPCL(keyframe.kf_timestamp_in_nanosec, keyframe.kf_id, keyframe.map_id, keyframe.kf_pointcloud);
             Eigen::Affine3d keyFramePoseEigen;
             tf2::fromMsg(keyframe.kf_pose, keyFramePoseEigen);
-            traversabilitySystem_->updateKeyFrame(keyframe.kf_id, keyFramePoseEigen);
+            traversabilitySystem_->updateKeyFrame(keyframe.kf_id, keyFramePoseEigen, 1);
 
             // pclPublisher_->publish(keyframe.kf_pointcloud);
 
@@ -95,7 +95,7 @@ private:
             // update the keyframe to the traversability map using pTraversability_
             Eigen::Affine3d keyFramePoseEigen;
             tf2::fromMsg(keyframe.kf_pose, keyFramePoseEigen);
-            traversabilitySystem_->updateKeyFrame(keyframe.kf_id, keyFramePoseEigen);
+            traversabilitySystem_->updateKeyFrame(keyframe.kf_id, keyFramePoseEigen, 1);
         }
     }
 

@@ -31,10 +31,12 @@ namespace traversability_mapping
         void informLoopClosure();
 
         void updateKeyFrame(long unsigned int kfID,
-                            Sophus::SE3f &poseSLAM);
+                            Sophus::SE3f &poseSLAM,
+                            long unsigned int numConnections);
 
         void updateKeyFrame(unsigned long long kfID,
-                            Eigen::Affine3d &poseAffine);
+                            Eigen::Affine3d &poseAffine,
+                            long unsigned int numConnections);
 
         void deleteKeyFrame(unsigned long long kfID);
 
