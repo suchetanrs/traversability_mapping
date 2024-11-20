@@ -9,7 +9,7 @@
 
   local_traversability_node:
     ros__parameters:
-      pointcloud_topic_name: "lidar/points"
+      pointcloud_topic_name: "/fused_pointcloud"
       expected_frequency: 4.0 # Hz.
 
   traversability_threshold_node:

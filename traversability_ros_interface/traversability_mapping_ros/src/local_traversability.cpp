@@ -72,10 +72,10 @@ private:
     {
         auto current_time = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> elapsed = current_time - last_callback_time_;
-        if (elapsed.count() < callback_interval_)
-            return;
+        // if (elapsed.count() < callback_interval_)
+        //     return;
         last_callback_time_ = current_time;
-        // RCLCPP_INFO_STREAM(this->get_logger(), "PCL callback.");
+        RCLCPP_INFO_STREAM(this->get_logger(), "PCL callback.");
         // Initialize your KeyFrame class
         std::shared_ptr<std::mutex> mapMutex_ = std::make_shared<std::mutex>();
         auto keyframe_ = std::make_shared<traversability_mapping::KeyFrame>(1, pGridMap_, mapMutex_, Tbv_); // Replace with your actual initialization logic
@@ -85,42 +85,54 @@ private:
         geometry_msgs::msg::TransformStamped transformStamped;
         try
         {
-            transformStamped = tf_buffer_ptr_->lookupTransform("map", static_cast<std::string>(this->get_namespace()).substr(1) + "/base_footprint", tf2::TimePointZero);
+            // transformStamped = tf_buffer_ptr_->lookupTransform("map", static_cast<std::string>(this->get_namespace()).substr(1) + "/map", tf2::TimePointZero);
+            transformStamped = tf_buffer_ptr_->lookupTransform("map", "map", tf2::TimePointZero);
         }
         catch (tf2::TransformException &ex)
         {
             RCLCPP_WARN(this->get_logger(), "Could not transform from map to base_footprint: %s", ex.what());
             return;
         }
-        Eigen::Translation3f translation(0.0f, 0.0f, 0.0f);
-        Eigen::Quaternionf rotation(transformStamped.transform.rotation.w, transformStamped.transform.rotation.x, transformStamped.transform.rotation.y, transformStamped.transform.rotation.z);
-        Eigen::Affine3f Tmb_ = translation * rotation;
-        keyframe_->setPose(Tmb_);
-
-        auto Tmv_ = Tmb_ * Tbv_;
-        sensor_msgs::msg::PointCloud2 pointCloudCorrected_;
-        traversability_mapping::doTransformPCL(*msg, pointCloudCorrected_, Tmv_);
-        auto pointCloudMap_ = std::make_shared<sensor_msgs::msg::PointCloud2>(pointCloudCorrected_);
-        pointCloudMap_->header.frame_id = "map";
-
-        keyframe_->computeLocalTraversability(*pointCloudMap_); // Assuming keyframe_ is a shared pointer to your KeyFrame object
-
-        nav_msgs::msg::OccupancyGrid occupancyGrid_msg;
-        traversability_mapping::gridMapToOccupancyGrid(*pGridMap_, "hazard", 0., 1., occupancyGrid_msg);
-        gridMapOccupancy_ = std::make_shared<nav_msgs::msg::OccupancyGrid>(occupancyGrid_msg);
-        gridMapOccupancy_->info.origin.position.x = transformStamped.transform.translation.x - parameterInstance.getValue<double>("half_size_traversability");
-        gridMapOccupancy_->info.origin.position.y = transformStamped.transform.translation.y - parameterInstance.getValue<double>("half_size_traversability");
-        // gridMapOccupancy_->info.origin.orientation = transformStamped.transform.rotation;
-        gridMapOccupancy_->header.frame_id = "map";
-        gridMapOccupancy_->header.stamp = msg->header.stamp;
-        occupancy_grid_publisher_->publish(*gridMapOccupancy_);
-
-        if (publish_local_gridmap_)
+        while(rclcpp::ok())
         {
-            auto message = *grid_map::GridMapRosConverter::toMessage(*pGridMap_);
-            traversabilityPub_->publish(message);
+            auto start_time = std::chrono::high_resolution_clock::now();
+            RCLCPP_INFO(this->get_logger(), "NEW!");
+            Eigen::Translation3f translation(0.0f, 0.0f, 0.0f);
+            Eigen::Quaternionf rotation(transformStamped.transform.rotation.w, transformStamped.transform.rotation.x, transformStamped.transform.rotation.y, transformStamped.transform.rotation.z);
+            Eigen::Affine3f Tmb_ = translation * rotation;
+            keyframe_->setPose(Tmb_);
+
+            auto Tmv_ = Tmb_ * Tbv_;
+            sensor_msgs::msg::PointCloud2 pointCloudCorrected_;
+            traversability_mapping::doTransformPCL(*msg, pointCloudCorrected_, Tmv_);
+            auto pointCloudMap_ = std::make_shared<sensor_msgs::msg::PointCloud2>(pointCloudCorrected_);
+            pointCloudMap_->header.frame_id = "map";
+
+            keyframe_->computeLocalTraversability(*pointCloudMap_); // Assuming keyframe_ is a shared pointer to your KeyFrame object
+
+            nav_msgs::msg::OccupancyGrid occupancyGrid_msg;
+            traversability_mapping::gridMapToOccupancyGrid(*pGridMap_, "hazard", 0., 1., occupancyGrid_msg);
+            gridMapOccupancy_ = std::make_shared<nav_msgs::msg::OccupancyGrid>(occupancyGrid_msg);
+            gridMapOccupancy_->info.origin.position.x = transformStamped.transform.translation.x - parameterInstance.getValue<double>("half_size_traversability");
+            gridMapOccupancy_->info.origin.position.y = transformStamped.transform.translation.y - parameterInstance.getValue<double>("half_size_traversability");
+            // gridMapOccupancy_->info.origin.orientation = transformStamped.transform.rotation;
+            gridMapOccupancy_->header.frame_id = "map";
+            gridMapOccupancy_->header.stamp = msg->header.stamp;
+            occupancy_grid_publisher_->publish(*gridMapOccupancy_);
+
+            if (publish_local_gridmap_)
+            {
+                auto message = *grid_map::GridMapRosConverter::toMessage(*pGridMap_);
+                traversabilityPub_->publish(message);
+            }
+            keyframe_->clearStrayValuesInGrid();
+            // End time measurement
+            auto end_time = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+
+            // Log the duration
+            RCLCPP_INFO(this->get_logger(), "Iteration time: %ld ms", duration.count());
         }
-        keyframe_->clearStrayValuesInGrid();
     }
 
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr pcl_subscriber_;

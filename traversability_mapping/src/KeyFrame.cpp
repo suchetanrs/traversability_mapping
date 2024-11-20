@@ -172,7 +172,7 @@ namespace traversability_mapping
             Eigen::Vector3d pt3(it[0], it[1], it[2]);
             if (((it[0] == 0) && (it[1] == 0)) || (it[2] > robot_height_))
                 continue;
-            traversabilityMap->insert_data(pt3);
+            traversabilityMap->insert_data(it[0], it[1], it[2]);
         }
         try
         {

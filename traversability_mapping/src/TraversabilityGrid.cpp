@@ -2,16 +2,18 @@
 #include <Eigen/Eigenvalues>
 namespace traversability_mapping
 {
-    void traversabilityGrid::insert_data(Eigen::Vector3d &p3d)
+    void traversabilityGrid::insert_data(float xp, float yp, float zp)
     {
 
         // Are we at maximal subdivision lvl?
-        Eigen::Vector2d ind = meter2ind(Eigen::Vector2d(p3d.x(), p3d.y()));
+        float xpo = 0;
+        float ypo = 0;
+        meter2indOpt(xp, yp, xpo, ypo);
 
-        if (ind.x() >= size_x_ || ind.y() >= size_y_ ||
-            ind.x() < 0 || ind.y() < 0)
+        if (xpo >= size_x_ || ypo >= size_y_ ||
+            xpo < 0 || ypo < 0)
             return;
-        _grid.at(ind.x()).at(ind.y()).insert(p3d);
+        _grid.at(xpo).at(ypo).insert(xp, yp, zp);
     }
 
     Eigen::Vector4d traversabilityGrid::get_goodness_m(Eigen::Vector2d meters, const double distance, const double ground_clearance, const double max_pitch)
@@ -36,7 +38,7 @@ namespace traversability_mapping
 
         // Init params
         uint border_hazard = 0;
-        double zM = -100., zm = 100.;
+        float zM = -100., zm = 100.;
 
         uint nb_min = 0.25 * (2 * delta_ind + 1) * (2 * delta_ind + 1);
 

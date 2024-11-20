@@ -29,37 +29,37 @@ public:
         N = 0;
     }
 
-    void insert(Eigen::Vector3d &p3d){
+    void insert(const float xp, const float yp, const float zp){
         N++;
         // deal with min max
         // TODO: Check logic of min and max.
-        z_min = std::min(p3d.z(), z_min);
-        z_max = std::max(p3d.z(), z_max);
+        z_min = std::min(zp, z_min);
+        z_max = std::max(zp, z_max);
 
         // update momentums
-        sx += p3d.x();
-        sy += p3d.y();
-        sz += p3d.z();
-        sx2 += p3d.x()*p3d.x();
-        sy2 += p3d.y()*p3d.y();
-        sz2 += p3d.z()*p3d.z();
-        sxy += p3d.x()*p3d.y();
-        sxz += p3d.x()*p3d.z();
-        syz += p3d.y()*p3d.z();
+        sx += xp;
+        sy += yp;
+        sz += zp;
+        sx2 += xp*xp;
+        sy2 += yp*yp;
+        sz2 += zp*zp;
+        sxy += xp*yp;
+        sxz += xp*zp;
+        syz += yp*zp;
     }
 
     unsigned int N=0;
-    double z_min=0.;
-    double z_max=0.;
-    double sx = 0.;
-    double sy = 0.;
-    double sz = 0.;
-    double sx2 = 0.;
-    double sy2 = 0.;
-    double sz2 =0.;
-    double sxy =0.;
-    double sxz =0.;
-    double syz = 0.;
+    float z_min=0.;
+    float z_max=0.;
+    float sx = 0.;
+    float sy = 0.;
+    float sz = 0.;
+    float sx2 = 0.;
+    float sy2 = 0.;
+    float sz2 =0.;
+    float sxy =0.;
+    float sxz =0.;
+    float syz = 0.;
 };
 
 
@@ -77,11 +77,16 @@ public:
         size_y_ = 2.*(std::ceil(Nd_y))+1;
         _grid.resize(size_x_, std::vector<NodeMetaData>(size_y_, default_value));
         reset();
+
+        offsetX = _gridOffset.x();
+        offsetY = _gridOffset.y();
+        halfsideX = _halfside.x();
+        halfsideY = _halfside.y();
     }
 
     // @brief responsible for inserting a 3D point into the appropriate cell within the grid.
     // The appropriate cell here is that all points with the same x and y coordinates as the node in the grid map are grouped regardless of the z direction.
-    void insert_data(Eigen::Vector3d &p3d);
+    void insert_data(float xp, float yp, float zp);
 
     // @brief resets metadata for all cells in the grid.
     void reset(){ 
@@ -106,6 +111,13 @@ public:
         return Eigen::Vector2d(std::min(static_cast<int>(std::round(idx.x())), size_x_ - 1) , std::min(static_cast<int>(std::round(idx.y())), size_y_ - 1));
     }
 
+    void meter2indOpt(float xp, float yp, float& xpo, float& ypo){
+        auto idx = (xp-offsetX+halfsideX)/_resolution;
+        auto idy = (yp-offsetY+halfsideY)/_resolution;
+        xpo = std::min(static_cast<int>(std::round(idx)), size_x_ - 1);
+        ypo = std::min(static_cast<int>(std::round(idy)), size_y_ - 1);
+    }
+
     Eigen::Vector2d ind2meter(Eigen::Vector2d ind){
         return (ind*_resolution -_halfside +_gridOffset);
     }
@@ -119,6 +131,10 @@ private :
     Eigen::Vector2d _center;                      /// Center
     Eigen::Vector2d _halfside;                    /// Half-size of the cube
     Eigen::Vector2d _gridOffset;
+    float offsetX;
+    float offsetY;
+    float halfsideX;
+    float halfsideY;
 
     NodeMetaData _meta_data;                      /// Meta-data container
 
