@@ -209,6 +209,7 @@ namespace traversability_mapping
             {
                 for (size_t j = 0; j < travGrid[i].size(); ++j)
                 {
+                    Eigen::Vector2d meterValue = traversabilityMap->ind2meter(Eigen::Vector2d(i, j));
                     Eigen::Vector4d haz = traversabilityMap->get_goodness(
                         Eigen::Vector2d(i, j),
                         security_distance_, ground_clearance_, max_slope_);
@@ -218,22 +219,22 @@ namespace traversability_mapping
                     if(parameterInstance.getValue<bool>("use_averaging"))
                     {
                         auto num_additions = 0.0;
-                        if(std::isnan(pGridMap_->atPosition("num_additions", traversabilityMap->ind2meter(Eigen::Vector2d(i, j)))))
+                        if(std::isnan(pGridMap_->atPosition("num_additions", meterValue)))
                         {
-                            pGridMap_->atPosition("num_additions", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) = 0.0;
-                            pGridMap_->atPosition("hazard", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) = 0.0;
+                            pGridMap_->atPosition("num_additions", meterValue) = 0.0;
+                            pGridMap_->atPosition("hazard", meterValue) = 0.0;
                         }
-                        num_additions = pGridMap_->atPosition("num_additions", traversabilityMap->ind2meter(Eigen::Vector2d(i, j)));
-                        if(haz(0) > pGridMap_->atPosition("hazard", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))))
+                        num_additions = pGridMap_->atPosition("num_additions", meterValue);
+                        if(haz(0) > pGridMap_->atPosition("hazard", meterValue))
                         {
                             if(num_additions > parameterInstance.getValue<double>("average_persistence"))
                             {
-                                pGridMap_->atPosition("num_additions", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) = 1.0;
+                                pGridMap_->atPosition("num_additions", meterValue) = 1.0;
                                 num_additions = 1.0;
-                                pGridMap_->atPosition("hazard", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) = haz(0);
+                                pGridMap_->atPosition("hazard", meterValue) = haz(0);
                             }
-                            pGridMap_->atPosition("num_additions", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) += 1.0;
-                            pGridMap_->atPosition("hazard", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) = ((pGridMap_->atPosition("hazard", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) * num_additions) + haz(0)) / (num_additions + 1.0);
+                            pGridMap_->atPosition("num_additions", meterValue) += 1.0;
+                            pGridMap_->atPosition("hazard", meterValue) = ((pGridMap_->atPosition("hazard", meterValue) * num_additions) + haz(0)) / (num_additions + 1.0);
                         }
                     }
                     else if(parameterInstance.getValue<bool>("use_probabilistic_update"))
@@ -244,22 +245,22 @@ namespace traversability_mapping
                             haz(0) = 0.1;
                         if(haz(0) == 1)
                             haz(0) = 0.9;
-                        double updated_probability = updateCellLogOdds(pGridMap_->atPosition("num_additions", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))), haz(0));
-                        pGridMap_->atPosition("hazard", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) = updated_probability;
+                        double updated_probability = updateCellLogOdds(pGridMap_->atPosition("num_additions", meterValue), haz(0));
+                        pGridMap_->atPosition("hazard", meterValue) = updated_probability;
                     }
                     else
                     {
-                        pGridMap_->atPosition("hazard", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) = haz(0);
+                        pGridMap_->atPosition("hazard", meterValue) = haz(0);
                     }
-                    pGridMap_->atPosition("step_haz", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) = haz(1);
+                    pGridMap_->atPosition("step_haz", meterValue) = haz(1);
                     // original
-                    // pGridMap_->atPosition("roughness_haz", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) = haz(2);
+                    // pGridMap_->atPosition("roughness_haz", meterValue) = haz(2);
                     // made now for visualization
-                    pGridMap_->atPosition("elevation", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) = haz(2);
-                    pGridMap_->atPosition("slope_haz", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) = haz(3);
+                    pGridMap_->atPosition("elevation", meterValue) = haz(2);
+                    pGridMap_->atPosition("slope_haz", meterValue) = haz(3);
                     // the latest updating kf's id is stored in this position of the gridmap.
-                    pGridMap_->atPosition("kfid", traversabilityMap->ind2meter(Eigen::Vector2d(i, j))) = static_cast<float>(kfID_);
-                    markedCells_.push_back(traversabilityMap->ind2meter(Eigen::Vector2d(i, j)));
+                    pGridMap_->atPosition("kfid", meterValue) = static_cast<float>(kfID_);
+                    markedCells_.push_back(meterValue);
                 }
             }
         }
