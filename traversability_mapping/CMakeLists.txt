@@ -22,6 +22,7 @@ ADD_DEFINITIONS("-DWITH_TRAVERSABILITY_MAP2")
 add_library(traversabilitySystem SHARED
               src/Parameters.cpp
               src/Helpers.cpp
+              src/HashGrid.cpp
               src/TraversabilityGrid.cpp
               src/KeyFrame.cpp
               src/LocalMap.cpp
