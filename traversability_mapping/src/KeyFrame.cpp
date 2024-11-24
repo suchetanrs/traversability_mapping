@@ -213,8 +213,7 @@ namespace traversability_mapping
                     traversabilityMap->ind2meterOpt(i, j, mx, my);
                     Eigen::Vector2d meterValue(mx, my);
                     Eigen::Vector4d haz = traversabilityMap->get_goodness(
-                        Eigen::Vector2d(i, j),
-                        security_distance_, ground_clearance_, max_slope_);
+                        i, j, security_distance_, ground_clearance_, max_slope_);
                     ++grid_count;
                     if (haz(0) < 0.)
                         continue;

@@ -10,7 +10,13 @@ namespace traversability_mapping
         std::cout << "Called traversability system constructor" << std::endl;
         YAML::Node loaded_node = YAML::LoadFile("/usr/local/params/traversabilityParams.yaml");
         if (loaded_node["use_pointcloud_buffer"].as<bool>())
+        {
             pointCloudBuffer_ = std::make_shared<PointCloudBuffer>();
+#ifdef WITH_ROS2_SENSOR_MSGS
+            useROSBuffer_ = parameterInstance.getValue<bool>("use_ros_buffer");
+            pointCloudBufferROS_ = std::make_shared<PointCloudBufferROS>();
+#endif
+        }
         keyFrameUpdateQueue_ = std::make_shared<UpdateQueue>();
     }
 
@@ -56,7 +62,15 @@ namespace traversability_mapping
             throw std::runtime_error(errorMsg);
         }
         long unsigned int kfIDlong = static_cast<long unsigned int>(kfID);
-        auto sensorPointCloud = pointCloudBuffer_->getClosestPointCloud(timestamp);
+        std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> sensorPointCloud;
+#ifdef WITH_ROS2_SENSOR_MSGS
+        if(useROSBuffer_)
+            sensorPointCloud = pointCloudBufferROS_->getClosestPointCloud(timestamp);
+        else
+            sensorPointCloud = pointCloudBuffer_->getClosestPointCloud(timestamp);
+#else
+        sensorPointCloud = pointCloudBuffer_->getClosestPointCloud(timestamp);
+#endif
         // std::cout << "Removing pcl before " << timestamp - 20.0 << std::endl;
         // pointCloudBuffer_->deletePointsBefore(timestamp - 20.0);
         if (sensorPointCloud == nullptr)
@@ -84,8 +98,15 @@ namespace traversability_mapping
             throw std::runtime_error(errorMsg);
         }
         long unsigned int kfIDlong = static_cast<long unsigned int>(kfID);
-
-        auto sensorPointCloud = pointCloudBuffer_->getClosestPointCloud(timestampDouble);
+        std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> sensorPointCloud;
+#ifdef WITH_ROS2_SENSOR_MSGS
+        if(useROSBuffer_)
+            sensorPointCloud = pointCloudBufferROS_->getClosestPointCloud(timestamp);
+        else
+            sensorPointCloud = pointCloudBuffer_->getClosestPointCloud(timestamp);
+#else
+        sensorPointCloud = pointCloudBuffer_->getClosestPointCloud(timestamp);
+#endif
         // std::cout << "Removing pcl before " << timestampDouble - 20.0 << std::endl;
         // pointCloudBuffer_->deletePointsBefore(timestampDouble - 20.0);
         if (sensorPointCloud == nullptr)
@@ -287,18 +308,14 @@ namespace traversability_mapping
     void System::pushToBuffer(double timestamp,
                                 pcl::PCLPointCloud2& pcl_pc2)
     {
-        throw std::runtime_error("This pushToBuffer is not implemented yet.");
+        throw std::runtime_error("This pushToBuffer function is not implemented yet.");
     }
 
 #ifdef WITH_ROS2_SENSOR_MSGS
-    void System::pushToBuffer(sensor_msgs::msg::PointCloud2 &pcl2)
+    void System::pushToBuffer(sensor_msgs::msg::PointCloud2::SharedPtr pcl2)
     {
-        std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> pointcloudInput = std::make_shared<pcl::PointCloud<pcl::PointXYZ>>();
-        pcl::PCLPointCloud2 pcl_pc2;
-        toPCL(pcl2, pcl_pc2);
-        pcl::fromPCLPointCloud2(pcl_pc2, *pointcloudInput);
-        double seconds = pcl2.header.stamp.sec + (pcl2.header.stamp.nanosec * pow(10, -9));
-        pointCloudBuffer_->addPointCloud(pointcloudInput, seconds);
+        double seconds = pcl2->header.stamp.sec + (pcl2->header.stamp.nanosec * pow(10, -9));
+        pointCloudBufferROS_->addPointCloud(pcl2, seconds);
     }
 #endif
 

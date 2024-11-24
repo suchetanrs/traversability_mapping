@@ -15,11 +15,13 @@ max_slope: 0.8
 robot_height: 1.5
 translation_change_threshold: 0.25
 rotation_change_threshold: 0.2
+compute_roughness: true
 
 # --- Mapping related ---
 num_local_keyframes: 10
 is_kf_optimization_enabled: true # if this is set to true, the pointclouds are stored in memory. Large pointclouds can lead to fast memory exhaustion.
 use_pointcloud_buffer: true
+use_ros_buffer: true
 use_probabilistic_update: true
 use_averaging: false
 average_persistence: 10.0 #if a cell is averaged 20 times, it is reset to start a new averaging instance.

@@ -82,6 +82,8 @@ public:
         offsetY = _gridOffset.y();
         halfsideX = _halfside.x();
         halfsideY = _halfside.y();
+        // _computeRoughness = parameterInstance.getValue<bool>("compute_roughness");
+        _computeRoughness = false;
     }
 
     // @brief responsible for inserting a 3D point into the appropriate cell within the grid.
@@ -96,10 +98,10 @@ public:
     }
 
     // @brief takes vector2d coordinates for which goodness needs to be calculated. These coordinates can be in meters.
-    Eigen::Vector4d get_goodness_m(Eigen::Vector2d meters, const double distance, const double ground_clearance, const double max_pitch);
+    Eigen::Vector4d get_goodness_m(float xp, float yp, const double distance, const double ground_clearance, const double max_pitch);
     
     // @brief takes vector2d coordinates for which goodness needs to be calculated. These coordinates must be in indices (row and column of the traversability grid map).
-    Eigen::Vector4d get_goodness(Eigen::Vector2d ind, const double distance, const double ground_clearance, const double max_pitch);
+    Eigen::Vector4d get_goodness(float index_x, float index_y, const double distance, const double ground_clearance, const double max_pitch);
     
     // @brief
     // void get_traversability(std::vector<Eigen::Matrix<double,6,1>> &cells, const double distance, const double ground_clearance, const double max_pitch);
@@ -133,6 +135,7 @@ public:
 
 private :
     double _resolution;                           /// cell size
+    bool _computeRoughness;
     Eigen::Vector2d _center;                      /// Center
     Eigen::Vector2d _halfside;                    /// Half-size of the cube
     Eigen::Vector2d _gridOffset;

@@ -25,6 +25,7 @@ ParameterHandler::ParameterHandler()
     parameter_map_["num_local_keyframes"] = loaded_node["num_local_keyframes"].as<double>();
     parameter_map_["is_kf_optimization_enabled"] = loaded_node["is_kf_optimization_enabled"].as<bool>();
     parameter_map_["use_pointcloud_buffer"] = loaded_node["use_pointcloud_buffer"].as<bool>();
+    parameter_map_["use_ros_buffer"] = loaded_node["use_ros_buffer"].as<bool>();
     parameter_map_["use_averaging"] = loaded_node["use_averaging"].as<bool>();
     parameter_map_["use_probabilistic_update"] = loaded_node["use_probabilistic_update"].as<bool>();
     parameter_map_["average_persistence"] = loaded_node["average_persistence"].as<double>();

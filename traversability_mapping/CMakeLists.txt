@@ -23,15 +23,22 @@ find_package(yaml-cpp REQUIRED)
 find_package(sensor_msgs)
 find_package(nav_msgs)
 # Create library target
-add_library(traversabilitySystem SHARED
-              src/Parameters.cpp
-              src/Helpers.cpp
-              src/HashGrid.cpp
-              src/TraversabilityGrid.cpp
-              src/KeyFrame.cpp
-              src/LocalMap.cpp
-              src/PointCloudBuffer.cpp
-              src/System.cpp)
+set(SOURCE_FILES
+    src/Parameters.cpp
+    src/Helpers.cpp
+    src/HashGrid.cpp
+    src/TraversabilityGrid.cpp
+    src/KeyFrame.cpp
+    src/LocalMap.cpp
+    src/PointCloudBuffer.cpp
+    src/System.cpp
+)
+
+if(sensor_msgs_FOUND)
+    list(APPEND SOURCE_FILES src/PointCloudBufferROS.cpp)
+endif(sensor_msgs_FOUND)
+
+add_library(traversabilitySystem SHARED ${SOURCE_FILES})
 
 # Set include directory
 target_include_directories(traversabilitySystem

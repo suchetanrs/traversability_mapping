@@ -109,7 +109,7 @@ private:
 
     void pointCloudCallback(sensor_msgs::msg::PointCloud2::SharedPtr msg)
     {
-        traversabilitySystem_->pushToBuffer(*msg);
+        traversabilitySystem_->pushToBuffer(msg);
     }
 
     void publishTraversabilityData()
