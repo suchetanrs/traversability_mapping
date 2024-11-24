@@ -4,12 +4,12 @@
       additions_topic_name: "traversability_keyframe_additions"
       updates_topic_name: "traversability_keyframe_updates"
       pointcloud_topic_name: "lidar/points"
-      use_lidar_pointcloud: false
+      use_lidar_pointcloud: true
       publish_traversability_grid: true
 
   local_traversability_node:
     ros__parameters:
-      pointcloud_topic_name: "/fused_pointcloud"
+      pointcloud_topic_name: "lidar/points"
       expected_frequency: 4.0 # Hz.
 
   traversability_threshold_node:

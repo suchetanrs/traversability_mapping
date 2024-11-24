@@ -166,7 +166,7 @@ namespace traversability_mapping
 
     std::shared_ptr<KeyFrame> LocalMap::addNewKeyFrame(double timestamp,
                                                        long unsigned int kfID,
-                                                       sensor_msgs::msg::PointCloud2 &pointCloud,
+                                                       pcl::PointCloud<pcl::PointXYZ> &pointCloud,
                                                        long unsigned int mapID)
     {
         std::shared_ptr<KeyFrame> keyFrame = std::make_shared<KeyFrame>(timestamp, kfID, pointCloud, pGridMap_, masterGridMapMutex_, mapID, Tbv_);
@@ -233,7 +233,7 @@ namespace traversability_mapping
     {
         return keyFramesMap_;
     }
-
+#ifdef WITH_ROS2_SENSOR_MSGS
     const std::shared_ptr<nav_msgs::msg::OccupancyGrid> LocalMap::getOccupancyMap()
     {
         nav_msgs::msg::OccupancyGrid occupancyGrid_msg;
@@ -241,7 +241,7 @@ namespace traversability_mapping
         gridMapOccupancy_ = std::make_shared<nav_msgs::msg::OccupancyGrid>(occupancyGrid_msg);
         return gridMapOccupancy_;
     }
-
+#endif
     const std::shared_ptr<grid_map::GridMap> LocalMap::getGridMap() const
     {
         return pGridMap_;

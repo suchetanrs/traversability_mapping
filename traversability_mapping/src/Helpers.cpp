@@ -3,28 +3,12 @@
 namespace traversability_mapping
 {
     void doTransformPCL(
-        const sensor_msgs::msg::PointCloud2 &p_in, sensor_msgs::msg::PointCloud2 &p_out,
+        const pcl::PointCloud<pcl::PointXYZ> &p_in, pcl::PointCloud<pcl::PointXYZ> &p_out,
         const Eigen::Affine3f &t)
     {
-        p_out = p_in;
-        sensor_msgs::PointCloud2ConstIterator<float> x_in(p_in, std::string("x"));
-        sensor_msgs::PointCloud2ConstIterator<float> y_in(p_in, std::string("y"));
-        sensor_msgs::PointCloud2ConstIterator<float> z_in(p_in, std::string("z"));
-
-        sensor_msgs::PointCloud2Iterator<float> x_out(p_out, std::string("x"));
-        sensor_msgs::PointCloud2Iterator<float> y_out(p_out, std::string("y"));
-        sensor_msgs::PointCloud2Iterator<float> z_out(p_out, std::string("z"));
-
-        Eigen::Vector3f point;
-        for (; x_in != x_in.end(); ++x_in, ++y_in, ++z_in, ++x_out, ++y_out, ++z_out)
-        {
-            point = t * Eigen::Vector3f(*x_in, *y_in, *z_in);
-            *x_out = point.x();
-            *y_out = point.y();
-            *z_out = point.z();
-        }
+        pcl:: transformPointCloud(p_in, p_out, t);
     }
-
+#ifdef WITH_ROS2_SENSOR_MSGS
     void gridMapToOccupancyGrid(
         const grid_map::GridMap &gridMap,
         const std::string &layer, float dataMin, float dataMax,
@@ -69,4 +53,5 @@ namespace traversability_mapping
             occupancyGrid.data[nCells - index - 1] = value;
         }
     }
+#endif
 }

@@ -1,4 +1,3 @@
-// keyFrame.hpp
 #ifndef PARAMETER_HPP_
 #define PARAMETER_HPP_
 

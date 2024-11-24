@@ -46,7 +46,7 @@ namespace traversability_mapping
         // Function to add a new keyframe to the map
         std::shared_ptr<KeyFrame> addNewKeyFrame(double timestamp,
                                                  long unsigned int kfID,
-                                                 sensor_msgs::msg::PointCloud2 &pointCloud,
+                                                 pcl::PointCloud<pcl::PointXYZ> &pointCloud,
                                                  long unsigned int mapID);
 
         void addAlreadyDeclaredKF(std::shared_ptr<KeyFrame> keyFrame);
@@ -54,9 +54,9 @@ namespace traversability_mapping
         void deleteKeyFrame(long unsigned int kfID);
 
         const std::unordered_map<long unsigned int, std::shared_ptr<KeyFrame>> &getKeyFramesMap() const;
-
+#ifdef WITH_ROS2_SENSOR_MSGS
         const std::shared_ptr<nav_msgs::msg::OccupancyGrid> getOccupancyMap();
-
+#endif
         const std::shared_ptr<grid_map::GridMap> getGridMap() const;
 
         std::shared_ptr<std::mutex> getGridMapMutex()
@@ -88,8 +88,9 @@ namespace traversability_mapping
         std::unordered_map<long unsigned int, std::shared_ptr<KeyFrame>> keyFramesMap_;
         std::mutex localKeyFramesMutex;
         std::deque<std::shared_ptr<KeyFrame>> mLocalKeyFrames_;
-
+#ifdef WITH_ROS2_SENSOR_MSGS
         std::shared_ptr<nav_msgs::msg::OccupancyGrid> gridMapOccupancy_;
+#endif
         bool activeMap_ = false;
         bool globalMappingRunning_ = false;
         bool localMappingRunning_ = false;

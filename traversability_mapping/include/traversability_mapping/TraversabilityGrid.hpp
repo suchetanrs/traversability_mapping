@@ -122,6 +122,11 @@ public:
         return (ind*_resolution -_halfside +_gridOffset);
     }
 
+    void ind2meterOpt(float indx, float indy, float& mx, float& my){
+        mx = indx*_resolution -halfsideX +offsetX;
+        my = indy*_resolution -halfsideY +offsetY;
+    }
+
     std::vector<std::vector<NodeMetaData>>& getGrid() {
         return _grid;
     }

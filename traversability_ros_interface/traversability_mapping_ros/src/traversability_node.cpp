@@ -14,6 +14,9 @@
 #include <grid_map_ros/grid_map_ros.hpp>
 #include <grid_map_cv/grid_map_cv.hpp>
 
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
+#include <pcl_conversions/pcl_conversions.h>
 class TraversabilityNode : public rclcpp::Node
 {
 public:
@@ -71,7 +74,12 @@ private:
             if (use_lidar_pointcloud_)
                 traversabilitySystem_->addNewKeyFrameTsULong(keyframe.kf_timestamp_in_nanosec, keyframe.kf_id, keyframe.map_id);
             else
-                traversabilitySystem_->addNewKeyFrameWithPCL(keyframe.kf_timestamp_in_nanosec, keyframe.kf_id, keyframe.map_id, keyframe.kf_pointcloud);
+            {
+                pcl::PointCloud<pcl::PointXYZ> pointcloudInput;
+                pcl::fromROSMsg(keyframe.kf_pointcloud, pointcloudInput);
+                std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> pclPtr = std::make_shared<pcl::PointCloud<pcl::PointXYZ>>(pointcloudInput);
+                traversabilitySystem_->addNewKeyFrameWithPCL(keyframe.kf_timestamp_in_nanosec, keyframe.kf_id, keyframe.map_id, pclPtr);
+            }
             Eigen::Affine3d keyFramePoseEigen;
             tf2::fromMsg(keyframe.kf_pose, keyFramePoseEigen);
             traversabilitySystem_->updateKeyFrame(keyframe.kf_id, keyFramePoseEigen, 1);

@@ -4,7 +4,7 @@ namespace traversability_mapping
 {
     KeyFrame::KeyFrame(double timestamp,
                        long unsigned int kfID,
-                       sensor_msgs::msg::PointCloud2 &pointCloud,
+                       pcl::PointCloud<pcl::PointXYZ> &pointCloud,
                        std::shared_ptr<grid_map::GridMap> gridMap,
                        std::shared_ptr<std::mutex> masterGridMapMutex,
                        long unsigned int mapID,
@@ -152,7 +152,7 @@ namespace traversability_mapping
         numConnections_ = numConnections;
     }
 
-    void KeyFrame::computeLocalTraversability(sensor_msgs::msg::PointCloud2 &kFpcl)
+    void KeyFrame::computeLocalTraversability(pcl::PointCloud<pcl::PointXYZ> &kFpcl)
     {
         // TODO: Load from paramter file.
         double resolution_ = parameterInstance.getValue<double>("resolution_local_map");
@@ -167,12 +167,12 @@ namespace traversability_mapping
         auto traversabilityMap = std::make_shared<traversabilityGrid>(resolution_, Eigen::Vector2d(half_size_traversability_, half_size_traversability_), slamPosition);
         // Fill traversability structure
         traversabilityMap->reset();
-        for (sensor_msgs::PointCloud2ConstIterator<float> it(kFpcl, "x"); it != it.end(); ++it)
+        for (const auto& point : kFpcl)
         {
-            Eigen::Vector3d pt3(it[0], it[1], it[2]);
-            if (((it[0] == 0) && (it[1] == 0)) || (it[2] > robot_height_))
+            if ((point.x == 0 && point.y == 0) || point.z > robot_height_)
                 continue;
-            traversabilityMap->insert_data(it[0], it[1], it[2]);
+
+            traversabilityMap->insert_data(point.x, point.y, point.z);
         }
         try
         {
@@ -209,7 +209,9 @@ namespace traversability_mapping
             {
                 for (size_t j = 0; j < travGrid[i].size(); ++j)
                 {
-                    Eigen::Vector2d meterValue = traversabilityMap->ind2meter(Eigen::Vector2d(i, j));
+                    float mx, my;
+                    traversabilityMap->ind2meterOpt(i, j, mx, my);
+                    Eigen::Vector2d meterValue(mx, my);
                     Eigen::Vector4d haz = traversabilityMap->get_goodness(
                         Eigen::Vector2d(i, j),
                         security_distance_, ground_clearance_, max_slope_);
@@ -295,19 +297,16 @@ namespace traversability_mapping
         // std::cout << "Recompute cache for KF with ID: " << kfID_ << std::endl;
         // Transform the pointCloudLidar_ to map frame.
         auto Tmv_ = Tmb_ * Tbv_;
-        sensor_msgs::msg::PointCloud2 pointCloudCorrected_;
+        pcl::PointCloud<pcl::PointXYZ> pointCloudCorrected_;
         traversability_mapping::doTransformPCL(pointCloudLidar_, pointCloudCorrected_, Tmv_);
-        auto pointCloudMap_ = std::make_shared<sensor_msgs::msg::PointCloud2>(pointCloudCorrected_);
-        pointCloudMap_->header.frame_id = "map";
 
         // clear stray values
         // clearStrayValuesInGrid();
         // recompute values and mark on map.
-        computeLocalTraversability(*pointCloudMap_);
+        computeLocalTraversability(pointCloudCorrected_);
         if(!parameterInstance.getValue<bool>("is_kf_optimization_enabled"))
         {
-            pointCloudMap_.reset();
-            pointCloudLidar_.data.clear();
+            pointCloudLidar_.clear();
         }
     }
 

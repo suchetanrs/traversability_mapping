@@ -1,23 +1,31 @@
 #ifndef TRAVERSABILITY_HELPERS_HPP_
 #define TRAVERSABILITY_HELPERS_HPP_
 
-#include <sensor_msgs/msg/point_cloud2.hpp>
-#include <sensor_msgs/point_cloud2_iterator.hpp>
+#include <chrono>
 #include <Eigen/Geometry>
 #include <grid_map_core/GridMapMath.hpp>
 #include <grid_map_core/iterators/GridMapIterator.hpp>
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
+#include <pcl/common/transforms.h>
+
+#ifdef WITH_ROS2_SENSOR_MSGS
+#include <sensor_msgs/msg/point_cloud2.hpp>
 #include <nav_msgs/msg/occupancy_grid.hpp>
+#endif
 
 namespace traversability_mapping
 {
     void doTransformPCL(
-        const sensor_msgs::msg::PointCloud2 &p_in, sensor_msgs::msg::PointCloud2 &p_out,
+        const pcl::PointCloud<pcl::PointXYZ> &p_in, pcl::PointCloud<pcl::PointXYZ> &p_out,
         const Eigen::Affine3f &t);
 
+#ifdef WITH_ROS2_SENSOR_MSGS
     void gridMapToOccupancyGrid(
         const grid_map::GridMap &gridMap,
         const std::string &layer, float dataMin, float dataMax,
         nav_msgs::msg::OccupancyGrid &occupancyGrid);
+#endif
 
     inline double probabilityToLogOdds(double p) {
         return std::log(p / (1.0 - p));
@@ -40,5 +48,28 @@ namespace traversability_mapping
 
         return logOddsToProbability(log_odds);
     }
+
+    class Profiler
+    {
+    public:
+        Profiler(const std::string & functionName) : functionName(functionName)
+        {
+            start = std::chrono::high_resolution_clock::now();
+        }
+
+        ~Profiler()
+        {
+            auto end      = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+            float seconds = duration.count() / 1e6;
+            std::cout << "\033[1;94m" << functionName << " Execution Time: " << seconds << " Seconds\033[0m" << std::endl;
+        }
+
+    private:
+        std::string functionName;
+        std::chrono::time_point<std::chrono::high_resolution_clock> start;
+    };
+
+    #define PROFILE_FUNCTION Profiler profiler_instance(__func__);
 }
 #endif // TRAVERSABILITY_HELPERS_HPP_

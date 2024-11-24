@@ -26,10 +26,12 @@ namespace traversability_mapping
         double delta = distance / _resolution;
         // TODO: std::max instead of std::min?
         uint delta_ind = std::min(1.0, std::ceil(delta));
+        float index_x = ind.x();
+        float index_y = ind.y();
 
         // Point goodness cannot be calculated (border of the area) or too close to robot
-        if (ind.x() < delta_ind || ind.x() > (size_x_ - delta_ind) ||
-            ind.y() < delta_ind || ind.y() > (size_y_ - delta_ind))
+        if (index_x < delta_ind || index_x > (size_x_ - delta_ind) ||
+            index_y < delta_ind || index_y > (size_y_ - delta_ind))
         {
             Eigen::Vector4d X;
             X << -1., 0., 0., 0.;
@@ -47,9 +49,9 @@ namespace traversability_mapping
         Eigen::Vector3d cellsSum = Eigen::Vector3d::Zero();
         Eigen::Matrix3d cellsSumSquared = Eigen::Matrix3d::Zero(); // stores all the covariances of the neighbouring cells.
         double cellsNumPoints = 0;
-        for (int i = std::max(0, int(ind.x() - delta_ind)); i < std::min(int(ind.x() + delta_ind), size_x_); i++)
+        for (int i = std::max(0, int(index_x - delta_ind)); i < std::min(int(index_x + delta_ind), size_x_); i++)
         {
-            for (int j = std::max(0, int(ind.y() - delta_ind)); j < std::min(int(ind.y() + delta_ind), size_y_); j++)
+            for (int j = std::max(0, int(index_y - delta_ind)); j < std::min(int(index_y + delta_ind), size_y_); j++)
             {
                 if (_grid.at(i).at(j).N < nb_min)
                 {
@@ -73,7 +75,7 @@ namespace traversability_mapping
                     cellsSumSquared.noalias() += sumSquared;
                     P3Ds.push_back(center);
                     cellsNumPoints += _grid.at(i).at(j).N;
-                    if(abs(i - ind.x()) < _resolution * 2 && abs(j - ind.y()) < _resolution * 2)
+                    if(abs(i - index_x) < _resolution * 2 && abs(j - index_y) < _resolution * 2)
                     {
                         zM = std::max(zM, _grid.at(i).at(j).z_max);
                         zm = std::min(zm, _grid.at(i).at(j).z_min);
@@ -151,9 +153,9 @@ namespace traversability_mapping
         haz(3) = pitch_hazard;
         // haz(4) = border_hazard;
         // elevation
-        // haz(5) = _grid.at(ind.x()).at(ind.y()).sz / _grid.at(ind.x()).at(ind.y()).N;
+        // haz(5) = _grid.at(index_x).at(index_y).sz / _grid.at(index_x).at(index_y).N;
         // making haz(2) as elevation for now. Was roughness before.
-        haz(2) = _grid.at(ind.x()).at(ind.y()).sz / _grid.at(ind.x()).at(ind.y()).N;
+        haz(2) = _grid.at(index_x).at(index_y).sz / _grid.at(index_x).at(index_y).N;
 
         return haz;
     }

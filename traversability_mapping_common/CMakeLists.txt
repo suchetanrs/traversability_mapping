@@ -8,11 +8,8 @@ endif()
 
 find_package(Sophus REQUIRED)
 find_package(Eigen3 REQUIRED)
-
-set(dependencies
-  Sophus
-  Eigen3
-)
+find_package(PCL REQUIRED)
+find_package(sensor_msgs)
 
 # Create library target
 add_library(type_conversion src/type_conversion.cpp)
@@ -24,12 +21,24 @@ target_include_directories(type_conversion
         $<INSTALL_INTERFACE:include>
         ${Sophus_INCLUDE_DIRS}
         ${EIGEN3_INCLUDE_DIR}
+        ${PCL_INCLUDE_DIRS}
 )
+
+if(sensor_msgs_FOUND)
+    ADD_DEFINITIONS("-DWITH_ROS2_SENSOR_MSGS")
+    target_include_directories(type_conversion
+        PUBLIC 
+            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+            $<INSTALL_INTERFACE:include>
+            ${sensor_msgs_INCLUDE_DIRS}
+    )
+endif(sensor_msgs_FOUND)
 
 # Link libraries
 target_link_libraries(type_conversion
     ${Sophus_LIBRARIES}
     ${EIGEN3_LIBS}
+    ${PCL_LIBRARIES}
 )
 
 # Generate and install CMake configuration file

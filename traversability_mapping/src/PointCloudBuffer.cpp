@@ -10,7 +10,7 @@ namespace traversability_mapping
         buffer_.clear();
     }
 
-    void PointCloudBuffer::addPointCloud(sensor_msgs::msg::PointCloud2 &pointCloud, double timestamp)
+    void PointCloudBuffer::addPointCloud(std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> pointCloud, double timestamp)
     {
         std::lock_guard<std::recursive_mutex> lock(bufferMutex_);
         auto pair = std::make_pair(timestamp, pointCloud);
@@ -19,20 +19,19 @@ namespace traversability_mapping
         {
             deletePointsBefore(timestamp - 5.0);
         }
-        // std::cout << "The size of buffer is: " << buffer_.size() << std::endl;
+        std::cout << "The size of buffer is: " << buffer_.size() << std::endl;
     }
 
     // Function to find the closest point cloud to the queried timestamp
-    sensor_msgs::msg::PointCloud2 PointCloudBuffer::getClosestPointCloud(const double &query_time)
+    std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> PointCloudBuffer::getClosestPointCloud(const double &query_time)
     {
         std::lock_guard<std::recursive_mutex> lock(bufferMutex_);
-        // std::cout << "PointCloudBuffer::getClosestPointCloud" << std::endl;
         // Check if buffer is empty
         if (buffer_.empty())
         {
             std::cerr << "Error: Point cloud buffer is empty." << std::endl;
             // Return an empty point cloud or handle the error condition based on your requirements
-            return sensor_msgs::msg::PointCloud2();
+            return nullptr;
         }
 
         auto closest_cloud_iter = std::min_element(buffer_.begin(), buffer_.end(),
@@ -41,18 +40,28 @@ namespace traversability_mapping
                                                        return std::abs(a.first - query_time) < std::abs(b.first - query_time);
                                                    });
 
+        std::cout << "pcl ts is: " << closest_cloud_iter->first << std::endl;
+        std::cout << "Difference in closest pcl ts is: " << query_time - closest_cloud_iter->first << std::endl;
         return closest_cloud_iter->second;
     }
 
     // Function to delete all points before the queried timestamp in the buffer
     void PointCloudBuffer::deletePointsBefore(const double &query_time)
     {
+        PROFILE_FUNCTION;
         std::lock_guard<std::recursive_mutex> lock(bufferMutex_);
-        buffer_.erase(std::remove_if(buffer_.begin(), buffer_.end(),
-                                     [&query_time](const auto &entry)
-                                     {
-                                         return entry.first < query_time;
-                                     }),
-                      buffer_.end());
+
+        // Remove elements from the front while their timestamp is less than the query time
+        while (!buffer_.empty() && buffer_.front().first < query_time)
+        {
+            buffer_.pop_front();
+        }
+
+        // buffer_.erase(std::remove_if(buffer_.begin(), buffer_.end(),
+        //                              [&query_time](const auto &entry)
+        //                              {
+        //                                  return entry.first < query_time;
+        //                              }),
+        //               buffer_.end());
     }
 }

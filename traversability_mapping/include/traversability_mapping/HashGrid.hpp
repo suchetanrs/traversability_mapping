@@ -10,6 +10,7 @@
 #include <cmath>
 #include <memory>
 #include <Eigen/Dense>
+#include <mutex>
 
 class SpatialHash {
 public:

@@ -46,6 +46,7 @@ def generate_launch_description():
         traversability_mapping_ros = Node(
             package='traversability_mapping_ros',
             executable='traversability_node',
+            # prefix=["gdbserver localhost:3000"],
             namespace=namespace,
             output='screen',
             parameters=[params_file])

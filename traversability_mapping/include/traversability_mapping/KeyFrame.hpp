@@ -7,9 +7,11 @@
 #include <thread>
 #include <deque>
 #include <sophus/se3.hpp>
-#include <sensor_msgs/msg/point_cloud2.hpp>
-#include <sensor_msgs/point_cloud2_iterator.hpp>
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
+#ifdef WITH_ROS2_SENSOR_MSGS
 #include <nav_msgs/msg/occupancy_grid.hpp>
+#endif
 #include <grid_map_core/GridMap.hpp>
 #include <grid_map_core/iterators/GridMapIterator.hpp>
 
@@ -25,7 +27,7 @@ namespace traversability_mapping
     public:
         KeyFrame(double timestamp,
                  long unsigned int kfID,
-                 sensor_msgs::msg::PointCloud2 &pointCloud,
+                 pcl::PointCloud<pcl::PointXYZ> &pointCloud,
                  std::shared_ptr<grid_map::GridMap> gridMap,
                  std::shared_ptr<std::mutex> masterGridMapMutex,
                  long unsigned int mapID,
@@ -59,7 +61,7 @@ namespace traversability_mapping
         void setConnections(long unsigned int numConnections);
 
         // TRAVERSABILITY FUNCTION
-        void computeLocalTraversability(sensor_msgs::msg::PointCloud2 &kFpcl);
+        void computeLocalTraversability(pcl::PointCloud<pcl::PointXYZ> &kFpcl);
 
         // CACHE RECOMPUTE
         void recomputeCache(bool useHashGrid);
@@ -74,7 +76,7 @@ namespace traversability_mapping
         // set only one time in constructor. thread safety not needed since it is only read.
         double timestamp_;
         long unsigned int kfID_;
-        sensor_msgs::msg::PointCloud2 pointCloudLidar_;
+        pcl::PointCloud<pcl::PointXYZ> pointCloudLidar_;
         Eigen::Affine3f Tbv_;
 
         std::mutex connectionMutex_;

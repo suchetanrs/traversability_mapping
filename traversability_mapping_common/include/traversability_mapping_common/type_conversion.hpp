@@ -11,6 +11,12 @@
 #include <Eigen/Geometry>
 #include "sophus/se3.hpp"
 #include <iostream>
+#ifdef WITH_ROS2_SENSOR_MSGS
+#include <sensor_msgs/msg/point_cloud2.hpp>
+#endif
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
+#include <pcl/common/transforms.h>
 
 namespace traversability_mapping
 {
@@ -100,6 +106,47 @@ namespace traversability_mapping
         // template <typename T>
         // T transformPointWithReference(Eigen::Affine3d &referencePose, Eigen::Vector3f &s);
     };
+
+#ifdef WITH_ROS2_SENSOR_MSGS
+    inline
+    void toPCL(const sensor_msgs::msg::PointField &pf, pcl::PCLPointField &pcl_pf)
+    {
+        pcl_pf.name = pf.name;
+        pcl_pf.offset = pf.offset;
+        pcl_pf.datatype = pf.datatype;
+        pcl_pf.count = pf.count;
+    }
+
+    inline
+    void toPCL(const std::vector<sensor_msgs::msg::PointField> &pfs, std::vector<pcl::PCLPointField> &pcl_pfs)
+    {
+        pcl_pfs.resize(pfs.size());
+        std::vector<sensor_msgs::msg::PointField>::const_iterator it = pfs.begin();
+        size_t i = 0;
+        for(; it != pfs.end(); ++it, ++i) {
+        toPCL(*(it), pcl_pfs[i]);
+        }
+    }
+
+    inline
+    void copyPointCloud2MetaData(const sensor_msgs::msg::PointCloud2 &pc2, pcl::PCLPointCloud2 &pcl_pc2)
+    {
+        pcl_pc2.height = pc2.height;
+        pcl_pc2.width = pc2.width;
+        toPCL(pc2.fields, pcl_pc2.fields);
+        pcl_pc2.is_bigendian = pc2.is_bigendian;
+        pcl_pc2.point_step = pc2.point_step;
+        pcl_pc2.row_step = pc2.row_step;
+        pcl_pc2.is_dense = pc2.is_dense;
+    }
+
+    inline
+    void toPCL(const sensor_msgs::msg::PointCloud2 &pc2, pcl::PCLPointCloud2 &pcl_pc2)
+    {
+        copyPointCloud2MetaData(pc2, pcl_pc2);
+        pcl_pc2.data = pc2.data;
+    }
+#endif
 }
 
 #endif

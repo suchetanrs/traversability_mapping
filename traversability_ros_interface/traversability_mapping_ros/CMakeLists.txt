@@ -1,6 +1,18 @@
 cmake_minimum_required(VERSION 3.5)
 project(traversability_mapping_ros)
 
+# default built type
+# if(NOT CMAKE_BUILD_TYPE)
+#   set(CMAKE_BUILD_TYPE Release)
+# endif()
+
+# MESSAGE(STATUS "BUILD TYPE:" ${CMAKE_BUILD_TYPE})
+
+# Default to C++20
+if(NOT CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 20)
+endif()
+
 # Find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
@@ -19,6 +31,8 @@ find_package(tf2_eigen REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
+find_package(PCL REQUIRED)
+ADD_DEFINITIONS("-DWITH_ROS2_SENSOR_MSGS")
 
 set(dependencies
     ament_cmake
@@ -38,6 +52,7 @@ set(dependencies
     tf2
     tf2_ros
     tf2_geometry_msgs
+    PCL
 )
 
 include_directories(
@@ -49,12 +64,13 @@ include_directories(
     ${grid_map_core_INCLUDE_DIRS}
     ${nav_msgs_INCLUDE_DIRS}
     ${YAML_CPP_INCLUDE_DIRS}
+    ${PCL_INCLUDE_DIRS}
 )
 
 # Add executable
 add_executable(traversability_node src/traversability_node.cpp)
 ament_target_dependencies(traversability_node ${dependencies})
-target_link_libraries(traversability_node ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem type_conversion)
+target_link_libraries(traversability_node ${PCL_LIBRARIES} ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem type_conversion)
 
 # Add executable
 add_executable(multi_map_merge src/multi_map_merge.cpp)
@@ -64,14 +80,14 @@ target_link_libraries(multi_map_merge ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_
 # Add executable
 add_executable(local_traversability src/local_traversability.cpp)
 ament_target_dependencies(local_traversability ${dependencies})
-target_link_libraries(local_traversability ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem type_conversion)
+target_link_libraries(local_traversability ${PCL_LIBRARIES} ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem type_conversion)
 
 # Add executable
 add_executable(threshold_occupancy src/threshold_occupancy.cpp)
 ament_target_dependencies(threshold_occupancy ${dependencies})
 target_link_libraries(threshold_occupancy ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem type_conversion)
 
-# Install executable
+# Install executable 
 install(TARGETS
     traversability_node multi_map_merge local_traversability threshold_occupancy
     DESTINATION lib/${PROJECT_NAME}

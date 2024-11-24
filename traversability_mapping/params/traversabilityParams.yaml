@@ -60,24 +60,24 @@ global_adjustment_sleep: 10 #time between processing every keyframe outside the 
 #     y: 0.07019467
 #     z: 0.01072864
 
-# T_SLAMFrameToLidarFrame:
-#   quaternion:
-#     x: 0.0
-#     y: 0.2474
-#     z: 0.0
-#     w: 0.9689
-#   translation:
-#     x: 0.0
-#     y: 0.0
-#     z: 0.6
-
 T_SLAMFrameToLidarFrame:
   quaternion:
     x: 0.0
-    y: 0.0
+    y: 0.2474
     z: 0.0
-    w: 1.0
+    w: 0.9689
   translation:
     x: 0.0
     y: 0.0
     z: 0.6
+
+# T_SLAMFrameToLidarFrame:
+#   quaternion:
+#     x: 0.0
+#     y: 0.0
+#     z: 0.0
+#     w: 1.0
+#   translation:
+#     x: 0.0
+#     y: 0.0
+#     z: 0.6
