@@ -20,7 +20,7 @@ namespace traversability_mapping
         {
             deletePointsBefore(timestamp - 5.0);
         }
-        std::cout << "The size of buffer is: " << buffer_.size() << std::endl;
+        // std::cout << "The size of buffer is: " << buffer_.size() << std::endl;
     }
 
     // Function to find the closest point cloud to the queried timestamp

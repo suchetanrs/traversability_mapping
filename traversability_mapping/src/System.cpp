@@ -143,7 +143,7 @@ namespace traversability_mapping
                                 Sophus::SE3f &poseSLAM,
                                 long unsigned int numConnections)
     {
-        std::cout << "traversability_mapping::System::updateKeyFrame with id: " << kfID << std::endl;
+        // std::cout << "traversability_mapping::System::updateKeyFrame with id: " << kfID << std::endl;
         // Add the keyframe to the local map
         std::lock_guard<std::recursive_mutex> lock(localMapMutex_);
         if (allKeyFramesSet_.find(kfID) != allKeyFramesSet_.end())
