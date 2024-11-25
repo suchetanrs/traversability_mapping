@@ -19,6 +19,7 @@ namespace traversability_mapping
     {
     public:
         PointCloudBufferROS();
+#ifdef WITH_ROS2_SENSOR_MSGS
 
         void addPointCloud(sensor_msgs::msg::PointCloud2::SharedPtr pointCloud, double timestamp);
 
@@ -31,6 +32,7 @@ namespace traversability_mapping
     private:
         std::deque<std::pair<double, sensor_msgs::msg::PointCloud2::SharedPtr>> buffer_;
         std::recursive_mutex bufferMutex_;
+#endif
     };
 }
 

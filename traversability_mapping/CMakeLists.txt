@@ -1,16 +1,19 @@
 cmake_minimum_required(VERSION 3.5)
 project(traversability_mapping VERSION 1.0)
 
-# IF(NOT CMAKE_BUILD_TYPE)
-#   SET(CMAKE_BUILD_TYPE Release)
-# ENDIF()
+IF(NOT CMAKE_BUILD_TYPE)
+  SET(CMAKE_BUILD_TYPE Release)
+ENDIF()
 
-# MESSAGE("Build type: " ${CMAKE_BUILD_TYPE})
+MESSAGE("Build type: " ${CMAKE_BUILD_TYPE})
 
 # Default to C++20
 if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 20)
 endif()
+
+# SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O1 -march=native")
+# SET(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O1 -march=native")
 
 find_package(Sophus REQUIRED)
 find_package(Eigen3 3.1.0 REQUIRED)
@@ -31,12 +34,9 @@ set(SOURCE_FILES
     src/KeyFrame.cpp
     src/LocalMap.cpp
     src/PointCloudBuffer.cpp
+    src/PointCloudBufferROS.cpp
     src/System.cpp
 )
-
-if(sensor_msgs_FOUND)
-    list(APPEND SOURCE_FILES src/PointCloudBufferROS.cpp)
-endif(sensor_msgs_FOUND)
 
 add_library(traversabilitySystem SHARED ${SOURCE_FILES})
 

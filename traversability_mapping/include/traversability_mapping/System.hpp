@@ -6,9 +6,7 @@
 #include "traversability_mapping/KeyFrame.hpp"
 #include "traversability_mapping/Helpers.hpp"
 #include "traversability_mapping_common/type_conversion.hpp"
-#ifdef WITH_ROS2_SENSOR_MSGS
 #include "traversability_mapping/PointCloudBufferROS.hpp"
-#endif
 #include <iostream>
 namespace traversability_mapping
 {
@@ -73,10 +71,8 @@ namespace traversability_mapping
         void setLocalMap(std::shared_ptr<LocalMap> pLocalMap);
 
         std::shared_ptr<PointCloudBuffer> pointCloudBuffer_ = nullptr;
-#ifdef WITH_ROS2_SENSOR_MSGS
         bool useROSBuffer_;
         std::shared_ptr<PointCloudBufferROS> pointCloudBufferROS_ = nullptr;
-#endif
         std::recursive_mutex localMapMutex_;
         std::unordered_map<long unsigned int, std::shared_ptr<LocalMap>> localMapsSet_;
         std::unordered_map<long unsigned int, long unsigned int> allKeyFramesSet_;

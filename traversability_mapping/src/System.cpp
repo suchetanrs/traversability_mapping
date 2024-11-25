@@ -1,6 +1,4 @@
 #include "traversability_mapping/System.hpp"
-// check pose of 0th frame continously.
-// mutex for localmaps's gridmap.
 
 namespace traversability_mapping
 {
@@ -12,10 +10,8 @@ namespace traversability_mapping
         if (loaded_node["use_pointcloud_buffer"].as<bool>())
         {
             pointCloudBuffer_ = std::make_shared<PointCloudBuffer>();
-#ifdef WITH_ROS2_SENSOR_MSGS
             useROSBuffer_ = parameterInstance.getValue<bool>("use_ros_buffer");
             pointCloudBufferROS_ = std::make_shared<PointCloudBufferROS>();
-#endif
         }
         keyFrameUpdateQueue_ = std::make_shared<UpdateQueue>();
     }
@@ -314,6 +310,10 @@ namespace traversability_mapping
 #ifdef WITH_ROS2_SENSOR_MSGS
     void System::pushToBuffer(sensor_msgs::msg::PointCloud2::SharedPtr pcl2)
     {
+        // pcl::PCLPointCloud2 pcl_pc2;
+        // toPCL(*pcl2, pcl_pc2);
+        // std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> pointcloudInput = std::make_shared<pcl::PointCloud<pcl::PointXYZ>>();
+        // pcl::fromPCLPointCloud2(pcl_pc2, *pointcloudInput);
         double seconds = pcl2->header.stamp.sec + (pcl2->header.stamp.nanosec * pow(10, -9));
         pointCloudBufferROS_->addPointCloud(pcl2, seconds);
     }

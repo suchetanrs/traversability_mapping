@@ -50,7 +50,7 @@ public:
             lidarPointCloudSubscriber_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
                 pointcloud_topic_name_, 10, std::bind(&TraversabilityNode::pointCloudCallback, this, std::placeholders::_1));
 
-        publishTimer_ = this->create_wall_timer(std::chrono::milliseconds(100), std::bind(&TraversabilityNode::publishTraversabilityData, this));
+        publishTimer_ = this->create_wall_timer(std::chrono::milliseconds(1000), std::bind(&TraversabilityNode::publishTraversabilityData, this));
 
         occupancy_grid_publisher_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("global_traversability_map", 10);
         traversabilityPub_ = this->create_publisher<grid_map_msgs::msg::GridMap>("RTQuadtree_struct", rclcpp::QoS(1).transient_local());

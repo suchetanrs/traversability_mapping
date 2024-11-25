@@ -7,9 +7,10 @@ namespace traversability_mapping
     PointCloudBufferROS::PointCloudBufferROS()
     {
         // Initialize the buffer
-        buffer_.clear();
+        // buffer_.clear();
     }
 
+#ifdef WITH_ROS2_SENSOR_MSGS
     void PointCloudBufferROS::addPointCloud(sensor_msgs::msg::PointCloud2::SharedPtr pointCloud, double timestamp)
     {
         std::lock_guard<std::recursive_mutex> lock(bufferMutex_);
@@ -70,4 +71,5 @@ namespace traversability_mapping
         //                              }),
         //               buffer_.end());
     }
+#endif
 }
