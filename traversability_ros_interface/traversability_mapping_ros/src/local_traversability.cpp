@@ -17,6 +17,10 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <tf2/utils.h>
 
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
+#include <pcl_conversions/pcl_conversions.h>
+
 class LocalTraversabilityNode : public rclcpp::Node
 {
 public:
@@ -71,11 +75,18 @@ private:
     void pointCloudCallback(sensor_msgs::msg::PointCloud2::SharedPtr msg)
     {
         auto current_time = std::chrono::high_resolution_clock::now();
+        pcl::PointCloud<pcl::PointXYZ> pointcloudInput;
+        pcl::PCLPointCloud2 pcl_pc2;
+        pcl_conversions::toPCL(*msg, pcl_pc2);
+        pcl::fromPCLPointCloud2(pcl_pc2, pointcloudInput);
+        auto conversion_time = std::chrono::high_resolution_clock::now();
+        auto conversion_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(conversion_time - current_time);
         std::chrono::duration<double> elapsed = current_time - last_callback_time_;
         // if (elapsed.count() < callback_interval_)
         //     return;
         last_callback_time_ = current_time;
-        RCLCPP_INFO_STREAM(this->get_logger(), "PCL callback.");
+        // RCLCPP_INFO_STREAM(this->get_logger(), "PCL callback.");
+        // RCLCPP_INFO_STREAM(this->get_logger(), "Conversion took: " << conversion_elapsed.count());
         // Initialize your KeyFrame class
         std::shared_ptr<std::mutex> mapMutex_ = std::make_shared<std::mutex>();
         auto keyframe_ = std::make_shared<traversability_mapping::KeyFrame>(1, pGridMap_, mapMutex_, Tbv_); // Replace with your actual initialization logic
@@ -93,7 +104,6 @@ private:
             RCLCPP_WARN(this->get_logger(), "Could not transform from map to base_footprint: %s", ex.what());
             return;
         }
-        while(rclcpp::ok())
         {
             auto start_time = std::chrono::high_resolution_clock::now();
             RCLCPP_INFO(this->get_logger(), "NEW!");
@@ -103,12 +113,10 @@ private:
             keyframe_->setPose(Tmb_);
 
             auto Tmv_ = Tmb_ * Tbv_;
-            sensor_msgs::msg::PointCloud2 pointCloudCorrected_;
-            traversability_mapping::doTransformPCL(*msg, pointCloudCorrected_, Tmv_);
-            auto pointCloudMap_ = std::make_shared<sensor_msgs::msg::PointCloud2>(pointCloudCorrected_);
-            pointCloudMap_->header.frame_id = "map";
+            pcl::PointCloud<pcl::PointXYZ> pointCloudCorrected_;
+            traversability_mapping::doTransformPCL(pointcloudInput, pointCloudCorrected_, Tmv_);
 
-            keyframe_->computeLocalTraversability(*pointCloudMap_); // Assuming keyframe_ is a shared pointer to your KeyFrame object
+            keyframe_->computeLocalTraversability(pointCloudCorrected_); // Assuming keyframe_ is a shared pointer to your KeyFrame object
 
             nav_msgs::msg::OccupancyGrid occupancyGrid_msg;
             traversability_mapping::gridMapToOccupancyGrid(*pGridMap_, "hazard", 0., 1., occupancyGrid_msg);
