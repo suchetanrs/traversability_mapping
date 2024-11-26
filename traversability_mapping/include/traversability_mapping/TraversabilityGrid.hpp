@@ -1,6 +1,15 @@
-//
-// Created by d.vivet on 19/04/23.
-//
+/* Traversability Mapping - A global and local traversability mapping algorithm.
+ * Copyright (C) 2024 Suchetan Saravanan and Damien Vivet
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Library General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library.  If not, see
+ * <https://www.gnu.org/licenses/>.
+ */
 
 #ifndef TRAVERSABILITY_TRAVERSABILITYGRID_HPP_
 #define TRAVERSABILITY_TRAVERSABILITYGRID_HPP_

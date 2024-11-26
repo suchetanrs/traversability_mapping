@@ -25,7 +25,7 @@ use_ros_buffer: true
 use_probabilistic_update: true
 use_averaging: false
 average_persistence: 10.0 #if a cell is averaged 20 times, it is reset to start a new averaging instance.
-global_adjustment_sleep: 10 #time between processing every keyframe outside the local window (ms)
+global_adjustment_sleep: 0 #time between processing every keyframe outside the local window (ms)
 
 # SLAM Frame normally is the camera frame.
 # T_SLAMFrameToLidarFrame:
