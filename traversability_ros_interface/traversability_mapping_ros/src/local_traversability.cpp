@@ -75,16 +75,16 @@ private:
     void pointCloudCallback(sensor_msgs::msg::PointCloud2::SharedPtr msg)
     {
         auto current_time = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed = current_time - last_callback_time_;
+        if (elapsed.count() < callback_interval_)
+            return;
+        last_callback_time_ = current_time;
         pcl::PointCloud<pcl::PointXYZ> pointcloudInput;
         pcl::PCLPointCloud2 pcl_pc2;
         pcl_conversions::toPCL(*msg, pcl_pc2);
         pcl::fromPCLPointCloud2(pcl_pc2, pointcloudInput);
         auto conversion_time = std::chrono::high_resolution_clock::now();
         auto conversion_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(conversion_time - current_time);
-        std::chrono::duration<double> elapsed = current_time - last_callback_time_;
-        // if (elapsed.count() < callback_interval_)
-        //     return;
-        last_callback_time_ = current_time;
         // RCLCPP_INFO_STREAM(this->get_logger(), "PCL callback.");
         // RCLCPP_INFO_STREAM(this->get_logger(), "Conversion took: " << conversion_elapsed.count());
         // Initialize your KeyFrame class
