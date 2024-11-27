@@ -28,7 +28,7 @@ sudo make install
 
 cd ../..
 source /opt/ros/humble/setup.bash
-sudo apt-get install ros-humble-grid-map* -y
+sudo apt-get install ros-humble-grid-map-core ros-humble-grid-map-rviz* -y
 
 # Core
 mkdir -p traversability_mapping/build
