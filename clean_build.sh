@@ -28,6 +28,7 @@ sudo make install
 
 cd ../..
 source /opt/ros/humble/setup.bash
+sudo apt-get install ros-humble-grid-map* -y
 
 # Core
 mkdir -p traversability_mapping/build
@@ -36,7 +37,8 @@ cmake ..
 make
 sudo make install
 
-cd /root/
+cd ../../
 
 cd traversability_ros_interface
 colcon build --symlink-install
+source install/setup.bash
