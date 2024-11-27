@@ -97,9 +97,11 @@ namespace traversability_mapping
                                        long unsigned int mapID)
     {
         // std::cout << "addNewKeyFrame3" << std::endl;
+        // std::cout << "TS input:" << timestamp << std::endl;
         const unsigned long long timestampSecond = timestamp / 1e9;
         const unsigned long long timestampNanoSec = timestamp % (unsigned long long)1e9;
         double timestampDouble = timestampSecond + (timestampNanoSec * 1e-9);
+        // std::cout << "TS double:" << timestampDouble << std::endl;
         if (kfID < 0)
         {
             std::string errorMsg = "The given KF ID was negative. Please make sure the keyFrame IDs are positive. KF ID: " + std::to_string(kfID);
@@ -109,11 +111,11 @@ namespace traversability_mapping
         std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> sensorPointCloud;
 #ifdef WITH_ROS2_SENSOR_MSGS
         if(useROSBuffer_)
-            sensorPointCloud = pointCloudBufferROS_->getClosestPointCloud(timestamp);
+            sensorPointCloud = pointCloudBufferROS_->getClosestPointCloud(timestampDouble);
         else
-            sensorPointCloud = pointCloudBuffer_->getClosestPointCloud(timestamp);
+            sensorPointCloud = pointCloudBuffer_->getClosestPointCloud(timestampDouble);
 #else
-        sensorPointCloud = pointCloudBuffer_->getClosestPointCloud(timestamp);
+        sensorPointCloud = pointCloudBuffer_->getClosestPointCloud(timestampDouble);
 #endif
         // std::cout << "Removing pcl before " << timestampDouble - 20.0 << std::endl;
         // pointCloudBuffer_->deletePointsBefore(timestampDouble - 20.0);
