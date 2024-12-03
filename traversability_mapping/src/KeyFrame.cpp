@@ -58,7 +58,7 @@ namespace traversability_mapping
     KeyFrame::~KeyFrame()
     {
         std::cout << "keyframe with Id: " << kfID_ << " destructed" << std::endl;
-        clearStrayValuesInGrid();
+        // clearStrayValuesInGrid();
     }
 
     const double &KeyFrame::getTimestamp()
