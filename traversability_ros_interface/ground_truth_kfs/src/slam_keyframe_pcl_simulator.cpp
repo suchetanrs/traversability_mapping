@@ -87,8 +87,16 @@ private:
 
         // odom to base_link
         transform_stamped.header.stamp = msg->header.stamp;
-        transform_stamped.header.frame_id = static_cast<std::string>(this->get_namespace()) + "/odom";
-        transform_stamped.child_frame_id = static_cast<std::string>(this->get_namespace()) + "/base_footprint";
+        if(static_cast<std::string>(this->get_namespace()) == "/")
+        {
+            transform_stamped.header.frame_id = "odom";
+            transform_stamped.child_frame_id = "base_footprint";
+        }
+        else
+        {
+            transform_stamped.header.frame_id = static_cast<std::string>(this->get_namespace()) + "/odom";
+            transform_stamped.child_frame_id = static_cast<std::string>(this->get_namespace()) + "/base_footprint";
+        }
 
         transform_stamped.transform.translation.x = msg->pose.pose.position.x;
         transform_stamped.transform.translation.y = msg->pose.pose.position.y;
@@ -100,7 +108,14 @@ private:
         // map to odom (0 transform)
         transform_stamped.header.stamp = msg->header.stamp;
         transform_stamped.header.frame_id = "map";
-        transform_stamped.child_frame_id = static_cast<std::string>(this->get_namespace()) + "/odom";
+        if(static_cast<std::string>(this->get_namespace()) == "/")
+        {
+            transform_stamped.child_frame_id = "odom";
+        }
+        else
+        {
+            transform_stamped.child_frame_id = static_cast<std::string>(this->get_namespace()) + "/odom";
+        }
 
         transform_stamped.transform.translation.x = 0.0;
         transform_stamped.transform.translation.y = 0.0;

@@ -11,6 +11,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, FindExecutable, TextSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
+from launch.substitutions import EnvironmentVariable
 
 def generate_launch_description():
 
@@ -21,7 +22,7 @@ def generate_launch_description():
 
     name_argument = DeclareLaunchArgument(
         "robot_ns",
-        default_value="robot_0",
+        default_value=EnvironmentVariable("ROBOT_NAMESPACE", default_value=""),
         description="Robot namespace",
     )
 
