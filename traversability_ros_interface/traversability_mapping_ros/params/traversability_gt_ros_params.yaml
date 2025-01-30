@@ -6,6 +6,7 @@
       pointcloud_topic_name: "lidar/points"
       use_lidar_pointcloud: false
       publish_traversability_grid: true
+      is_kf_optimization_enabled: false
 
   local_traversability_node:
     ros__parameters:

@@ -36,8 +36,13 @@ public:
 
         this->declare_parameter("publish_traversability_grid", rclcpp::ParameterValue(false));
         this->get_parameter("publish_traversability_grid", publish_traversability_grid_);
+
+        bool kf_opt;
+        this->declare_parameter("is_kf_optimization_enabled", rclcpp::ParameterValue(false));
+        this->get_parameter("is_kf_optimization_enabled", kf_opt);
+
         RCLCPP_WARN_STREAM(this->get_logger(), "Using lidar pointcloud? " << use_lidar_pointcloud_);
-        parameterInstance.setValue<bool>("is_kf_optimization_enabled", false);
+        parameterInstance.setValue<bool>("is_kf_optimization_enabled", kf_opt);
         parameterInstance.setValue<std::string>("SLAM_System", "ISAE");
 
         keyFrameAdditionsSubscriber_ = this->create_subscription<traversability_msgs::msg::KeyFrameAdditions>(

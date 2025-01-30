@@ -36,7 +36,7 @@ def generate_launch_description():
 
         declare_params_file_cmd = DeclareLaunchArgument(
             'params_file',
-            default_value=os.path.join(traversability_mapping_ros_pkg, 'params', 'traversability_ros_params.yaml'),
+            default_value=os.path.join(traversability_mapping_ros_pkg, 'params', 'traversability_gt_ros_params.yaml'),
             description='Full path to the ROS2 parameters file to use for all launched nodes')
 
         declare_use_gt_pose_cmd = DeclareLaunchArgument(

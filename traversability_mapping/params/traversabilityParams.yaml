@@ -1,3 +1,6 @@
+# IMPORTANT: Parameters is_kf_optimization_enabled and SLAM_System is reset in the traversability_node.cpp when running through ROS and not directly with ORB-SLAM3.
+# The updated parameters for this is taken from traversability_ros_params.yaml
+
 # Choose from ORB3, ISAE
 SLAM_System: "ORB3"
 
