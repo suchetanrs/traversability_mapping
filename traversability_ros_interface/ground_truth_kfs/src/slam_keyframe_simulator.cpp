@@ -34,7 +34,7 @@ private:
     
         geometry_msgs::msg::TransformStamped transform_stamped;
 
-        // odom to base_link
+        // odom to base_footprint
         transform_stamped.header.stamp = msg->header.stamp;
         if(static_cast<std::string>(this->get_namespace()) == "/")
         {

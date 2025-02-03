@@ -57,7 +57,7 @@ public:
         Tbv_ = translation * quaternion;
 
         grid_map::GridMap gridMap_({"num_additions", "hazard", "step_haz", "roughness_haz", "slope_haz", "border_haz", "elevation", "kfid"});
-        gridMap_.setFrameId("map");
+        gridMap_.setFrameId("odom");
         gridMap_.setGeometry(grid_map::Length(2. * parameterInstance.getValue<double>("half_size_traversability"), 2. * parameterInstance.getValue<double>("half_size_traversability")), parameterInstance.getValue<double>("resolution_local_map"));
         pGridMap_ = std::make_shared<grid_map::GridMap>(gridMap_);
         RCLCPP_INFO_STREAM(this->get_logger(), "Constructor ended.");
@@ -96,8 +96,8 @@ private:
         geometry_msgs::msg::TransformStamped transformStamped;
         try
         {
-            // transformStamped = tf_buffer_ptr_->lookupTransform("map", static_cast<std::string>(this->get_namespace()).substr(1) + "/map", tf2::TimePointZero);
-            transformStamped = tf_buffer_ptr_->lookupTransform("map", "map", tf2::TimePointZero);
+            // transformStamped = tf_buffer_ptr_->lookupTransform("odom", static_cast<std::string>(this->get_namespace()).substr(1) + "/map", tf2::TimePointZero);
+            transformStamped = tf_buffer_ptr_->lookupTransform("odom", "base_footprint", tf2::TimePointZero);
         }
         catch (tf2::TransformException &ex)
         {
@@ -124,7 +124,7 @@ private:
             gridMapOccupancy_->info.origin.position.x = transformStamped.transform.translation.x - parameterInstance.getValue<double>("half_size_traversability");
             gridMapOccupancy_->info.origin.position.y = transformStamped.transform.translation.y - parameterInstance.getValue<double>("half_size_traversability");
             // gridMapOccupancy_->info.origin.orientation = transformStamped.transform.rotation;
-            gridMapOccupancy_->header.frame_id = "map";
+            gridMapOccupancy_->header.frame_id = "odom";
             gridMapOccupancy_->header.stamp = msg->header.stamp;
             occupancy_grid_publisher_->publish(*gridMapOccupancy_);
 

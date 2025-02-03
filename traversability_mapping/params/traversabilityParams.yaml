@@ -9,7 +9,7 @@ half_size_local_map: 50.0 # size of the entire local map. The individual maps wi
 grid_center_x: 0.1
 grid_center_y: 0.1
 resolution_local_map: 0.25
-half_size_traversability: 35.5 # size of the map around the robot to consider for computing on the go traversability.
+half_size_traversability: 7.5 # size of the map around the robot to consider for computing on the go traversability.
 
 # --- Traversability related ---
 security_distance: 0.6
