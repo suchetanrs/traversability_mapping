@@ -44,7 +44,7 @@ namespace traversability_mapping
     }
 
     inline double logOddsToProbability(double l) {
-        return 1.0 - 1.0 / (1.0 + std::exp(l));
+        return 1.0 / (1.0 + std::exp(-l));
     }
 
     // Function to update the occupancy of a cell

@@ -5,7 +5,7 @@
 SLAM_System: "ORB3"
 
 # --- Gridmap related ---
-half_size_local_map: 50.0 # size of the entire local map. The individual maps will be stitched in this space.
+half_size_local_map: 35.0 # size of the entire local map. The individual maps will be stitched in this space.
 grid_center_x: 0.1
 grid_center_y: 0.1
 resolution_local_map: 0.25
@@ -13,8 +13,8 @@ half_size_traversability: 7.5 # size of the map around the robot to consider for
 
 # --- Traversability related ---
 security_distance: 0.6
-ground_clearance: 0.2
-max_slope: 0.8
+ground_clearance: 0.17
+max_slope: 0.7
 robot_height: 1.5
 translation_change_threshold: 0.25
 rotation_change_threshold: 0.2
