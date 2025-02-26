@@ -8,7 +8,7 @@ SLAM_System: "ORB3"
 half_size_local_map: 35.0 # size of the entire local map. The individual maps will be stitched in this space.
 grid_center_x: 0.1
 grid_center_y: 0.1
-resolution_local_map: 0.25
+resolution_local_map: 0.09
 half_size_traversability: 7.5 # size of the map around the robot to consider for computing on the go traversability.
 
 # --- Traversability related ---
@@ -20,9 +20,10 @@ translation_change_threshold: 0.25
 rotation_change_threshold: 0.2
 compute_roughness: true
 
+
 # --- Mapping related ---
 num_local_keyframes: 10
-is_kf_optimization_enabled: true # if this is set to true, the pointclouds are stored in memory. Large pointclouds can lead to fast memory exhaustion.
+is_kf_optimization_enabled: true #444 if this is set to true, the pointclouds are stored in memory. Large pointclouds can lead to fast memory exhaustion.
 use_pointcloud_buffer: true
 use_ros_buffer: true
 use_probabilistic_update: true
@@ -67,14 +68,14 @@ global_adjustment_sleep: 0 #time between processing every keyframe outside the l
 
 T_SLAMFrameToLidarFrame:
   quaternion:
-    x: 0.0
-    y: 0.2474
-    z: 0.0
-    w: 0.9689
+    x: 0.587
+    y: -0.587
+    z: 0.394
+    w: -0.394
   translation:
     x: 0.0
     y: 0.0
-    z: 0.6
+    z: 0.0
 
 # T_SLAMFrameToLidarFrame:
 #   quaternion:

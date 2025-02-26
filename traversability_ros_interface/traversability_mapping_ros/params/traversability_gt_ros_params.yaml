@@ -3,14 +3,14 @@
     ros__parameters:
       additions_topic_name: "traversability_keyframe_additions"
       updates_topic_name: "traversability_keyframe_updates"
-      pointcloud_topic_name: "lidar/points"
+      pointcloud_topic_name: "camera/depth/points"
       use_lidar_pointcloud: false
       publish_traversability_grid: true
       is_kf_optimization_enabled: false
 
   local_traversability_node:
     ros__parameters:
-      pointcloud_topic_name: "lidar/points"
+      pointcloud_topic_name: "camera/depth/points"
       expected_frequency: 4.0 # Hz.
 
   traversability_threshold_node:
