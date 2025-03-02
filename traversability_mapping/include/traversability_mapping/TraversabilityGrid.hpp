@@ -25,25 +25,25 @@ class NodeMetaData{
 
 public:
     NodeMetaData(){
-        z_min = 100.;
-        z_max = -100.;
+        z_min_robot_frame = 100.;
+        z_max_robot_frame = -100.;
         sx = 0; sy = 0; sz = 0;  sx2 = 0; sy2 = 0; sz2 =0; sxy =0; sxz =0; syz = 0;
         N = 0;
     }
 
     void reset(){
-        z_min = 100.;
-        z_max = -100.;
+        z_min_robot_frame = 100.;
+        z_max_robot_frame = -100.;
         sx = 0; sy = 0; sz = 0;  sx2 = 0; sy2 = 0; sz2 =0; sxy =0; sxz =0; syz = 0;
         N = 0;
     }
 
-    void insert(const float xp, const float yp, const float zp){
+    void insert(const float xp, const float yp, const float zp, float xrp, float yrp, float zrp){
         N++;
         // deal with min max
         // TODO: Check logic of min and max.
-        z_min = std::min(zp, z_min);
-        z_max = std::max(zp, z_max);
+        z_min_robot_frame = std::min(zrp, z_min_robot_frame);
+        z_max_robot_frame = std::max(zrp, z_max_robot_frame);
 
         // update momentums
         sx += xp;
@@ -58,8 +58,8 @@ public:
     }
 
     unsigned int N=0;
-    float z_min=0.;
-    float z_max=0.;
+    float z_min_robot_frame=0.;
+    float z_max_robot_frame=0.;
     float sx = 0.;
     float sy = 0.;
     float sz = 0.;
@@ -97,7 +97,7 @@ public:
 
     // @brief responsible for inserting a 3D point into the appropriate cell within the grid.
     // The appropriate cell here is that all points with the same x and y coordinates as the node in the grid map are grouped regardless of the z direction.
-    void insert_data(float xp, float yp, float zp);
+    void insert_data(float xp, float yp, float zp, float xrp, float yrp, float zrp);
 
     // @brief resets metadata for all cells in the grid.
     void reset(){ 

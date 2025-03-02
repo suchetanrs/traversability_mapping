@@ -50,7 +50,7 @@ target_include_directories(traversabilitySystem
         ${Boost_INCLUDE_DIRS}
         ${PCL_INCLUDE_DIRS}
         ${traversability_mapping_common_INCLUDE_DIRS}
-        ${grid_map_core_INCLUDE_DIRS}
+        # ${grid_map_core_INCLUDE_DIRS}
         ${YAML_CPP_INCLUDE_DIRS}
 )
 
@@ -71,9 +71,10 @@ target_link_libraries(traversabilitySystem
     PRIVATE ${EIGEN3_LIBS}
     PRIVATE ${Boost_LIBRARIES}
     PRIVATE ${PCL_LIBRARIES}
-    PRIVATE ${grid_map_core_LIBRARIES}
+    # PRIVATE ${grid_map_core_LIBRARIES}
     PRIVATE ${YAML_CPP_LIBRARIES}
     type_conversion
+    grid_map_core::grid_map_core
 )
 
 # Generate and install CMake configuration file
@@ -95,7 +96,7 @@ configure_package_config_file(
 add_executable(traversabilityMapping src/main.cpp)
 
 # Link the executable with the traversabilitySystem library
-target_link_libraries(traversabilityMapping traversabilitySystem)
+target_link_libraries(traversabilityMapping traversabilitySystem grid_map_core::grid_map_core)
 
 install(TARGETS traversabilitySystem traversabilityMapping
     EXPORT export_${PROJECT_NAME}

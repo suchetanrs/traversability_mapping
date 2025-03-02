@@ -36,18 +36,24 @@ namespace traversability_mapping
     class KeyFrame
     {
     public:
+        // Tsv: T_slam_to_velodyne
+        // Tbs: T_basefootprint_to_slam
         KeyFrame(double timestamp,
                  long unsigned int kfID,
                  pcl::PointCloud<pcl::PointXYZ> &pointCloud,
                  std::shared_ptr<grid_map::GridMap> gridMap,
                  std::shared_ptr<std::mutex> masterGridMapMutex,
                  long unsigned int mapID,
-                 Eigen::Affine3f Tbv);
+                 Eigen::Affine3f Tsv,
+                 Eigen::Affine3f Tbs);
 
+        // Tsv: T_slam_to_velodyne
+        // Tbs: T_basefootprint_to_slam
         KeyFrame(long unsigned int kfID,
                  std::shared_ptr<grid_map::GridMap> gridMap,
                  std::shared_ptr<std::mutex> masterGridMapMutex,
-                 Eigen::Affine3f Tbv);
+                 Eigen::Affine3f Tsv,
+                 Eigen::Affine3f Tbs);
         
         ~KeyFrame();
 
@@ -72,7 +78,9 @@ namespace traversability_mapping
         void setConnections(long unsigned int numConnections);
 
         // TRAVERSABILITY FUNCTION
-        void computeLocalTraversability(pcl::PointCloud<pcl::PointXYZ> &kFpcl);
+        // kFpcl : pointcloud transformed into the world frame.
+        // traversabilityPose : the pose of the robot in map frame. This is the !!base_footprint!! in the map frame.
+        void computeLocalTraversability(pcl::PointCloud<pcl::PointXYZ> &kFpcl, Eigen::Affine3f& traversabilityPose);
 
         // CACHE RECOMPUTE
         void recomputeCache(bool useHashGrid);
@@ -88,7 +96,8 @@ namespace traversability_mapping
         double timestamp_;
         long unsigned int kfID_;
         pcl::PointCloud<pcl::PointXYZ> pointCloudLidar_;
-        Eigen::Affine3f Tbv_;
+        Eigen::Affine3f Tsv_; // transform from slam frame to velodyne (lidar) frame.
+        Eigen::Affine3f Tsb_; // transform from slam frame to base_footprint frame.
 
         std::mutex connectionMutex_;
         long unsigned int numConnections_;

@@ -87,7 +87,8 @@ namespace traversability_mapping
         // set only one time in constructor.
         long unsigned int mapID_;
         std::shared_ptr<TraversabilityTypeConversions> typeConversion_;
-        Eigen::Affine3f Tbv_;
+        Eigen::Affine3f Tsv_;
+        Eigen::Affine3f Tbs_;
 
         std::mutex &updateQueueMutex_;
         std::shared_ptr<UpdateQueue> keyFrameUpdateQueue_;

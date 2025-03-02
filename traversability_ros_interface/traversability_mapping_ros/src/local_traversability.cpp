@@ -41,20 +41,34 @@ public:
         this->declare_parameter("publish_local_gridmap", rclcpp::ParameterValue(false));
         this->get_parameter("publish_local_gridmap", publish_local_gridmap_);
 
+        this->declare_parameter("slam_frame", rclcpp::ParameterValue("camera_link"));
+        this->get_parameter("slam_frame", slam_frame_);
+
         pcl_subscriber_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
             pointcloud_topic_name_, qos_profile, std::bind(&LocalTraversabilityNode::pointCloudCallback, this, std::placeholders::_1));
 
         // Other params
-        Eigen::Translation3f translation(
+        Eigen::Translation3f translation_slam_lidar(
             parameterInstance.getValue<float>("T_SLAMFrameToLidarFrame/translation/x"),
             parameterInstance.getValue<float>("T_SLAMFrameToLidarFrame/translation/y"),
             parameterInstance.getValue<float>("T_SLAMFrameToLidarFrame/translation/z"));
-        Eigen::Quaternion<float> quaternion(
+        Eigen::Quaternion<float> quaternion_slam_lidar(
             parameterInstance.getValue<float>("T_SLAMFrameToLidarFrame/quaternion/w"),
             parameterInstance.getValue<float>("T_SLAMFrameToLidarFrame/quaternion/x"),
             parameterInstance.getValue<float>("T_SLAMFrameToLidarFrame/quaternion/y"),
             parameterInstance.getValue<float>("T_SLAMFrameToLidarFrame/quaternion/z"));
-        Tbv_ = translation * quaternion;
+        Tsv_ = translation_slam_lidar * quaternion_slam_lidar;
+
+        Eigen::Translation3f translation_bf_slam(
+            parameterInstance.getValue<float>("T_BasefootprintToSLAM/translation/x"),
+            parameterInstance.getValue<float>("T_BasefootprintToSLAM/translation/y"),
+            parameterInstance.getValue<float>("T_BasefootprintToSLAM/translation/z"));
+        Eigen::Quaternion<float> quaternion_bf_slam(
+            parameterInstance.getValue<float>("T_BasefootprintToSLAM/quaternion/w"),
+            parameterInstance.getValue<float>("T_BasefootprintToSLAM/quaternion/x"),
+            parameterInstance.getValue<float>("T_BasefootprintToSLAM/quaternion/y"),
+            parameterInstance.getValue<float>("T_BasefootprintToSLAM/quaternion/z"));
+        Tbs_ = translation_bf_slam * quaternion_bf_slam;
 
         grid_map::GridMap gridMap_({"num_additions", "hazard", "step_haz", "roughness_haz", "slope_haz", "border_haz", "elevation", "kfid"});
         gridMap_.setFrameId("odom");
@@ -89,7 +103,7 @@ private:
         // RCLCPP_INFO_STREAM(this->get_logger(), "Conversion took: " << conversion_elapsed.count());
         // Initialize your KeyFrame class
         std::shared_ptr<std::mutex> mapMutex_ = std::make_shared<std::mutex>();
-        auto keyframe_ = std::make_shared<traversability_mapping::KeyFrame>(1, pGridMap_, mapMutex_, Tbv_); // Replace with your actual initialization logic
+        auto keyframe_ = std::make_shared<traversability_mapping::KeyFrame>(1, pGridMap_, mapMutex_, Tsv_, Tbs_); // Replace with your actual initialization logic
         // Call computeLocalTraversability function from your KeyFrame class
 
         // set pose
@@ -97,7 +111,7 @@ private:
         try
         {
             // transformStamped = tf_buffer_ptr_->lookupTransform("odom", static_cast<std::string>(this->get_namespace()).substr(1) + "/map", tf2::TimePointZero);
-            transformStamped = tf_buffer_ptr_->lookupTransform("odom", "base_footprint", tf2::TimePointZero);
+            transformStamped = tf_buffer_ptr_->lookupTransform("odom", slam_frame_, tf2::TimePointZero);
         }
         catch (tf2::TransformException &ex)
         {
@@ -109,14 +123,15 @@ private:
             RCLCPP_INFO(this->get_logger(), "NEW!");
             Eigen::Translation3f translation(0.0f, 0.0f, 0.0f);
             Eigen::Quaternionf rotation(transformStamped.transform.rotation.w, transformStamped.transform.rotation.x, transformStamped.transform.rotation.y, transformStamped.transform.rotation.z);
-            Eigen::Affine3f Tmb_ = translation * rotation;
-            keyframe_->setPose(Tmb_);
+            Eigen::Affine3f Tms_ = translation * rotation;
+            keyframe_->setPose(Tms_);
 
-            auto Tmv_ = Tmb_ * Tbv_;
+            auto Tmv = Tms_ * Tsv_;
+            auto Tmb = Tms_ * Tbs_.inverse();
             pcl::PointCloud<pcl::PointXYZ> pointCloudCorrected_;
-            traversability_mapping::doTransformPCL(pointcloudInput, pointCloudCorrected_, Tmv_);
+            traversability_mapping::doTransformPCL(pointcloudInput, pointCloudCorrected_, Tmv);
 
-            keyframe_->computeLocalTraversability(pointCloudCorrected_); // Assuming keyframe_ is a shared pointer to your KeyFrame object
+            keyframe_->computeLocalTraversability(pointCloudCorrected_, Tmb); // Assuming keyframe_ is a shared pointer to your KeyFrame object
 
             nav_msgs::msg::OccupancyGrid occupancyGrid_msg;
             traversability_mapping::gridMapToOccupancyGrid(*pGridMap_, "hazard", 0., 1., occupancyGrid_msg);
@@ -147,9 +162,11 @@ private:
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr occupancy_grid_publisher_;
     rclcpp::Publisher<grid_map_msgs::msg::GridMap>::SharedPtr traversabilityPub_;
     std::string pointcloud_topic_name_;
+    std::string slam_frame_;
     std::shared_ptr<grid_map::GridMap> pGridMap_;
     std::shared_ptr<nav_msgs::msg::OccupancyGrid> gridMapOccupancy_;
-    Eigen::Affine3f Tbv_;
+    Eigen::Affine3f Tsv_;
+    Eigen::Affine3f Tbs_;
     double expected_frequency_;
     double callback_interval_;
     bool publish_local_gridmap_;

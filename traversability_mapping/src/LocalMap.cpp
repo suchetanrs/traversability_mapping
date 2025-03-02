@@ -20,16 +20,27 @@ namespace traversability_mapping
           mapID_(mapID),
           keyFrameUpdateQueue_(keyFrameUpdateQueue)
     {
-        Eigen::Translation3f translation(
+        Eigen::Translation3f translation_slam_lidar(
             parameterInstance.getValue<float>("T_SLAMFrameToLidarFrame/translation/x"),
             parameterInstance.getValue<float>("T_SLAMFrameToLidarFrame/translation/y"),
             parameterInstance.getValue<float>("T_SLAMFrameToLidarFrame/translation/z"));
-        Eigen::Quaternion<float> quaternion(
+        Eigen::Quaternion<float> quaternion_slam_lidar(
             parameterInstance.getValue<float>("T_SLAMFrameToLidarFrame/quaternion/w"),
             parameterInstance.getValue<float>("T_SLAMFrameToLidarFrame/quaternion/x"),
             parameterInstance.getValue<float>("T_SLAMFrameToLidarFrame/quaternion/y"),
             parameterInstance.getValue<float>("T_SLAMFrameToLidarFrame/quaternion/z"));
-        Tbv_ = translation * quaternion;
+        Tsv_ = translation_slam_lidar * quaternion_slam_lidar;
+
+        Eigen::Translation3f translation_bf_slam(
+            parameterInstance.getValue<float>("T_BasefootprintToSLAM/translation/x"),
+            parameterInstance.getValue<float>("T_BasefootprintToSLAM/translation/y"),
+            parameterInstance.getValue<float>("T_BasefootprintToSLAM/translation/z"));
+        Eigen::Quaternion<float> quaternion_bf_slam(
+            parameterInstance.getValue<float>("T_BasefootprintToSLAM/quaternion/w"),
+            parameterInstance.getValue<float>("T_BasefootprintToSLAM/quaternion/x"),
+            parameterInstance.getValue<float>("T_BasefootprintToSLAM/quaternion/y"),
+            parameterInstance.getValue<float>("T_BasefootprintToSLAM/quaternion/z"));
+        Tbs_ = translation_bf_slam * quaternion_bf_slam;
 
         typeConversion_ = std::make_shared<TraversabilityTypeConversions>();
         grid_map::GridMap gridMap_({"num_additions", "hazard", "step_haz", "roughness_haz", "slope_haz", "border_haz", "elevation", "kfid"});
@@ -181,7 +192,7 @@ namespace traversability_mapping
                                                        pcl::PointCloud<pcl::PointXYZ> &pointCloud,
                                                        long unsigned int mapID)
     {
-        std::shared_ptr<KeyFrame> keyFrame = std::make_shared<KeyFrame>(timestamp, kfID, pointCloud, pGridMap_, masterGridMapMutex_, mapID, Tbv_);
+        std::shared_ptr<KeyFrame> keyFrame = std::make_shared<KeyFrame>(timestamp, kfID, pointCloud, pGridMap_, masterGridMapMutex_, mapID, Tsv_, Tbs_);
         std::lock_guard<std::mutex> lock(keyFramesMapMutex);
         keyFramesMap_[kfID] = keyFrame;
         localKeyFramesMutex.lock();

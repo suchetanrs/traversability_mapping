@@ -14,7 +14,7 @@
 #include <Eigen/Eigenvalues>
 namespace traversability_mapping
 {
-    void traversabilityGrid::insert_data(float xp, float yp, float zp)
+    void traversabilityGrid::insert_data(float xp, float yp, float zp, float xrp, float yrp, float zrp)
     {
 
         // Are we at maximal subdivision lvl?
@@ -25,7 +25,7 @@ namespace traversability_mapping
         if (xpo >= size_x_ || ypo >= size_y_ ||
             xpo < 0 || ypo < 0)
             return;
-        _grid.at(xpo).at(ypo).insert(xp, yp, zp);
+        _grid.at(xpo).at(ypo).insert(xp, yp, zp, xrp, yrp, zrp);
     }
 
     Eigen::Vector4d traversabilityGrid::get_goodness_m(float xp, float yp, const double distance, const double ground_clearance, const double max_pitch)
@@ -90,8 +90,8 @@ namespace traversability_mapping
                     cellsNumPoints += cell.N;
                     if(abs(i - index_x) < _resolution * 2 && abs(j - index_y) < _resolution * 2)
                     {
-                        zM = std::max(zM, cell.z_max);
-                        zm = std::min(zm, cell.z_min);
+                        zM = std::max(zM, cell.z_max_robot_frame);
+                        zm = std::min(zm, cell.z_min_robot_frame);
                     }
                 }
             }

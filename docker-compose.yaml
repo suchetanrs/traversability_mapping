@@ -10,6 +10,8 @@ services:
       #Time
       - /etc/timezone:/etc/timezone:rw
       - /etc/localtime:/etc/localtime:rw
+      #code
+      - ./:/root/
     privileged: true
     network_mode: host
     ipc: host

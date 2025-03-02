@@ -49,6 +49,14 @@ ParameterHandler::ParameterHandler()
     parameter_map_["T_SLAMFrameToLidarFrame/quaternion/x"] = loaded_node["T_SLAMFrameToLidarFrame"]["quaternion"]["x"].as<float>();
     parameter_map_["T_SLAMFrameToLidarFrame/quaternion/y"] = loaded_node["T_SLAMFrameToLidarFrame"]["quaternion"]["y"].as<float>();
     parameter_map_["T_SLAMFrameToLidarFrame/quaternion/z"] = loaded_node["T_SLAMFrameToLidarFrame"]["quaternion"]["z"].as<float>();
+
+    parameter_map_["T_BasefootprintToSLAM/translation/x"] = loaded_node["T_BasefootprintToSLAM"]["translation"]["x"].as<float>();
+    parameter_map_["T_BasefootprintToSLAM/translation/y"] = loaded_node["T_BasefootprintToSLAM"]["translation"]["y"].as<float>();
+    parameter_map_["T_BasefootprintToSLAM/translation/z"] = loaded_node["T_BasefootprintToSLAM"]["translation"]["z"].as<float>();
+    parameter_map_["T_BasefootprintToSLAM/quaternion/w"] = loaded_node["T_BasefootprintToSLAM"]["quaternion"]["w"].as<float>();
+    parameter_map_["T_BasefootprintToSLAM/quaternion/x"] = loaded_node["T_BasefootprintToSLAM"]["quaternion"]["x"].as<float>();
+    parameter_map_["T_BasefootprintToSLAM/quaternion/y"] = loaded_node["T_BasefootprintToSLAM"]["quaternion"]["y"].as<float>();
+    parameter_map_["T_BasefootprintToSLAM/quaternion/z"] = loaded_node["T_BasefootprintToSLAM"]["quaternion"]["z"].as<float>();
     parameter_map_["global_adjustment_sleep"] = loaded_node["global_adjustment_sleep"].as<int>();
 
     if(getValue<bool>("use_averaging") && getValue<bool>("use_probabilistic_update"))

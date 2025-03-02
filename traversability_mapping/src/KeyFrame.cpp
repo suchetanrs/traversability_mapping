@@ -20,14 +20,16 @@ namespace traversability_mapping
                        std::shared_ptr<grid_map::GridMap> gridMap,
                        std::shared_ptr<std::mutex> masterGridMapMutex,
                        long unsigned int mapID,
-                       Eigen::Affine3f Tbv)
+                       Eigen::Affine3f Tsv,
+                       Eigen::Affine3f Tbs)
         : timestamp_(timestamp),
           kfID_(kfID),
           pointCloudLidar_(pointCloud),
           pGridMap_(gridMap),
           masterGridMapMutex_(masterGridMapMutex),
           parentMapID_(mapID),
-          Tbv_(Tbv)
+          Tsv_(Tsv),
+          Tsb_(Tbs.inverse())
     {
         // TODO: Make this a parameter
         // auto translation = Eigen::Translation3f(
@@ -39,18 +41,20 @@ namespace traversability_mapping
         //     static_cast<float>(0.0),   // x
         //     static_cast<float>(0.381), // y
         //     static_cast<float>(0.0));  // z
-        // Tbv_ = translation * quaternion;
+        // Tsv_ = translation * quaternion;
         numConnections_ = 0;
     }
 
     KeyFrame::KeyFrame(long unsigned int kfID,
                        std::shared_ptr<grid_map::GridMap> gridMap,
                        std::shared_ptr<std::mutex> masterGridMapMutex,
-                       Eigen::Affine3f Tbv)
+                       Eigen::Affine3f Tsv,
+                       Eigen::Affine3f Tbs)
         : kfID_(kfID),
           pGridMap_(gridMap),
           masterGridMapMutex_(masterGridMapMutex),
-          Tbv_(Tbv)
+          Tsv_(Tsv),
+          Tsb_(Tbs.inverse())
     {
         numConnections_ = 0;
     }
@@ -164,35 +168,39 @@ namespace traversability_mapping
         numConnections_ = numConnections;
     }
 
-    void KeyFrame::computeLocalTraversability(pcl::PointCloud<pcl::PointXYZ> &kFpcl)
+    void KeyFrame::computeLocalTraversability(pcl::PointCloud<pcl::PointXYZ> &kFpcl, Eigen::Affine3f& traversabilityPose)
     {
-        // TODO: Load from paramter file.
         double resolution_ = parameterInstance.getValue<double>("resolution_local_map");
         double half_size_traversability_ = parameterInstance.getValue<double>("half_size_traversability");
         const double security_distance_ = parameterInstance.getValue<double>("security_distance");
         const double ground_clearance_ = parameterInstance.getValue<double>("ground_clearance");
         const double max_slope_ = parameterInstance.getValue<double>("max_slope");
         double robot_height_ = parameterInstance.getValue<double>("robot_height");
-        Eigen::Vector2d slamPosition;
-        slamPosition.x() = poseTraversabilityCoord_->translation().x();
-        slamPosition.y() = poseTraversabilityCoord_->translation().y();
-        auto traversabilityMap = std::make_shared<traversabilityGrid>(resolution_, Eigen::Vector2d(half_size_traversability_, half_size_traversability_), slamPosition);
+        Eigen::Vector2d traversabilityPose2D;
+        traversabilityPose2D.x() = traversabilityPose.translation().x();
+        traversabilityPose2D.y() = traversabilityPose.translation().y();
+        auto traversabilityMap = std::make_shared<traversabilityGrid>(resolution_, Eigen::Vector2d(half_size_traversability_, half_size_traversability_), traversabilityPose2D);
         // Fill traversability structure
         traversabilityMap->reset();
+        auto T_robot_to_map = traversabilityPose.inverse();
+        Eigen::Vector3f pRobot;
+        Eigen::Vector3f pGlobal;
         for (const auto& point : kFpcl)
         {
-            if ((point.x == 0 && point.y == 0) || point.z > robot_height_)
+            pGlobal = {point.x, point.y, point.z};
+            pRobot = T_robot_to_map * pGlobal; 
+            if ((point.x == 0 && point.y == 0) || pRobot.z() > robot_height_)
                 continue;
 
-            traversabilityMap->insert_data(point.x, point.y, point.z);
+            traversabilityMap->insert_data(point.x, point.y, point.z, pRobot.x(), pRobot.y(), pRobot.z());
         }
         try
         {
 
             // Publish as grid map
             // Create grid map.
-            // map.move(slamPosition);
-            // map.setPosition(slamPosition);
+            // map.move(traversabilityPose2D);
+            // map.setPosition(traversabilityPose2D);
             int grid_count = 0;
             // for (grid_map::GridMapIterator it(map); !it.isPastEnd(); ++it)
             // {
@@ -282,7 +290,7 @@ namespace traversability_mapping
             std::cerr << "Out of range exception caught: " << e.what() << std::endl;
         }
         // std::cout << "Grid count: " << grid_count << " KF ID: " << kfID_;
-        // map.setPosition(slamPosition);
+        // map.setPosition(traversabilityPose2D);
     }
 
     void KeyFrame::recomputeCache(bool useHashGrid)
@@ -294,11 +302,11 @@ namespace traversability_mapping
             poseUpdateQueueMutex_.unlock();
             return;
         }
-        auto Tmb_ = poseUpdates_[poseUpdates_.size() - 1];
+        auto Tms_ = poseUpdates_[poseUpdates_.size() - 1];
         poseUpdates_.clear();
         poseUpdateQueueMutex_.unlock();
 
-        if(!spatialHashGridInstance_.updateKeyframe(kfID_, Tmb_, getConnections()))
+        if(!spatialHashGridInstance_.updateKeyframe(kfID_, Tms_, getConnections()))
         {
             if(useHashGrid)
                 return;
@@ -307,14 +315,17 @@ namespace traversability_mapping
         auto start_time = std::chrono::high_resolution_clock::now();
         // std::cout << "Recompute cache for KF with ID: " << kfID_ << std::endl;
         // Transform the pointCloudLidar_ to map frame.
-        auto Tmv_ = Tmb_ * Tbv_;
+        // transform from map frame to slam frame * transform from slam frame to velodyne (lidar) frame.
+        auto Tmv = Tms_ * Tsv_;
+        auto Tmb = Tms_ * Tsb_;
         pcl::PointCloud<pcl::PointXYZ> pointCloudCorrected_;
-        traversability_mapping::doTransformPCL(pointCloudLidar_, pointCloudCorrected_, Tmv_);
+        // correct the pointcloud from velodyne frame to map frame.
+        traversability_mapping::doTransformPCL(pointCloudLidar_, pointCloudCorrected_, Tmv);
 
         // clear stray values
         // clearStrayValuesInGrid();
         // recompute values and mark on map.
-        computeLocalTraversability(pointCloudCorrected_);
+        computeLocalTraversability(pointCloudCorrected_, Tmb);
         if(!parameterInstance.getValue<bool>("is_kf_optimization_enabled"))
         {
             pointCloudLidar_.clear();

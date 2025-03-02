@@ -5,3 +5,4 @@ traversability_mapping_common/build
 build/
 install/
 log/
+.bash_history
