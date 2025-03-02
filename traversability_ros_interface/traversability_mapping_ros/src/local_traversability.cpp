@@ -115,7 +115,7 @@ private:
         }
         catch (tf2::TransformException &ex)
         {
-            RCLCPP_WARN(this->get_logger(), "Could not transform from map to base_footprint: %s", ex.what());
+            RCLCPP_WARN_STREAM(this->get_logger(), "Could not transform from map to " << slam_frame_ << ex.what());
             return;
         }
         {

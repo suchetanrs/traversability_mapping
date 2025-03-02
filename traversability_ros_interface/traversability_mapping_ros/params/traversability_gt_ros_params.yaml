@@ -12,6 +12,7 @@
     ros__parameters:
       pointcloud_topic_name: "lidar/points"
       expected_frequency: 4.0 # Hz.
+      slam_frame: camera_link
 
   traversability_threshold_node:
     ros__parameters:

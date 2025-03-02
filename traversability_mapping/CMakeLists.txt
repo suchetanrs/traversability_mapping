@@ -74,7 +74,7 @@ target_link_libraries(traversabilitySystem
     # PRIVATE ${grid_map_core_LIBRARIES}
     PRIVATE ${YAML_CPP_LIBRARIES}
     type_conversion
-    grid_map_core::grid_map_core
+    PUBLIC grid_map_core::grid_map_core
 )
 
 # Generate and install CMake configuration file
@@ -96,7 +96,7 @@ configure_package_config_file(
 add_executable(traversabilityMapping src/main.cpp)
 
 # Link the executable with the traversabilitySystem library
-target_link_libraries(traversabilityMapping traversabilitySystem grid_map_core::grid_map_core)
+target_link_libraries(traversabilityMapping traversabilitySystem)
 
 install(TARGETS traversabilitySystem traversabilityMapping
     EXPORT export_${PROJECT_NAME}

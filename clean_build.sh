@@ -36,9 +36,3 @@ cd traversability_mapping/build
 cmake ..
 make
 sudo make install
-
-cd ../../
-
-cd traversability_ros_interface
-colcon build --symlink-install
-source install/setup.bash

@@ -30,30 +30,9 @@ use_averaging: false
 average_persistence: 10.0 #if a cell is averaged 20 times, it is reset to start a new averaging instance.
 global_adjustment_sleep: 0 #time between processing every keyframe outside the local window (ms)
 
-# SLAM Frame normally is the camera frame.
-# T_SLAMFrameToLidarFrame:
-#   quaternion:
-#     x: 0.0
-#     y: 0.381
-#     z: 0.0
-#     w: 0.9246
-#   translation:
-#     x: 0.6
-#     y: 0.0
-#     z: 0.8
+# ----------------------SLAM Frame is the camera frame-------------------------
 
-# T_SLAMFrameToLidarFrame:
-#   quaternion:
-#     x: 0.0
-#     y: 0.0
-#     z: 0.0
-#     w: 1.0
-#   translation:
-#     x: 0.0
-#     y: 0.0
-#     z: 0.6
-
-# ISAE
+# ------------------ISAE----------------------
 # T_SLAMFrameToLidarFrame:
 #   quaternion:
 #     x: -0.496686
@@ -65,6 +44,7 @@ global_adjustment_sleep: 0 #time between processing every keyframe outside the l
 #     y: 0.07019467
 #     z: 0.01072864
 
+# ------------------Gazebo Lidar----------------------
 T_SLAMFrameToLidarFrame:
   quaternion:
     x: 0.0
@@ -72,9 +52,9 @@ T_SLAMFrameToLidarFrame:
     z: 0.0
     w: 0.9689
   translation:
-    x: 0.0
+    x: -0.10
     y: 0.0
-    z: 0.6
+    z: 0.350
 
 # T_SLAMFrameToLidarFrame:
 #   quaternion:
@@ -91,6 +71,8 @@ T_SLAMFrameToLidarFrame:
 
 ###############################################################################################################
 
+# ------------------Gazebo Lidar----------------------
+
 T_BasefootprintToSLAM:
   quaternion:
     x: 0.0
@@ -98,6 +80,6 @@ T_BasefootprintToSLAM:
     z: 0.0
     w: 1.0
   translation:
-    x: 0.0
+    x: 0.7
     y: 0.0
-    z: 0.6
+    z: 1.150
