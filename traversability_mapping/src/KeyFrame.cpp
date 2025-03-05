@@ -126,7 +126,7 @@ namespace traversability_mapping
             //     translationDiff.maxCoeff() > parameterInstance.getValue<double>("translation_change_threshold"))
             // {
             // }
-            
+
             *poseTraversabilityCoord_ = pose;
             newPose = true;
         }
@@ -148,7 +148,7 @@ namespace traversability_mapping
             else
                 *poseSLAMCoord_ = pose;
         }
-        catch (const std::exception& e)
+        catch (const std::exception &e)
         {
             throw std::runtime_error("Code should crash now");
         }
@@ -168,7 +168,7 @@ namespace traversability_mapping
         numConnections_ = numConnections;
     }
 
-    void KeyFrame::computeLocalTraversability(pcl::PointCloud<pcl::PointXYZ> &kFpcl, Eigen::Affine3f& traversabilityPose)
+    void KeyFrame::computeLocalTraversability(pcl::PointCloud<pcl::PointXYZ> &kFpcl, Eigen::Affine3f &traversabilityPose)
     {
         double resolution_ = parameterInstance.getValue<double>("resolution_local_map");
         double half_size_traversability_ = parameterInstance.getValue<double>("half_size_traversability");
@@ -185,10 +185,10 @@ namespace traversability_mapping
         auto T_robot_to_map = traversabilityPose.inverse();
         Eigen::Vector3f pRobot;
         Eigen::Vector3f pGlobal;
-        for (const auto& point : kFpcl)
+        for (const auto &point : kFpcl)
         {
             pGlobal = {point.x, point.y, point.z};
-            pRobot = T_robot_to_map * pGlobal; 
+            pRobot = T_robot_to_map * pGlobal;
             if ((point.x == 0 && point.y == 0) || pRobot.z() > robot_height_)
                 continue;
 
@@ -237,18 +237,18 @@ namespace traversability_mapping
                     ++grid_count;
                     if (haz(0) < 0.)
                         continue;
-                    if(parameterInstance.getValue<bool>("use_averaging"))
+                    if (parameterInstance.getValue<bool>("use_averaging"))
                     {
                         auto num_additions = 0.0;
-                        if(std::isnan(pGridMap_->atPosition("num_additions", meterValue)))
+                        if (std::isnan(pGridMap_->atPosition("num_additions", meterValue)))
                         {
                             pGridMap_->atPosition("num_additions", meterValue) = 0.0;
                             pGridMap_->atPosition("hazard", meterValue) = 0.0;
                         }
                         num_additions = pGridMap_->atPosition("num_additions", meterValue);
-                        if(haz(0) > pGridMap_->atPosition("hazard", meterValue))
+                        if (haz(0) > pGridMap_->atPosition("hazard", meterValue))
                         {
-                            if(num_additions > parameterInstance.getValue<double>("average_persistence"))
+                            if (num_additions > parameterInstance.getValue<double>("average_persistence"))
                             {
                                 pGridMap_->atPosition("num_additions", meterValue) = 1.0;
                                 num_additions = 1.0;
@@ -258,13 +258,13 @@ namespace traversability_mapping
                             pGridMap_->atPosition("hazard", meterValue) = ((pGridMap_->atPosition("hazard", meterValue) * num_additions) + haz(0)) / (num_additions + 1.0);
                         }
                     }
-                    else if(parameterInstance.getValue<bool>("use_probabilistic_update"))
+                    else if (parameterInstance.getValue<bool>("use_probabilistic_update"))
                     {
                         // in this case, num additions becomes the log odds.
                         // TODO: rename the key in the gridmap.
-                        if(haz(0) == 0)
+                        if (haz(0) == 0)
                             haz(0) = 0.1;
-                        if(haz(0) == 1)
+                        if (haz(0) == 1)
                             haz(0) = 0.9;
                         double updated_probability = updateCellLogOdds(pGridMap_->atPosition("num_additions", meterValue), haz(0));
                         pGridMap_->atPosition("hazard", meterValue) = updated_probability;
@@ -273,6 +273,8 @@ namespace traversability_mapping
                     {
                         pGridMap_->atPosition("hazard", meterValue) = haz(0);
                     }
+                    if (parameterInstance.getValue<bool>("use_virtual_boundary"))
+                        pGridMap_->atPosition("hazard", meterValue) = std::max(pGridMap_->atPosition("virtual_boundary", meterValue), pGridMap_->atPosition("hazard", meterValue));
                     pGridMap_->atPosition("step_haz", meterValue) = haz(1);
                     // original
                     // pGridMap_->atPosition("roughness_haz", meterValue) = haz(2);
@@ -306,9 +308,9 @@ namespace traversability_mapping
         poseUpdates_.clear();
         poseUpdateQueueMutex_.unlock();
 
-        if(!spatialHashGridInstance_.updateKeyframe(kfID_, Tms_, getConnections()))
+        if (!spatialHashGridInstance_.updateKeyframe(kfID_, Tms_, getConnections()))
         {
-            if(useHashGrid)
+            if (useHashGrid)
                 return;
         }
 
@@ -326,7 +328,7 @@ namespace traversability_mapping
         // clearStrayValuesInGrid();
         // recompute values and mark on map.
         computeLocalTraversability(pointCloudCorrected_, Tmb);
-        if(!parameterInstance.getValue<bool>("is_kf_optimization_enabled"))
+        if (!parameterInstance.getValue<bool>("is_kf_optimization_enabled"))
         {
             pointCloudLidar_.clear();
         }

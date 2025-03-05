@@ -29,6 +29,7 @@ use_probabilistic_update: true
 use_averaging: false
 average_persistence: 10.0 #if a cell is averaged 20 times, it is reset to start a new averaging instance.
 global_adjustment_sleep: 0 #time between processing every keyframe outside the local window (ms)
+use_virtual_boundary: false
 
 # ----------------------SLAM Frame is the camera frame-------------------------
 

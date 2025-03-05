@@ -52,9 +52,74 @@ namespace traversability_mapping
         gridMap_.setPosition(slamPosition);
         pGridMap_ = std::make_shared<grid_map::GridMap>(gridMap_);
         masterGridMapMutex_ = std::make_shared<std::mutex>();
+        markVirtualBoundary("/usr/local/params/virtual_boundary.csv");
     }
 
     LocalMap::~LocalMap() {}
+
+    void LocalMap::markVirtualBoundary(const std::string &csvFilePath)
+    {
+        if(!parameterInstance.getValue<bool>("use_virtual_boundary"))
+        {
+            return;
+        }
+        // 1) Add "virtual_boundary" layer if it doesn't exist already.
+        if (!pGridMap_->exists("virtual_boundary"))
+        {
+            std::lock_guard<std::mutex> lock(*masterGridMapMutex_);
+            // Initialize the entire layer to 0.0
+            pGridMap_->add("virtual_boundary", 0.0);
+        }
+
+        // 2) Read line segments from CSV
+        std::vector<LineSegment2D> segments;
+        {
+            std::ifstream file(csvFilePath);
+            if (!file.is_open())
+            {
+                throw std::runtime_error("Cannot open CSV file: " + csvFilePath);
+            }
+
+            std::string line;
+            while (std::getline(file, line))
+            {
+                if (line.empty())
+                    continue;
+                std::stringstream ss(line);
+
+                float x1, y1, z1, x2, y2, z2;
+                char comma;
+                // CSV format: x1,y1,z1,x2,y2,z2
+                if (!(ss >> x1 >> comma >> y1 >> comma >> z1 >> comma >> x2 >> comma >> y2 >> comma >> z2))
+                {
+                    throw std::runtime_error("Invalid CSV row: " + line);
+                }
+
+                segments.push_back({x1, y1, x2, y2});
+            }
+        }
+
+        // 3) Mark each line segment by sampling points along it
+        const int numSamples = 100; // or adjust as needed
+        for (const auto &seg : segments)
+        {
+            for (int i = 0; i < numSamples; ++i)
+            {
+                float alpha = static_cast<float>(i) / (numSamples - 1);
+                float x = seg.x1 + alpha * (seg.x2 - seg.x1);
+                float y = seg.y1 + alpha * (seg.y2 - seg.y1);
+
+                grid_map::Position pos(x, y);
+
+                // Check if within map bounds, then mark "virtual_boundary" = 1.0
+                if (pGridMap_->isInside(pos))
+                {
+                    std::lock_guard<std::mutex> lock(*masterGridMapMutex_);
+                    pGridMap_->atPosition("virtual_boundary", pos) = 1.0f;
+                }
+            }
+        }
+    }
 
     void LocalMap::RunUpdateQueue()
     {
@@ -91,7 +156,7 @@ namespace traversability_mapping
     void LocalMap::RunTraversability()
     {
         int sleep = parameterInstance.getValue<int>("global_adjustment_sleep");
-        while(1)
+        while (1)
         {
             while (activeMap_)
             {
@@ -103,7 +168,7 @@ namespace traversability_mapping
                 }
                 for (auto &pair : keyFramesMapCopy_)
                 {
-                    if(!activeMap_)
+                    if (!activeMap_)
                     {
                         globalMappingRunning_ = false;
                         break;
@@ -131,12 +196,12 @@ namespace traversability_mapping
 
     void LocalMap::RunLocalKeyFrames()
     {
-        while(1)
+        while (1)
         {
-            while(1)
+            while (1)
             {
                 localKeyFramesMutex.lock();
-                if(mLocalKeyFrames_.size() == 0 || !activeMap_)
+                if (mLocalKeyFrames_.size() == 0 || !activeMap_)
                 {
                     localKeyFramesMutex.unlock();
                     localMappingRunning_ = false;
@@ -144,7 +209,7 @@ namespace traversability_mapping
                 }
                 auto kfPtr = mLocalKeyFrames_.back();
                 mLocalKeyFrames_.pop_back();
-                if (mLocalKeyFrames_.size() > parameterInstance.getValue<double>("num_local_keyframes")) 
+                if (mLocalKeyFrames_.size() > parameterInstance.getValue<double>("num_local_keyframes"))
                 {
                     // Remove the oldest element
                     mLocalKeyFrames_.pop_front();
@@ -163,7 +228,7 @@ namespace traversability_mapping
         activeMap_ = false;
         globalMappingRunning_ = true;
         localMappingRunning_ = true;
-        while(globalMappingRunning_ || localMappingRunning_)
+        while (globalMappingRunning_ || localMappingRunning_)
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(200));
             std::cout << "Waiting for local (" << localMappingRunning_ << ") and global mapping (" << globalMappingRunning_ << ")to stop" << std::endl;
@@ -273,10 +338,10 @@ namespace traversability_mapping
     void LocalMap::processUpdateQueue()
     {
         // std::cout << mapID_ << " Processing queue with size: " << keyFrameUpdateQueue_->size() << std::endl;
-        while(1)
+        while (1)
         {
             updateQueueMutex_.lock();
-            if(keyFrameUpdateQueue_->size() == 0)
+            if (keyFrameUpdateQueue_->size() == 0)
             {
                 updateQueueMutex_.unlock();
                 break;
@@ -292,7 +357,7 @@ namespace traversability_mapping
                     kfPtrToUpdate = keyFramesMap_[kfPoseToUpdate.id];
                 }
             }
-            if(kfPtrToUpdate)
+            if (kfPtrToUpdate)
             {
                 kfPtrToUpdate->setSLAMPose(kfPoseToUpdate.pose);
                 kfPtrToUpdate->setConnections(kfPoseToUpdate.numConnections);

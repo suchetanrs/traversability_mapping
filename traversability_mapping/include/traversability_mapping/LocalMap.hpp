@@ -29,12 +29,18 @@ struct KeyFrameUpdateData
     long unsigned int numConnections;
 
     KeyFrameUpdateData() : id(0), pose(Sophus::SE3f()), numConnections(0) {}
-    
-    KeyFrameUpdateData(long unsigned int id, Sophus::SE3f p, long unsigned int connections) 
+
+    KeyFrameUpdateData(long unsigned int id, Sophus::SE3f p, long unsigned int connections)
         : id(id), pose(p), numConnections(connections) {}
 };
 
 using UpdateQueue = std::queue<KeyFrameUpdateData>;
+
+struct LineSegment2D
+{
+    float x1, y1;
+    float x2, y2;
+};
 
 namespace traversability_mapping
 {
@@ -46,6 +52,8 @@ namespace traversability_mapping
 
         // Destructor
         ~LocalMap();
+
+        void markVirtualBoundary(const std::string &csvFilePath);
 
         void RunUpdateQueue();
 
@@ -92,7 +100,7 @@ namespace traversability_mapping
 
         std::mutex &updateQueueMutex_;
         std::shared_ptr<UpdateQueue> keyFrameUpdateQueue_;
-        
+
         std::shared_ptr<std::mutex> masterGridMapMutex_;
         std::shared_ptr<grid_map::GridMap> pGridMap_;
 
