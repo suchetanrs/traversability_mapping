@@ -36,3 +36,5 @@ Setup the ORB-SLAM3 Wrapper and the traversability system from this repository [
 ## Other information:
 
 To integrate this library with your own SLAM system via CPP, follow this [Wiki](https://github.com/suchetanrs/traversability_mapping/wiki/Integrating-with-your-own-SLAM-System.)
+
+This work was done at the PNX Lab at ISAE-SUPAERO, Toulouse, France.
