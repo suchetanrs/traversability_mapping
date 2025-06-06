@@ -13,15 +13,17 @@ This repository contains the packages responsible for performing realtime global
 
 Setup the Gazebo simulation from this repository [Gazebo sim](https://github.com/suchetanrs/gz-sim-environment)
 
+```cd && mkdir -p traversability_ws/src```
+
+```cd traversability_ws```
+
 ```git clone https://github.com/suchetanrs/traversability_mapping```
 
 ```cd traversability_mapping && sudo chmod +x clean_build.sh && ./clean_build.sh```
 
-Go to your ros2 workspace where you cloned your repo and run `colcon build`
+```cd ~/traversability_ws/ && colcon build --symlink-install && source install/setup.bash```
 
-Source your ros2_ws.
-
-To launch the global traversability mapping, run ```ros2 launch traversability_mapping_ros global_traversability_mapping.launch.py```
+To launch the global traversability mapping, run ```ros2 launch traversability_mapping_ros global_gt_traversability_mapping.launch.py```
 
 To launch the local traversability mapping, run
 ```ros2 launch traversability_mapping_ros local_traversability_mapping.launch.py```
