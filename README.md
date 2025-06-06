@@ -19,6 +19,8 @@ Setup the Gazebo simulation from this repository [Gazebo sim](https://github.com
 
 Go to your ros2 workspace where you cloned your repo and run `colcon build`
 
+Source your ros2_ws.
+
 To launch the global traversability mapping, run ```ros2 launch traversability_mapping_ros global_traversability_mapping.launch.py```
 
 To launch the local traversability mapping, run
