@@ -38,6 +38,8 @@ find_package(Eigen3 3.3.0 REQUIRED)
 # Define interface library target
 add_library(sophus INTERFACE)
 
+add_compile_definitions(-DEIGEN_DONT_VECTORIZE)
+
 set(SOPHUS_HEADER_FILES
   sophus/average.hpp
   sophus/common.hpp

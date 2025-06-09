@@ -11,7 +11,7 @@ This repository contains the packages responsible for performing realtime global
 
 ## Running the library independent of SLAM and with Ground truth poses.
 
-Setup the humble branch of the Gazebo simulation from this repository [Gazebo sim humble](https://github.com/suchetanrs/gz-sim-environment/tree/humble)
+Setup the Gazebo simulation from this repository [Gazebo sim humble](https://github.com/suchetanrs/gz-sim-environment/tree/humble) or [Gazebo sim jazzy](https://github.com/suchetanrs/gz-sim-environment/tree/jazzy)
 
 ### Building with colcon (recommended)
 
@@ -21,7 +21,7 @@ Once you are inside the gz-sim-environment docker, run the following:
 
 ```git clone https://github.com/suchetanrs/traversability_mapping```
 
-```cd .. && rosdep install --from-paths src --ignore-src -r -y --skip-keys sophus```
+```cd .. && rosdep update && rosdep install --from-paths src --ignore-src -r -y --skip-keys sophus```
 
 ```colcon build --symlink-install```
 
@@ -44,7 +44,7 @@ Once you are inside the gz-sim-environment docker, run the following:
 
 ## Launching the mapping
 
-### Method 1: Launch the shell file if you are using the [Gazebo sim humble](https://github.com/suchetanrs/gz-sim-environment/tree/humble) repository
+### Method 1: Launch the shell file if you are using the [Gazebo sim humble](https://github.com/suchetanrs/gz-sim-environment/tree/humble) [Gazebo sim jazzy](https://github.com/suchetanrs/gz-sim-environment/tree/jazzy) repository
 
 ```cd ~/other_ws/src/traversability_mapping/```
 
