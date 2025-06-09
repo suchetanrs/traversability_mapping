@@ -7,7 +7,8 @@ This repository contains the packages responsible for performing realtime global
 | Traversability Map generated with the 3D PointCloud and ORB-SLAM 3 | Gazebo world of the map|
 
 ## Build status
-![Humble Docker Build](https://github.com/suchetanrs/traversability_mapping/actions/workflows/build-humble-image.yml/badge.svg)
+![Humble Build](https://github.com/suchetanrs/traversability_mapping/actions/workflows/build-humble-image.yml/badge.svg)
+![Jazzy Build](https://github.com/suchetanrs/traversability_mapping/actions/workflows/build-jazzy-image.yml/badge.svg)
 
 ## Running the library independent of SLAM and with Ground truth poses.
 
