@@ -1,37 +1,23 @@
-FROM osrf/ros:humble-desktop-full-jammy
+FROM osrf/ros:humble-desktop-full
 
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y \
     build-essential \
     cmake \
-    git \
-    wget \
     libboost-all-dev \
-    libeigen3-dev \
-    && rm -rf /var/lib/apt/lists/*
+    libeigen3-dev
 
 RUN apt-get update && apt-get install -y \
     libpcl-dev \
-    ros-humble-pcl-* \
-    && rm -rf /var/lib/apt/lists/*
+    ros-humble-pcl-*
 
 RUN apt-get update && apt-get install -y \
-    libyaml-cpp-dev \
-    && rm -rf /var/lib/apt/lists/*
+    libyaml-cpp-dev
 
-RUN apt-get update && apt-get install -y ros-humble-grid-map \
-    sudo \
-    && rm -rf /var/lib/apt/lists/*
-
-COPY ./ /root/
-# check build without ROS sensor_msgs
-RUN cd /root/ && sudo chmod +x clean_build.sh && ./clean_build.sh
-RUN . /opt/ros/humble/setup.sh && cd && cd traversability_ros_interface && colcon build
-
-# check build with ROS sensor_msgs
-RUN . /opt/ros/humble/setup.sh && cd /root/ && sudo chmod +x clean_build.sh && ./clean_build.sh
-RUN . /opt/ros/humble/setup.sh && cd && cd traversability_ros_interface && colcon build
+COPY ./ /root/other_ws/src/
+RUN cd /root/other_ws && rosdep install --from-paths src --ignore-src -r -y --skip-keys sophus
+RUN . /opt/ros/humble/setup.sh && cd ~/other_ws && colcon build --symlink-install
 
 # Set default command
 CMD ["bash"]
