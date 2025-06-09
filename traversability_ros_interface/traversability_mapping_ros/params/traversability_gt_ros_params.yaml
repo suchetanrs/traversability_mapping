@@ -7,12 +7,17 @@
       use_lidar_pointcloud: false
       publish_traversability_grid: true
       is_kf_optimization_enabled: false
+      slam_frame: base_footprint
+      robot_base_frame: base_footprint
+      lidar_frame: lidar_link
 
   local_traversability_node:
     ros__parameters:
       pointcloud_topic_name: "lidar/points"
       expected_frequency: 4.0 # Hz.
       slam_frame: base_footprint
+      robot_base_frame: base_footprint
+      lidar_frame: lidar_link
 
   traversability_threshold_node:
     ros__parameters:

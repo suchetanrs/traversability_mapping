@@ -21,6 +21,8 @@
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
 
+#include "common.hpp"
+
 class LocalTraversabilityNode : public rclcpp::Node
 {
 public:
@@ -44,8 +46,19 @@ public:
         this->declare_parameter("slam_frame", rclcpp::ParameterValue("camera_link"));
         this->get_parameter("slam_frame", slam_frame_);
 
+        this->declare_parameter("robot_base_frame", rclcpp::ParameterValue("base_link"));
+        this->get_parameter("robot_base_frame", robot_base_frame_id_);
+
+        this->declare_parameter("lidar_frame", rclcpp::ParameterValue("lidar_link"));
+        this->get_parameter("lidar_frame", lidar_frame_id_);
+
         pcl_subscriber_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-            pointcloud_topic_name_, qos_profile, std::bind(&LocalTraversabilityNode::pointCloudCallback, this, std::placeholders::_1));
+            pointcloud_topic_name_, 1, std::bind(&LocalTraversabilityNode::pointCloudCallback, this, std::placeholders::_1));
+
+        tf_buffer_ptr_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
+        tf_listener_ptr_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_ptr_, this, true);
+
+        populateTransforms(slam_frame_, robot_base_frame_id_, lidar_frame_id_, this->get_clock(), this->get_logger(), tf_buffer_ptr_);
 
         // Other params
         Eigen::Translation3f translation_slam_lidar(
@@ -79,8 +92,6 @@ public:
         traversabilityPub_ = this->create_publisher<grid_map_msgs::msg::GridMap>("RTQuadtree_struct", rclcpp::QoS(1).transient_local());
         last_callback_time_ = std::chrono::high_resolution_clock::now();
 
-        tf_buffer_ptr_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
-        tf_listener_ptr_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_ptr_);
         parameterInstance.setValue<bool>("use_averaging", true);
         parameterInstance.setValue<bool>("use_probabilistic_update", false);
     }
@@ -163,6 +174,8 @@ private:
     rclcpp::Publisher<grid_map_msgs::msg::GridMap>::SharedPtr traversabilityPub_;
     std::string pointcloud_topic_name_;
     std::string slam_frame_;
+    std::string robot_base_frame_id_;
+    std::string lidar_frame_id_;
     std::shared_ptr<grid_map::GridMap> pGridMap_;
     std::shared_ptr<nav_msgs::msg::OccupancyGrid> gridMapOccupancy_;
     Eigen::Affine3f Tsv_;
@@ -171,7 +184,7 @@ private:
     double callback_interval_;
     bool publish_local_gridmap_;
     std::chrono::high_resolution_clock::time_point last_callback_time_;
-    std::unique_ptr<tf2_ros::Buffer> tf_buffer_ptr_; //!< Unique pointer to a buffer of Map to BaseLink tfs
+    std::shared_ptr<tf2_ros::Buffer> tf_buffer_ptr_; //!< shared pointer to a buffer of Map to BaseLink tfs
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_ptr_; //!< Shared pointer to a TransformListener, used to listen to Map To BaseLink transforms
 };
 
