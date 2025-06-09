@@ -17,7 +17,7 @@ Setup the humble branch of the Gazebo simulation from this repository [Gazebo si
 
 Once you are inside the gz-sim-environment docker, run the following:
 
-```cd other/src```
+```cd other_ws/src```
 
 ```git clone https://github.com/suchetanrs/traversability_mapping```
 
@@ -32,21 +32,21 @@ Once you are inside the gz-sim-environment docker, run the following:
 
 Once you are inside the gz-sim-environment docker, run the following:
 
-```cd && mkdir -p other/src```
+```cd && mkdir -p other_ws/src```
 
-```cd other/src```
+```cd other_ws/src```
 
 ```git clone https://github.com/suchetanrs/traversability_mapping```
 
 ```cd traversability_mapping && sudo chmod +x clean_build.sh && ./clean_build.sh```
 
-```cd ~/other/ && colcon build --symlink-install && source install/setup.bash```
+```cd ~/other_ws/ && colcon build --symlink-install && source install/setup.bash```
 
 ## Launching the mapping
 
 ### Method 1: Launch the shell file if you are using the [Gazebo sim humble](https://github.com/suchetanrs/gz-sim-environment/tree/humble) repository
 
-```cd ~/other/src/traversability_mapping/```
+```cd ~/other_ws/src/traversability_mapping/```
 
 ```sudo chmod +x launch_example.sh && ./launch_example.sh```
 
