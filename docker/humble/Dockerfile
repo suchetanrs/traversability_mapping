@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y \
 RUN apt-get update && apt-get install -y \
     libyaml-cpp-dev
 
-COPY ./ /root/other_ws/src/
+COPY ./../../ /root/other_ws/src/
 RUN cd /root/other_ws && rosdep install --from-paths src --ignore-src -r -y --skip-keys sophus
 RUN . /opt/ros/humble/setup.sh && cd ~/other_ws && colcon build --symlink-install
 
