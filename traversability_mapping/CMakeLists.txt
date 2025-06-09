@@ -25,6 +25,8 @@ find_package(yaml-cpp REQUIRED)
 # ROS Packages
 find_package(sensor_msgs)
 find_package(nav_msgs)
+find_package(ament_cmake REQUIRED)
+find_package(ament_index_cpp REQUIRED)
 # Create library target
 set(SOURCE_FILES
     src/Parameters.cpp
@@ -49,7 +51,7 @@ target_include_directories(traversabilitySystem
         ${EIGEN3_INCLUDE_DIR}
         ${Boost_INCLUDE_DIRS}
         ${PCL_INCLUDE_DIRS}
-        ${traversability_mapping_common_INCLUDE_DIRS}
+        # ${traversability_mapping_common_INCLUDE_DIRS}
         # ${grid_map_core_INCLUDE_DIRS}
         ${YAML_CPP_INCLUDE_DIRS}
 )
@@ -73,8 +75,9 @@ target_link_libraries(traversabilitySystem
     PRIVATE ${PCL_LIBRARIES}
     # PRIVATE ${grid_map_core_LIBRARIES}
     PRIVATE ${YAML_CPP_LIBRARIES}
-    type_conversion
+    PUBLIC traversability_mapping_common
     PUBLIC grid_map_core::grid_map_core
+    PUBLIC ament_index_cpp::ament_index_cpp
 )
 
 # Generate and install CMake configuration file
@@ -122,3 +125,19 @@ install(FILES
 
 install(DIRECTORY include/ DESTINATION include)
 install(DIRECTORY params/ DESTINATION params)
+install(DIRECTORY params/ DESTINATION share/${PROJECT_NAME}/params/)
+
+ament_export_include_directories(include)
+ament_export_libraries(traversabilitySystem)
+ament_export_dependencies(
+    Sophus
+    Eigen3
+    Boost
+    PCL
+    traversability_mapping_common
+    grid_map_core
+    yaml-cpp
+    sensor_msgs
+    nav_msgs
+)
+ament_package()

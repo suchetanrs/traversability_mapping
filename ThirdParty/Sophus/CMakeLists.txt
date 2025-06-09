@@ -11,6 +11,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 set(CMAKE_CXX_STANDARD 11)
+find_package(ament_cmake REQUIRED)
 
 # Set compiler specific settings (FixMe: Should not cmake do this for us automatically?)
 IF("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
@@ -156,3 +157,15 @@ install(
   FILES ${SOPHUS_HEADER_FILES}
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/sophus
 )
+
+## ————————————— ament export / package ————————————— ##
+
+ament_export_include_directories(include)
+# ament_export_libraries(sophus)
+
+# expose our exported target to ament
+ament_export_targets(SophusTargets HAS_LIBRARY_TARGET)
+# forward that we depend on Eigen3
+ament_export_dependencies(Eigen3)
+# finally hook into ament
+ament_package()

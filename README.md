@@ -13,15 +13,36 @@ This repository contains the packages responsible for performing realtime global
 
 Setup the humble branch of the Gazebo simulation from this repository [Gazebo sim humble](https://github.com/suchetanrs/gz-sim-environment/tree/humble)
 
-```cd && mkdir -p traversability_ws/src```
+### Building with colcon (recommended)
 
-```cd traversability_ws/src```
+Once you are inside the gz-sim-environment docker, run the following:
+
+```cd other/src```
+
+```git clone https://github.com/suchetanrs/traversability_mapping```
+
+```rosdep install --from-paths src --ignore-src -r -y --skip-keys sophus```
+
+```colcon build --symlink-install```
+
+```source install/setup.bash```
+
+
+### Building with cmake
+
+Once you are inside the gz-sim-environment docker, run the following:
+
+```cd && mkdir -p other/src```
+
+```cd other/src```
 
 ```git clone https://github.com/suchetanrs/traversability_mapping```
 
 ```cd traversability_mapping && sudo chmod +x clean_build.sh && ./clean_build.sh```
 
-```cd ~/traversability_ws/ && colcon build --symlink-install && source install/setup.bash```
+```cd ~/other/ && colcon build --symlink-install && source install/setup.bash```
+
+## Launching the mapping
 
 To launch the global traversability mapping, run ```ros2 launch traversability_mapping_ros global_gt_traversability_mapping.launch.py```
 

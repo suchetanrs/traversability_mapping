@@ -12,6 +12,8 @@ if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 20)
 endif()
 
+find_package(ament_cmake REQUIRED)
+
 # SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O1 -march=native")
 # SET(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O1 -march=native")
 
@@ -21,10 +23,10 @@ find_package(PCL REQUIRED)
 find_package(sensor_msgs)
 
 # Create library target
-add_library(type_conversion src/type_conversion.cpp)
+add_library(traversability_mapping_common src/type_conversion.cpp)
 
 # Set include directory
-target_include_directories(type_conversion
+target_include_directories(traversability_mapping_common
     PUBLIC 
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>
@@ -35,7 +37,7 @@ target_include_directories(type_conversion
 
 if(sensor_msgs_FOUND)
     ADD_DEFINITIONS("-DWITH_ROS2_SENSOR_MSGS")
-    target_include_directories(type_conversion
+    target_include_directories(traversability_mapping_common
         PUBLIC 
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
             $<INSTALL_INTERFACE:include>
@@ -44,7 +46,7 @@ if(sensor_msgs_FOUND)
 endif(sensor_msgs_FOUND)
 
 # Link libraries
-target_link_libraries(type_conversion
+target_link_libraries(traversability_mapping_common
     ${Sophus_LIBRARIES}
     ${EIGEN3_LIBS}
     ${PCL_LIBRARIES}
@@ -65,7 +67,7 @@ configure_package_config_file(
     INSTALL_DESTINATION lib/cmake/${PROJECT_NAME}
 )
 
-install(TARGETS type_conversion
+install(TARGETS traversability_mapping_common
     EXPORT export_${PROJECT_NAME}
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
@@ -88,3 +90,8 @@ install(FILES
 )
 
 install(DIRECTORY include/ DESTINATION include)
+
+ament_export_include_directories(include)
+ament_export_libraries(${PROJECT_NAME})
+ament_export_dependencies(Sophus)
+ament_package()

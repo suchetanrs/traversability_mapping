@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>traversability_mapping</name>
+  <version>1.0.0</version>
+  <description>
+    Core traversability mapping library and executable, providing grid‐based traversability estimation.
+  </description>
+
+  <maintainer email="rssuchetan@gmail.com">Suchetan Saravanan</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <!-- direct dependencies -->
+  <depend>sophus</depend>
+  <depend>eigen3</depend>
+  <depend>boost</depend>
+  <depend>pcl</depend>
+  <depend>traversability_mapping_common</depend>
+  <depend>grid_map_core</depend>
+  <depend>yaml-cpp</depend>
+
+  <!-- ROS message dependencies -->
+  <depend>sensor_msgs</depend>
+  <depend>nav_msgs</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

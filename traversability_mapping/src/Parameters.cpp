@@ -18,7 +18,11 @@ std::mutex ParameterHandler::instanceMutex_;
 ParameterHandler::ParameterHandler()
 {
     // Load YAML file and retrieve parameters
-    YAML::Node loaded_node = YAML::LoadFile("/usr/local/params/traversabilityParams.yaml");
+    const std::string yaml_base_path = ament_index_cpp::get_package_share_directory("traversability_mapping");
+    std::string yaml_path;
+    YAML::Node yaml_node;
+    yaml_path = yaml_base_path + "/params/traversabilityParams.yaml";
+    YAML::Node loaded_node = YAML::LoadFile(yaml_path);
 
     // Traversability Params
     parameter_map_["SLAM_System"] = loaded_node["SLAM_System"].as<std::string>();

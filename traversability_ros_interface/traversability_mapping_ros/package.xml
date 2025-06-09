@@ -12,6 +12,8 @@
 
   <exec_depend>rclcpp</exec_depend>
   <exec_depend>traversability_msgs</exec_depend>
+  <depend>traversability_mapping</depend>
+  <depend>grid_map</depend>
 
   <export>
     <build_type>ament_cmake</build_type>

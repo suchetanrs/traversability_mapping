@@ -75,27 +75,27 @@ include_directories(
 # Add executable
 add_executable(traversability_node src/traversability_node.cpp)
 ament_target_dependencies(traversability_node ${dependencies})
-target_link_libraries(traversability_node ${PCL_LIBRARIES} ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem type_conversion)
+target_link_libraries(traversability_node ${PCL_LIBRARIES} ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem traversability_mapping_common)
 
 # Add executable
 add_executable(multi_map_merge src/multi_map_merge.cpp)
 ament_target_dependencies(multi_map_merge ${dependencies})
-target_link_libraries(multi_map_merge ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem type_conversion)
+target_link_libraries(multi_map_merge ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem traversability_mapping_common)
 
 # Add executable
 add_executable(local_traversability src/local_traversability.cpp)
 ament_target_dependencies(local_traversability ${dependencies})
-target_link_libraries(local_traversability ${PCL_LIBRARIES} ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem type_conversion)
+target_link_libraries(local_traversability ${PCL_LIBRARIES} ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem traversability_mapping_common)
 
 # Add executable
 add_executable(threshold_occupancy src/threshold_occupancy.cpp)
 ament_target_dependencies(threshold_occupancy ${dependencies})
-target_link_libraries(threshold_occupancy ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem type_conversion)
+target_link_libraries(threshold_occupancy ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem traversability_mapping_common)
 
 # Add executable
 add_executable(virtual_boundary_maker src/virtual_boundary_maker.cpp)
 ament_target_dependencies(virtual_boundary_maker ${dependencies})
-target_link_libraries(virtual_boundary_maker ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem type_conversion)
+target_link_libraries(virtual_boundary_maker ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem traversability_mapping_common)
 
 # Install executable 
 install(TARGETS

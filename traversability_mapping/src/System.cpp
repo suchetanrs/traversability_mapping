@@ -18,7 +18,11 @@ namespace traversability_mapping
     System::System()
     {
         std::cout << "Called traversability system constructor" << std::endl;
-        YAML::Node loaded_node = YAML::LoadFile("/usr/local/params/traversabilityParams.yaml");
+        const std::string yaml_base_path = ament_index_cpp::get_package_share_directory("traversability_mapping");
+        std::string yaml_path;
+        YAML::Node yaml_node;
+        yaml_path = yaml_base_path + "/params/traversabilityParams.yaml";
+        YAML::Node loaded_node = YAML::LoadFile(yaml_path);
         if (loaded_node["use_pointcloud_buffer"].as<bool>())
         {
             pointCloudBuffer_ = std::make_shared<PointCloudBuffer>();
