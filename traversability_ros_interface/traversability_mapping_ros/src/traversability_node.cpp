@@ -17,6 +17,9 @@
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
+
+#include "common.hpp"
+
 class TraversabilityNode : public rclcpp::Node
 {
 public:
@@ -37,6 +40,15 @@ public:
         this->declare_parameter("publish_traversability_grid", rclcpp::ParameterValue(false));
         this->get_parameter("publish_traversability_grid", publish_traversability_grid_);
 
+        this->declare_parameter("slam_frame", rclcpp::ParameterValue("camera_link"));
+        this->get_parameter("slam_frame", slam_frame_id_);
+
+        this->declare_parameter("robot_base_frame", rclcpp::ParameterValue("base_link"));
+        this->get_parameter("robot_base_frame", robot_base_frame_id_);
+
+        this->declare_parameter("lidar_frame", rclcpp::ParameterValue("lidar_link"));
+        this->get_parameter("lidar_frame", lidar_frame_id_);
+
         bool kf_opt;
         this->declare_parameter("is_kf_optimization_enabled", rclcpp::ParameterValue(false));
         this->get_parameter("is_kf_optimization_enabled", kf_opt);
@@ -44,6 +56,11 @@ public:
         RCLCPP_WARN_STREAM(this->get_logger(), "Using lidar pointcloud? " << use_lidar_pointcloud_);
         parameterInstance.setValue<bool>("is_kf_optimization_enabled", kf_opt);
         parameterInstance.setValue<std::string>("SLAM_System", "ISAE");
+
+        tf_buffer_ptr_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
+        tf_listener_ptr_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_ptr_);
+
+        populateTransforms(slam_frame_id_, robot_base_frame_id_, lidar_frame_id_, this->get_clock(), this->get_logger(), tf_buffer_ptr_);
 
         keyFrameAdditionsSubscriber_ = this->create_subscription<traversability_msgs::msg::KeyFrameAdditions>(
             additions_topic_name_, 10, std::bind(&TraversabilityNode::keyFrameAdditionsCallback, this, std::placeholders::_1));
@@ -156,6 +173,9 @@ private:
     std::string additions_topic_name_;
     std::string updates_topic_name_;
     std::string pointcloud_topic_name_;
+    std::string slam_frame_id_;
+    std::string lidar_frame_id_;
+    std::string robot_base_frame_id_;
     bool use_lidar_pointcloud_;
     bool publish_traversability_grid_;
     rclcpp::TimerBase::SharedPtr publishTimer_;
@@ -169,6 +189,9 @@ private:
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr posePublisher_;
 
     std::shared_ptr<traversability_mapping::System> traversabilitySystem_;
+
+    std::shared_ptr<tf2_ros::Buffer> tf_buffer_ptr_; //!< shared pointer to a buffer of Map to BaseLink tfs
+    std::shared_ptr<tf2_ros::TransformListener> tf_listener_ptr_; //!< Shared pointer to a TransformListener, used to listen to Map To BaseLink transforms
 };
 
 int main(int argc, char **argv)
