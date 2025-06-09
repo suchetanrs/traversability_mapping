@@ -45,7 +45,7 @@ Once you are inside the gz-sim-environment docker, run the following:
 
 ## Launching the mapping
 
-### Method 1: Launch the shell file if you are using the [Gazebo sim humble](https://github.com/suchetanrs/gz-sim-environment/tree/humble) [Gazebo sim jazzy](https://github.com/suchetanrs/gz-sim-environment/tree/jazzy) repository
+### Method 1: Launch the shell file if you are using the [Gazebo sim humble](https://github.com/suchetanrs/gz-sim-environment/tree/humble) or [Gazebo sim jazzy](https://github.com/suchetanrs/gz-sim-environment/tree/jazzy) repository
 
 ```cd ~/other_ws/src/traversability_mapping/```
 
