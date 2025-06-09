@@ -11,11 +11,11 @@ This repository contains the packages responsible for performing realtime global
 
 ## Running the library independent of SLAM and with Ground truth poses.
 
-Setup the Gazebo simulation from this repository [Gazebo sim](https://github.com/suchetanrs/gz-sim-environment)
+Setup the humble branch of the Gazebo simulation from this repository [Gazebo sim humble](https://github.com/suchetanrs/gz-sim-environment/tree/humble)
 
 ```cd && mkdir -p traversability_ws/src```
 
-```cd traversability_ws```
+```cd traversability_ws/src```
 
 ```git clone https://github.com/suchetanrs/traversability_mapping```
 
