@@ -63,7 +63,6 @@ def generate_launch_description():
             package='ground_truth_kfs',
             executable='slam_keyframe_pcl_simulator',
             namespace=namespace,
-            parameters=[{"use_sim_time": True}],
             output='screen')
         
         return [declare_params_file_cmd, declare_use_gt_pose_cmd, traversability_mapping_ros, threshold_traversability_ros, slam_keyframe_pcl_simulator]
