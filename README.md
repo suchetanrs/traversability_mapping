@@ -21,7 +21,7 @@ Once you are inside the gz-sim-environment docker, run the following:
 
 ```git clone https://github.com/suchetanrs/traversability_mapping```
 
-```rosdep install --from-paths src --ignore-src -r -y --skip-keys sophus```
+```cd .. && rosdep install --from-paths src --ignore-src -r -y --skip-keys sophus```
 
 ```colcon build --symlink-install```
 
@@ -43,6 +43,14 @@ Once you are inside the gz-sim-environment docker, run the following:
 ```cd ~/other/ && colcon build --symlink-install && source install/setup.bash```
 
 ## Launching the mapping
+
+### Method 1: Launch the shell file if you are using the [Gazebo sim humble](https://github.com/suchetanrs/gz-sim-environment/tree/humble) repository
+
+```cd ~/other/src/traversability_mapping/```
+
+```sudo chmod +x launch_example.sh && ./launch_example.sh```
+
+### Method 2: Launch manually
 
 To launch the global traversability mapping, run ```ros2 launch traversability_mapping_ros global_gt_traversability_mapping.launch.py```
 
