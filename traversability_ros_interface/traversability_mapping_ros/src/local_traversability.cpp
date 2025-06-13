@@ -58,30 +58,7 @@ public:
         tf_buffer_ptr_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
         tf_listener_ptr_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_ptr_, this, true);
 
-        populateTransforms(slam_frame_, robot_base_frame_id_, lidar_frame_id_, this->get_clock(), this->get_logger(), tf_buffer_ptr_);
-
-        // Other params
-        Eigen::Translation3f translation_slam_lidar(
-            parameterInstance.getValue<float>("T_SLAMFrameToLidarFrame/translation/x"),
-            parameterInstance.getValue<float>("T_SLAMFrameToLidarFrame/translation/y"),
-            parameterInstance.getValue<float>("T_SLAMFrameToLidarFrame/translation/z"));
-        Eigen::Quaternion<float> quaternion_slam_lidar(
-            parameterInstance.getValue<float>("T_SLAMFrameToLidarFrame/quaternion/w"),
-            parameterInstance.getValue<float>("T_SLAMFrameToLidarFrame/quaternion/x"),
-            parameterInstance.getValue<float>("T_SLAMFrameToLidarFrame/quaternion/y"),
-            parameterInstance.getValue<float>("T_SLAMFrameToLidarFrame/quaternion/z"));
-        Tsv_ = translation_slam_lidar * quaternion_slam_lidar;
-
-        Eigen::Translation3f translation_bf_slam(
-            parameterInstance.getValue<float>("T_BasefootprintToSLAM/translation/x"),
-            parameterInstance.getValue<float>("T_BasefootprintToSLAM/translation/y"),
-            parameterInstance.getValue<float>("T_BasefootprintToSLAM/translation/z"));
-        Eigen::Quaternion<float> quaternion_bf_slam(
-            parameterInstance.getValue<float>("T_BasefootprintToSLAM/quaternion/w"),
-            parameterInstance.getValue<float>("T_BasefootprintToSLAM/quaternion/x"),
-            parameterInstance.getValue<float>("T_BasefootprintToSLAM/quaternion/y"),
-            parameterInstance.getValue<float>("T_BasefootprintToSLAM/quaternion/z"));
-        Tbs_ = translation_bf_slam * quaternion_bf_slam;
+        populateTransforms(slam_frame_, robot_base_frame_id_, lidar_frame_id_, this->get_clock(), this->get_logger(), tf_buffer_ptr_, Tsv_, Tbs_);
 
         grid_map::GridMap gridMap_({"num_additions", "hazard", "step_haz", "roughness_haz", "slope_haz", "border_haz", "elevation", "kfid"});
         gridMap_.setFrameId("odom");

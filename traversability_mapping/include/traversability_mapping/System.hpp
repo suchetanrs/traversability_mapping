@@ -27,6 +27,8 @@ namespace traversability_mapping
     public:
         System();
 
+        void setExtrinsicParameters(Eigen::Affine3f &tf_SlamToLidar, Eigen::Affine3f &tf_BaseToSlam);
+
         void addNewKeyFrameTsDouble(const double timestamp,
                                     long unsigned int kfID,
                                     long unsigned int mapID);

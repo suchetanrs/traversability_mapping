@@ -32,6 +32,12 @@ namespace traversability_mapping
         keyFrameUpdateQueue_ = std::make_shared<UpdateQueue>();
     }
 
+    void System::setExtrinsicParameters(Eigen::Affine3f &tf_SlamToLidar, Eigen::Affine3f &tf_BaseToSlam)
+    {
+        parameterInstance.setValue<Eigen::Affine3f>("T_SLAMFrameToLidarFrame", tf_SlamToLidar);
+        parameterInstance.setValue<Eigen::Affine3f>("T_BasefootprintToSLAM", tf_BaseToSlam);
+    }
+
     void System::addNewKeyFrameToMap(const double timestamp,
                                      long unsigned int kfID,
                                      long unsigned int mapID,

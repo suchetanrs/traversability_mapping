@@ -13,8 +13,7 @@
 
   <!-- core dependencies -->
   <depend>Sophus</depend>
-  <depend>eigen3</depend>
-  <depend>PCL</depend>
+  <depend>pcl_ros</depend>
   <depend>sensor_msgs</depend>
 
   <export>
