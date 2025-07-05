@@ -36,6 +36,78 @@ namespace traversability_mapping
         markVirtualBoundary("/usr/local/params/virtual_boundary.csv");
     }
 
+    void LocalMap::resizeGridMap(double posOutOfRangeX, double posOutOfRangeY)
+    {
+        // 1) Make a full copy of the current map
+        std::lock_guard<std::mutex> lock(*masterGridMapMutex_);
+        std::cout << "Position x: " << pGridMap_->getPosition().x() << " y: " << pGridMap_->getPosition().y() << std::endl;
+        std::cout << "Length x: " << pGridMap_->getLength().x() << " y: " << pGridMap_->getLength().y() << std::endl;
+
+        double hx = pGridMap_->getLength().x() / 2.0;
+        double hy = pGridMap_->getLength().y() / 2.0;
+        double grid_center_x = pGridMap_->getPosition().x();
+        double grid_center_y = pGridMap_->getPosition().y();
+
+        // world bounds
+        double min_x = grid_center_x - hx;
+        double max_x = grid_center_x + hx;
+        double min_y = grid_center_y - hy;
+        double max_y = grid_center_y + hy;
+        std::cout << "min_x: " << min_x << " max_x: " << max_x << " min_y: " << min_y << " max_y: " << max_y << std::endl;
+
+        double new_length_x = pGridMap_->getLength().x();
+        double new_length_y = pGridMap_->getLength().y();
+        double extend_length_by = parameterInstance.getValue<double>("extend_length_every_resize_by");
+        if (abs(posOutOfRangeX - max_x) <= 10.0)
+        {
+            new_length_x = new_length_x + extend_length_by;
+            grid_center_x = grid_center_x + (extend_length_by / 2.0);
+        }
+        else if (abs(posOutOfRangeX - min_x) <= 10.0)
+        {
+            new_length_x = new_length_x + extend_length_by;
+            grid_center_x = grid_center_x - (extend_length_by / 2.0);
+        }
+
+        if (abs(posOutOfRangeY - max_y) <= 10.0)
+        {
+            new_length_y = new_length_y + extend_length_by;
+            grid_center_y = grid_center_y + (extend_length_by / 2.0);
+        }
+        else if (abs(posOutOfRangeY - min_y) <= 10.0)
+        {
+            new_length_y = new_length_y + extend_length_by;
+            grid_center_y = grid_center_y - (extend_length_by / 2.0);
+        }
+        grid_map::GridMap oldMap = *pGridMap_;  // deep copy of layers, geometry, etc.
+
+        // 2) Resize & recenter the live map
+        double resolution = parameterInstance.getValue<double>("resolution_local_map");
+        grid_map::Length newLength(new_length_x, new_length_y);
+        pGridMap_->setGeometry(newLength, resolution);
+        pGridMap_->setPosition(Eigen::Vector2d(grid_center_x, grid_center_y));
+
+        // 3) Transfer back any cells that still lie inside the new bounds
+        for (grid_map::GridMapIterator it(oldMap); !it.isPastEnd(); ++it) {
+            const grid_map::Index oldIndex(*it);
+            grid_map::Position worldPos;
+            // get world position of this old cell
+            if (! oldMap.getPosition(oldIndex, worldPos)) {
+                continue;
+            }
+            // see if that worldPos lies inside the new map, and get its new index
+            grid_map::Index newIndex;
+            if (! pGridMap_->getIndex(worldPos, newIndex)) {
+                continue;
+            }
+            // copy every layer’s value from old -> new
+            for (const auto & layer : oldMap.getLayers()) {
+                // note: oldMap.at(layer, oldIndex) and pGridMap_->at(layer, newIndex)
+                pGridMap_->at(layer, newIndex) = oldMap.at(layer, oldIndex);
+            }
+        }
+    }
+
     LocalMap::~LocalMap() {}
 
     void LocalMap::markVirtualBoundary(const std::string &csvFilePath)
@@ -159,7 +231,15 @@ namespace traversability_mapping
                     // Check if the pointer is valid before calling recomputeCache
                     if (keyFramePtr)
                     {
-                        keyFramePtr->recomputeCache(true);
+                        try
+                        {
+                            keyFramePtr->recomputeCache(true);
+                        }
+                        catch (const std::out_of_range &e)
+                        {
+                            std::cerr << "Out of range exception caught: " << e.what() << " x: " << keyFramePtr->getPose().translation().x() << " y: " << keyFramePtr->getPose().translation().y() << std::endl;
+                            resizeGridMap(keyFramePtr->getPose().translation().x(), keyFramePtr->getPose().translation().y());
+                        }
                     }
                     std::this_thread::sleep_for(std::chrono::milliseconds(sleep));
                 }
@@ -196,7 +276,15 @@ namespace traversability_mapping
                     mLocalKeyFrames_.pop_front();
                 }
                 localKeyFramesMutex.unlock();
-                kfPtr->recomputeCache(false);
+                try
+                {
+                    kfPtr->recomputeCache(false);
+                }
+                catch (const std::out_of_range &e)
+                {
+                    std::cerr << "Out of range exception caught: " << e.what() << " x: " << kfPtr->getPose().translation().x() << " y: " << kfPtr->getPose().translation().y() << std::endl;
+                    resizeGridMap(kfPtr->getPose().translation().x(), kfPtr->getPose().translation().y());
+                }
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
             }
             std::cout << "No Local Keyframes present ..." << std::endl;

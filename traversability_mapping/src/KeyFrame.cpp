@@ -24,7 +24,7 @@ namespace traversability_mapping
                        Eigen::Affine3f Tbs)
         : timestamp_(timestamp),
           kfID_(kfID),
-          pointCloudLidar_(pointCloud),
+          pointCloudLidar_(std::make_shared<pcl::PointCloud<pcl::PointXYZ>>(pointCloud)),
           pGridMap_(gridMap),
           masterGridMapMutex_(masterGridMapMutex),
           parentMapID_(mapID),
@@ -194,102 +194,94 @@ namespace traversability_mapping
 
             traversabilityMap->insert_data(point.x, point.y, point.z, pRobot.x(), pRobot.y(), pRobot.z());
         }
-        try
+        // Publish as grid map
+        // Create grid map.
+        // map.move(traversabilityPose2D);
+        // map.setPosition(traversabilityPose2D);
+        int grid_count = 0;
+        // for (grid_map::GridMapIterator it(map); !it.isPastEnd(); ++it)
+        // {
+        //     grid_map::Position position;
+        //     map.getPosition(*it, position);
+        //     Eigen::Vector4d haz = traversabilityMap->get_goodness_m(
+        //         Eigen::Vector2d(position.x(), position.y()),
+        //         security_distance_, ground_clearance_, max_slope_);
+        //     ++grid_count;
+        //     if (haz(0) < 0.)
+        //         continue;
+
+        //     // map.at("hazard", *it) = haz(0);
+        //     // map.at("step_haz", *it) = haz(1);
+        //     // map.at("roughness_haz", *it) = haz(2);
+        //     // map.at("slope_haz", *it) = haz(3);
+        //     map.atPosition("hazard", position) = haz(0);
+        //     // std::cout << "Hazard value is: " << haz(0) << std::endl;
+        //     // map.at("border_haz", *it) = haz(4);
+        //     // map.at("elevation", *it) = haz(5);
+        // }
+        auto travGrid = traversabilityMap->getGrid();
+        std::lock_guard<std::mutex> lock(gridMapMutex_);
+        std::lock_guard<std::mutex> lock2(*masterGridMapMutex_);
+        for (size_t i = 0; i < travGrid.size(); ++i)
         {
-
-            // Publish as grid map
-            // Create grid map.
-            // map.move(traversabilityPose2D);
-            // map.setPosition(traversabilityPose2D);
-            int grid_count = 0;
-            // for (grid_map::GridMapIterator it(map); !it.isPastEnd(); ++it)
-            // {
-            //     grid_map::Position position;
-            //     map.getPosition(*it, position);
-            //     Eigen::Vector4d haz = traversabilityMap->get_goodness_m(
-            //         Eigen::Vector2d(position.x(), position.y()),
-            //         security_distance_, ground_clearance_, max_slope_);
-            //     ++grid_count;
-            //     if (haz(0) < 0.)
-            //         continue;
-
-            //     // map.at("hazard", *it) = haz(0);
-            //     // map.at("step_haz", *it) = haz(1);
-            //     // map.at("roughness_haz", *it) = haz(2);
-            //     // map.at("slope_haz", *it) = haz(3);
-            //     map.atPosition("hazard", position) = haz(0);
-            //     // std::cout << "Hazard value is: " << haz(0) << std::endl;
-            //     // map.at("border_haz", *it) = haz(4);
-            //     // map.at("elevation", *it) = haz(5);
-            // }
-            auto travGrid = traversabilityMap->getGrid();
-            std::lock_guard<std::mutex> lock(gridMapMutex_);
-            std::lock_guard<std::mutex> lock2(*masterGridMapMutex_);
-            for (size_t i = 0; i < travGrid.size(); ++i)
+            for (size_t j = 0; j < travGrid[i].size(); ++j)
             {
-                for (size_t j = 0; j < travGrid[i].size(); ++j)
+                float mx, my;
+                traversabilityMap->ind2meterOpt(i, j, mx, my);
+                Eigen::Vector2d meterValue(mx, my);
+                Eigen::Vector4d haz = traversabilityMap->get_goodness(
+                    i, j, security_distance_, ground_clearance_, max_slope_);
+                ++grid_count;
+                if (haz(0) < 0.)
+                    continue;
+                if (parameterInstance.getValue<bool>("use_averaging"))
                 {
-                    float mx, my;
-                    traversabilityMap->ind2meterOpt(i, j, mx, my);
-                    Eigen::Vector2d meterValue(mx, my);
-                    Eigen::Vector4d haz = traversabilityMap->get_goodness(
-                        i, j, security_distance_, ground_clearance_, max_slope_);
-                    ++grid_count;
-                    if (haz(0) < 0.)
-                        continue;
-                    if (parameterInstance.getValue<bool>("use_averaging"))
+                    auto num_additions = 0.0;
+                    if (std::isnan(pGridMap_->atPosition("num_additions", meterValue)))
                     {
-                        auto num_additions = 0.0;
-                        if (std::isnan(pGridMap_->atPosition("num_additions", meterValue)))
+                        pGridMap_->atPosition("num_additions", meterValue) = 0.0;
+                        pGridMap_->atPosition("hazard", meterValue) = 0.0;
+                    }
+                    num_additions = pGridMap_->atPosition("num_additions", meterValue);
+                    if (haz(0) > pGridMap_->atPosition("hazard", meterValue))
+                    {
+                        if (num_additions > parameterInstance.getValue<double>("average_persistence"))
                         {
-                            pGridMap_->atPosition("num_additions", meterValue) = 0.0;
-                            pGridMap_->atPosition("hazard", meterValue) = 0.0;
+                            pGridMap_->atPosition("num_additions", meterValue) = 1.0;
+                            num_additions = 1.0;
+                            pGridMap_->atPosition("hazard", meterValue) = haz(0);
                         }
-                        num_additions = pGridMap_->atPosition("num_additions", meterValue);
-                        if (haz(0) > pGridMap_->atPosition("hazard", meterValue))
-                        {
-                            if (num_additions > parameterInstance.getValue<double>("average_persistence"))
-                            {
-                                pGridMap_->atPosition("num_additions", meterValue) = 1.0;
-                                num_additions = 1.0;
-                                pGridMap_->atPosition("hazard", meterValue) = haz(0);
-                            }
-                            pGridMap_->atPosition("num_additions", meterValue) += 1.0;
-                            pGridMap_->atPosition("hazard", meterValue) = ((pGridMap_->atPosition("hazard", meterValue) * num_additions) + haz(0)) / (num_additions + 1.0);
-                        }
+                        pGridMap_->atPosition("num_additions", meterValue) += 1.0;
+                        pGridMap_->atPosition("hazard", meterValue) = ((pGridMap_->atPosition("hazard", meterValue) * num_additions) + haz(0)) / (num_additions + 1.0);
                     }
-                    else if (parameterInstance.getValue<bool>("use_probabilistic_update"))
-                    {
-                        // in this case, num additions becomes the log odds.
-                        // TODO: rename the key in the gridmap.
-                        if (haz(0) == 0)
-                            haz(0) = 0.1;
-                        if (haz(0) == 1)
-                            haz(0) = 0.9;
-                        double updated_probability = updateCellLogOdds(pGridMap_->atPosition("num_additions", meterValue), haz(0));
-                        pGridMap_->atPosition("hazard", meterValue) = updated_probability;
-                    }
-                    else
-                    {
-                        pGridMap_->atPosition("hazard", meterValue) = haz(0);
-                    }
-                    if (parameterInstance.getValue<bool>("use_virtual_boundary"))
-                        pGridMap_->atPosition("hazard", meterValue) = std::max(pGridMap_->atPosition("virtual_boundary", meterValue), pGridMap_->atPosition("hazard", meterValue));
-                    pGridMap_->atPosition("step_haz", meterValue) = haz(1);
-                    // original
-                    // pGridMap_->atPosition("roughness_haz", meterValue) = haz(2);
-                    // made now for visualization
-                    pGridMap_->atPosition("elevation", meterValue) = haz(2);
-                    pGridMap_->atPosition("slope_haz", meterValue) = haz(3);
-                    // the latest updating kf's id is stored in this position of the gridmap.
-                    pGridMap_->atPosition("kfid", meterValue) = static_cast<float>(kfID_);
-                    markedCells_.push_back(meterValue);
                 }
+                else if (parameterInstance.getValue<bool>("use_probabilistic_update"))
+                {
+                    // in this case, num additions becomes the log odds.
+                    // TODO: rename the key in the gridmap.
+                    if (haz(0) == 0)
+                        haz(0) = 0.1;
+                    if (haz(0) == 1)
+                        haz(0) = 0.9;
+                    double updated_probability = updateCellLogOdds(pGridMap_->atPosition("num_additions", meterValue), haz(0));
+                    pGridMap_->atPosition("hazard", meterValue) = updated_probability;
+                }
+                else
+                {
+                    pGridMap_->atPosition("hazard", meterValue) = haz(0);
+                }
+                if (parameterInstance.getValue<bool>("use_virtual_boundary"))
+                    pGridMap_->atPosition("hazard", meterValue) = std::max(pGridMap_->atPosition("virtual_boundary", meterValue), pGridMap_->atPosition("hazard", meterValue));
+                pGridMap_->atPosition("step_haz", meterValue) = haz(1);
+                // original
+                // pGridMap_->atPosition("roughness_haz", meterValue) = haz(2);
+                // made now for visualization
+                pGridMap_->atPosition("elevation", meterValue) = haz(2);
+                pGridMap_->atPosition("slope_haz", meterValue) = haz(3);
+                // the latest updating kf's id is stored in this position of the gridmap.
+                pGridMap_->atPosition("kfid", meterValue) = static_cast<float>(kfID_);
+                markedCells_.push_back(meterValue);
             }
-        }
-        catch (const std::out_of_range &e)
-        {
-            std::cerr << "Out of range exception caught: " << e.what() << std::endl;
         }
         // std::cout << "Grid count: " << grid_count << " KF ID: " << kfID_;
         // map.setPosition(traversabilityPose2D);
@@ -311,7 +303,13 @@ namespace traversability_mapping
         if (!spatialHashGridInstance_.updateKeyframe(kfID_, Tms_, getConnections()))
         {
             if (useHashGrid)
+            {
+                if (!parameterInstance.getValue<bool>("is_kf_optimization_enabled"))
+                {
+                    pointCloudLidar_.reset();
+                }
                 return;
+            }
         }
 
         auto start_time = std::chrono::high_resolution_clock::now();
@@ -322,7 +320,12 @@ namespace traversability_mapping
         auto Tmb = Tms_ * Tsb_;
         pcl::PointCloud<pcl::PointXYZ> pointCloudCorrected_;
         // correct the pointcloud from velodyne frame to map frame.
-        traversability_mapping::doTransformPCL(pointCloudLidar_, pointCloudCorrected_, Tmv);
+        if (pointCloudLidar_ == nullptr)
+        {
+            std::cerr << "POINTCLOUD LIDAR IS NULL" << std::endl;
+            return;
+        }
+        traversability_mapping::doTransformPCL(*pointCloudLidar_, pointCloudCorrected_, Tmv);
 
         // clear stray values
         // clearStrayValuesInGrid();
@@ -330,7 +333,7 @@ namespace traversability_mapping
         computeLocalTraversability(pointCloudCorrected_, Tmb);
         if (!parameterInstance.getValue<bool>("is_kf_optimization_enabled"))
         {
-            pointCloudLidar_.clear();
+            pointCloudLidar_.reset();
         }
     }
 

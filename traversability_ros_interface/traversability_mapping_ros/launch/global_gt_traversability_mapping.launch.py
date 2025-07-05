@@ -47,6 +47,7 @@ def generate_launch_description():
             package='traversability_mapping_ros',
             executable='traversability_node',
             # prefix=["gdbserver localhost:3000"],
+            # prefix='heaptrack --output /tmp/heaptrack_global_trav.gz',
             namespace=namespace,
             output='screen',
             parameters=[params_file])
@@ -54,6 +55,7 @@ def generate_launch_description():
         threshold_traversability_ros = Node(
             package='traversability_mapping_ros',
             executable='threshold_occupancy',
+            # prefix='heaptrack --output /tmp/heaptrack_threshold.gz',
             namespace=namespace,
             output='screen',
             parameters=[params_file])
@@ -62,6 +64,7 @@ def generate_launch_description():
             condition=IfCondition(use_gt_pose),
             package='ground_truth_kfs',
             executable='slam_keyframe_pcl_simulator',
+            # prefix='heaptrack --output /tmp/heaptrack_slam_keyframe_pcl_simulator.gz',
             namespace=namespace,
             output='screen')
         
