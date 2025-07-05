@@ -15,13 +15,21 @@
 std::unique_ptr<ParameterHandler> ParameterHandler::parameterHandlerPtr_ = nullptr;
 std::mutex ParameterHandler::instanceMutex_;
 
-ParameterHandler::ParameterHandler()
+ParameterHandler::ParameterHandler(std::string yaml_file_path)
 {
     // Load YAML file and retrieve parameters
-    const std::string yaml_base_path = ament_index_cpp::get_package_share_directory("traversability_mapping");
     std::string yaml_path;
-    YAML::Node yaml_node;
-    yaml_path = yaml_base_path + "/params/traversabilityParams.yaml";
+    if (yaml_file_path == "")
+    {
+        std::cerr << "\033[1;31m!!!Error: No YAML file path provided. Using defaults!!!\033[0m" << std::endl;
+        const std::string yaml_base_path = ament_index_cpp::get_package_share_directory("traversability_mapping");
+        YAML::Node yaml_node;
+        yaml_path = yaml_base_path + "/params/traversabilityParams.yaml";
+    }
+    else
+    {
+        yaml_path = yaml_file_path;
+    }
     YAML::Node loaded_node = YAML::LoadFile(yaml_path);
 
     // Traversability Params
