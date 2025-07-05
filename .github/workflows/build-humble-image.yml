@@ -2,7 +2,7 @@ name: Humble
 on:
   push:
     branches:
-    - 'main'
+    - 'master'
   pull_request:
     branches:
     - '*'
@@ -18,7 +18,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
-        path: src/roadmap-explorer
+        path: src/traversability_mapping
     - name: Install Dependencies with Rosdep
       run: |
         apt update
