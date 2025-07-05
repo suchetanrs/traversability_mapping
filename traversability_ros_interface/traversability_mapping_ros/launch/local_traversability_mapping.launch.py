@@ -19,6 +19,7 @@ def generate_launch_description():
 
     #Essential_paths
     traversability_mapping_ros_pkg = get_package_share_directory('traversability_mapping_ros')
+    traversability_pkg = get_package_share_directory('traversability_mapping')
 
     name_argument = DeclareLaunchArgument(
         "robot_ns",
@@ -38,14 +39,21 @@ def generate_launch_description():
             default_value=os.path.join(traversability_mapping_ros_pkg, 'params', 'traversability_gt_ros_params.yaml'),
             description='Full path to the ROS2 parameters file to use for all launched nodes')
 
+        traversability_params_file = LaunchConfiguration('traversability_params_file')
+        
+        declare_traversability_params_file_cmd = DeclareLaunchArgument(
+            'traversability_params_file',
+            default_value=os.path.join(traversability_pkg, 'params', 'traversabilityParams.yaml'),
+            description='Full path to the traversability parameters file to use for all launched nodes')
+
         traversability_mapping_ros = Node(
             package='traversability_mapping_ros',
             executable='local_traversability',
             namespace=namespace,
             output='screen',
-            parameters=[params_file])
+            parameters=[params_file, {"parameter_file_path": traversability_params_file}])
         
-        return [declare_params_file_cmd, traversability_mapping_ros]
+        return [declare_params_file_cmd, declare_traversability_params_file_cmd, traversability_mapping_ros]
 
     opaque_function = OpaqueFunction(function=all_nodes_launch)
 #---------------------------------------------

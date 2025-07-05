@@ -95,7 +95,7 @@ namespace traversability_mapping
         // set only one time in constructor. thread safety not needed since it is only read.
         double timestamp_;
         long unsigned int kfID_;
-        pcl::PointCloud<pcl::PointXYZ> pointCloudLidar_;
+        std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> pointCloudLidar_;
         Eigen::Affine3f Tsv_; // transform from slam frame to velodyne (lidar) frame.
         Eigen::Affine3f Tsb_; // transform from slam frame to base_footprint frame.
 

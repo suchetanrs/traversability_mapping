@@ -13,9 +13,8 @@
 
   <!-- direct dependencies -->
   <depend>sophus</depend>
-  <depend>eigen3</depend>
   <depend>boost</depend>
-  <depend>pcl</depend>
+  <depend>pcl_ros</depend>
   <depend>traversability_mapping_common</depend>
   <depend>grid_map_core</depend>
   <depend>yaml-cpp</depend>

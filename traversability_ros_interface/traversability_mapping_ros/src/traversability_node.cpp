@@ -49,6 +49,13 @@ public:
         this->declare_parameter("lidar_frame", rclcpp::ParameterValue("lidar_link"));
         this->get_parameter("lidar_frame", lidar_frame_id_);
 
+        std::string parameter_file_path_;
+        this->declare_parameter("parameter_file_path", rclcpp::ParameterValue(""));
+        this->get_parameter("parameter_file_path", parameter_file_path_);
+        RCLCPP_INFO_STREAM(this->get_logger(), "Parameter file path: " << parameter_file_path_);
+
+        ParameterHandler::getInstance(parameter_file_path_);
+
         bool kf_opt;
         this->declare_parameter("is_kf_optimization_enabled", rclcpp::ParameterValue(false));
         this->get_parameter("is_kf_optimization_enabled", kf_opt);
@@ -60,7 +67,9 @@ public:
         tf_buffer_ptr_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
         tf_listener_ptr_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_ptr_);
 
-        populateTransforms(slam_frame_id_, robot_base_frame_id_, lidar_frame_id_, this->get_clock(), this->get_logger(), tf_buffer_ptr_);
+        Eigen::Affine3f tf_SlamToLidar;
+        Eigen::Affine3f tf_BaseToSlam;
+        populateTransforms(slam_frame_id_, robot_base_frame_id_, lidar_frame_id_, this->get_clock(), this->get_logger(), tf_buffer_ptr_, tf_SlamToLidar, tf_BaseToSlam);
         tf_buffer_ptr_.reset();
         tf_listener_ptr_.reset();
 
@@ -82,6 +91,7 @@ public:
         posePublisher_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("kf_pose", 10);
 
         traversabilitySystem_ = std::make_shared<traversability_mapping::System>();
+        traversabilitySystem_->setExtrinsicParameters(tf_SlamToLidar, tf_BaseToSlam);
         traversabilitySystem_->addNewLocalMap(0);
         RCLCPP_INFO(this->get_logger(), "Added new map");
     }

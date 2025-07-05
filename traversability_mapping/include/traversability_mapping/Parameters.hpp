@@ -35,13 +35,13 @@
 class ParameterHandler
 {
   public:
-    ParameterHandler();
+    ParameterHandler(std::string yaml_file_path = "");
 
-    static ParameterHandler& getInstance()
+    static ParameterHandler& getInstance(std::string yaml_file_path = "")
     {
         std::lock_guard<std::mutex> lock(instanceMutex_);
         if(parameterHandlerPtr_ == nullptr)
-            parameterHandlerPtr_.reset(new ParameterHandler());
+            parameterHandlerPtr_.reset(new ParameterHandler(yaml_file_path));
         return *parameterHandlerPtr_;
     }
 
@@ -75,6 +75,6 @@ class ParameterHandler
     std::unordered_map<std::string, boost::any> parameter_map_;
 };
 
-inline ParameterHandler& parameterInstance = ParameterHandler::getInstance();
+#define parameterInstance (ParameterHandler::getInstance())
 
 #endif

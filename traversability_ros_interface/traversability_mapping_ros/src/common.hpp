@@ -4,7 +4,7 @@
 #include <tf2_ros/transform_listener.h>
 
 inline void populateTransforms(std::string slam_frame_id, std::string robot_base_frame_id, std::string lidar_frame_id, 
-    rclcpp::Clock::SharedPtr clock, rclcpp::Logger logger, std::shared_ptr<tf2_ros::Buffer> tf_buffer)
+    rclcpp::Clock::SharedPtr clock, rclcpp::Logger logger, std::shared_ptr<tf2_ros::Buffer> tf_buffer, Eigen::Affine3f &tf_SlamToLidar, Eigen::Affine3f &tf_BaseToSlam)
 {
     bool tf1_found = false;
     bool tf2_found = false;
@@ -32,13 +32,16 @@ inline void populateTransforms(std::string slam_frame_id, std::string robot_base
         RCLCPP_INFO_STREAM(logger, "Got transform from " << slam_frame_id << " to " << lidar_frame_id << 
             "x: " << tf_stamped.transform.translation.x << " y: " << tf_stamped.transform.translation.y << " z: " << tf_stamped.transform.translation.z <<
             "qx: " << tf_stamped.transform.rotation.x << " qy: " << tf_stamped.transform.rotation.y << " qz: " << tf_stamped.transform.rotation.z << " qw: " << tf_stamped.transform.rotation.w);
-            parameterInstance.setValue<float>("T_SLAMFrameToLidarFrame/translation/x", tf_stamped.transform.translation.x);
-            parameterInstance.setValue<float>("T_SLAMFrameToLidarFrame/translation/y", tf_stamped.transform.translation.y);
-            parameterInstance.setValue<float>("T_SLAMFrameToLidarFrame/translation/z", tf_stamped.transform.translation.z);
-            parameterInstance.setValue<float>("T_SLAMFrameToLidarFrame/quaternion/w", tf_stamped.transform.rotation.w);
-            parameterInstance.setValue<float>("T_SLAMFrameToLidarFrame/quaternion/x", tf_stamped.transform.rotation.x);
-            parameterInstance.setValue<float>("T_SLAMFrameToLidarFrame/quaternion/y", tf_stamped.transform.rotation.y);
-            parameterInstance.setValue<float>("T_SLAMFrameToLidarFrame/quaternion/z", tf_stamped.transform.rotation.z);
+        Eigen::Translation3f translation_slam_lidar(
+            tf_stamped.transform.translation.x,
+            tf_stamped.transform.translation.y,
+            tf_stamped.transform.translation.z);
+        Eigen::Quaternion<float> quaternion_slam_lidar(
+            tf_stamped.transform.rotation.w,
+            tf_stamped.transform.rotation.x,
+            tf_stamped.transform.rotation.y,
+            tf_stamped.transform.rotation.z);
+        tf_SlamToLidar = translation_slam_lidar * quaternion_slam_lidar;
     }
 
     while(!tf2_found)
@@ -64,12 +67,15 @@ inline void populateTransforms(std::string slam_frame_id, std::string robot_base
         RCLCPP_INFO_STREAM(logger, "Got transform from " << robot_base_frame_id << " to " << slam_frame_id <<
         "x: " << tf_stamped.transform.translation.x << " y: " << tf_stamped.transform.translation.y << " z: " << tf_stamped.transform.translation.z <<
         "qx: " << tf_stamped.transform.rotation.x << " qy: " << tf_stamped.transform.rotation.y << " qz: " << tf_stamped.transform.rotation.z << " qw: " << tf_stamped.transform.rotation.w);
-        parameterInstance.setValue<float>("T_BasefootprintToSLAM/translation/x", tf_stamped.transform.translation.x);
-        parameterInstance.setValue<float>("T_BasefootprintToSLAM/translation/y", tf_stamped.transform.translation.y);
-        parameterInstance.setValue<float>("T_BasefootprintToSLAM/translation/z", tf_stamped.transform.translation.z);
-        parameterInstance.setValue<float>("T_BasefootprintToSLAM/quaternion/w", tf_stamped.transform.rotation.w);
-        parameterInstance.setValue<float>("T_BasefootprintToSLAM/quaternion/x", tf_stamped.transform.rotation.x);
-        parameterInstance.setValue<float>("T_BasefootprintToSLAM/quaternion/y", tf_stamped.transform.rotation.y);
-        parameterInstance.setValue<float>("T_BasefootprintToSLAM/quaternion/z", tf_stamped.transform.rotation.z);
+        Eigen::Translation3f translation_bf_slam(
+            tf_stamped.transform.translation.x,
+            tf_stamped.transform.translation.y,
+            tf_stamped.transform.translation.z);
+        Eigen::Quaternion<float> quaternion_bf_slam(
+            tf_stamped.transform.rotation.w,
+            tf_stamped.transform.rotation.x,
+            tf_stamped.transform.rotation.y,
+            tf_stamped.transform.rotation.z);
+        tf_BaseToSlam = translation_bf_slam * quaternion_bf_slam;
     }
 }

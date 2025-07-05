@@ -9,13 +9,25 @@
 
 class SLAMKeyFrameSimulator : public rclcpp::Node {
 public:
-    SLAMKeyFrameSimulator() : Node("slam_key_frame_simulator") {
+    SLAMKeyFrameSimulator() : Node("slam_keyframe_pcl_simulator") {
+        std::string odom_topic_;
+        std::string pcl_topic_;
+        this->declare_parameter("odom_topic", "ground_truth_pose");
+        this->get_parameter("odom_topic", odom_topic_);
+        this->declare_parameter("pcl_topic", "lidar/points");
+        this->get_parameter("pcl_topic", pcl_topic_);
+
+        this->declare_parameter("keyframe_publish_rate_hz", 2.5);
+        this->get_parameter("keyframe_publish_rate_hz", keyframe_publish_rate_hz_);
+
+        RCLCPP_INFO(this->get_logger(), "SLAMKeyFrameSimulator initialized with odom_topic: %s, pcl_topic: %s, keyframe_publish_rate_hz: %f", odom_topic_.c_str(), pcl_topic_.c_str(), keyframe_publish_rate_hz_);
+        
         // Subscribers for the topics
-        odom_subscriber_ = std::make_shared<message_filters::Subscriber<nav_msgs::msg::Odometry>>(this, "ground_truth_pose");
-        pcl_subscriber_ = std::make_shared<message_filters::Subscriber<sensor_msgs::msg::PointCloud2>>(this, "lidar/points");
+        odom_subscriber_ = std::make_shared<message_filters::Subscriber<nav_msgs::msg::Odometry>>(this, odom_topic_);
+        pcl_subscriber_ = std::make_shared<message_filters::Subscriber<sensor_msgs::msg::PointCloud2>>(this, pcl_topic_);
 
         subscription_ = this->create_subscription<nav_msgs::msg::Odometry>(
-            "ground_truth_pose", 10, std::bind(&SLAMKeyFrameSimulator::topic_callback, this, std::placeholders::_1));
+            odom_topic_, 10, std::bind(&SLAMKeyFrameSimulator::topic_callback, this, std::placeholders::_1));
 
         // Approximate Time Synchronization
         sync_ = std::make_shared<message_filters::Synchronizer<MySyncPolicy>>(MySyncPolicy(10), *odom_subscriber_, *pcl_subscriber_);
@@ -50,7 +62,7 @@ private:
         std::chrono::duration<double> elapsed_time = std::chrono::high_resolution_clock::now() - prev_time;
         double dt = elapsed_time.count();
 
-        if(dt > 0.4)
+        if(dt > 1 / keyframe_publish_rate_hz_)
         {
             // RCLCPP_INFO(this->get_logger(), "Time difference: %f seconds", dt);
             ++current_kf_id_;
@@ -134,6 +146,7 @@ private:
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr subscription_;
     long unsigned current_kf_id_;
     std::chrono::_V2::system_clock::time_point prev_time;
+    double keyframe_publish_rate_hz_;
 };
 
 int main(int argc, char **argv) {

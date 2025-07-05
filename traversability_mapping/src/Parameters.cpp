@@ -15,13 +15,21 @@
 std::unique_ptr<ParameterHandler> ParameterHandler::parameterHandlerPtr_ = nullptr;
 std::mutex ParameterHandler::instanceMutex_;
 
-ParameterHandler::ParameterHandler()
+ParameterHandler::ParameterHandler(std::string yaml_file_path)
 {
     // Load YAML file and retrieve parameters
-    const std::string yaml_base_path = ament_index_cpp::get_package_share_directory("traversability_mapping");
     std::string yaml_path;
-    YAML::Node yaml_node;
-    yaml_path = yaml_base_path + "/params/traversabilityParams.yaml";
+    if (yaml_file_path == "")
+    {
+        std::cerr << "\033[1;31m!!!Error: No YAML file path provided. Using defaults!!!\033[0m" << std::endl;
+        const std::string yaml_base_path = ament_index_cpp::get_package_share_directory("traversability_mapping");
+        YAML::Node yaml_node;
+        yaml_path = yaml_base_path + "/params/traversabilityParams.yaml";
+    }
+    else
+    {
+        yaml_path = yaml_file_path;
+    }
     YAML::Node loaded_node = YAML::LoadFile(yaml_path);
 
     // Traversability Params
@@ -46,6 +54,7 @@ ParameterHandler::ParameterHandler()
     parameter_map_["use_probabilistic_update"] = loaded_node["use_probabilistic_update"].as<bool>();
     parameter_map_["average_persistence"] = loaded_node["average_persistence"].as<double>();
     parameter_map_["use_virtual_boundary"] = loaded_node["use_virtual_boundary"].as<bool>();
+    parameter_map_["extend_length_every_resize_by"] = loaded_node["extend_length_every_resize_by"].as<double>();
     
     parameter_map_["global_adjustment_sleep"] = loaded_node["global_adjustment_sleep"].as<int>();
 

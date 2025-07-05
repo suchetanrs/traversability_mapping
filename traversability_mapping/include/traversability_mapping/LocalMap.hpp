@@ -53,6 +53,8 @@ namespace traversability_mapping
         // Destructor
         ~LocalMap();
 
+        void resizeGridMap(double posOutOfRangeX, double posOutOfRangeY);
+
         void markVirtualBoundary(const std::string &csvFilePath);
 
         void RunUpdateQueue();

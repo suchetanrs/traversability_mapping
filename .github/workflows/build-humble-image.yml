@@ -1,20 +1,33 @@
 name: Humble
-
 on:
   push:
-    branches: [ "master" ]
+    branches:
+    - 'master'
   pull_request:
-    branches: [ "master" ]
-
+    branches:
+    - '*'
 jobs:
-
   build:
-
-    runs-on: ubuntu-latest
-
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - {rosdistro: 'humble', container: 'ros:humble'}
+    container: ${{ matrix.config.container }}
     steps:
     - uses: actions/checkout@v4
-    - name: Build the Docker image
-      run: cp docker/humble/* . && sudo docker build -t traversability_humble:1.0 .
-    - name: Cleanup
-      run: sudo docker rmi --force traversability_humble:1.0 && rm -rf Dockerfile docker-compose.yaml
+      with:
+        path: src/traversability_mapping
+    - name: Install Dependencies with Rosdep
+      run: |
+        apt update
+        rosdep update
+        source /opt/ros/${{matrix.config.rosdistro}}/setup.bash
+        rosdep install --from-paths src --ignore-src -y --skip-keys sophus
+      shell: bash
+    - name: Colcon Build (Release)
+      run: |
+        source /opt/ros/${{matrix.config.rosdistro}}/setup.bash
+        colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release
+      shell: bash
