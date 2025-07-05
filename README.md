@@ -28,21 +28,6 @@ Once you are inside the gz-sim-environment docker, run the following:
 
 ```source install/setup.bash```
 
-
-### Building with cmake
-
-Once you are inside the gz-sim-environment docker, run the following:
-
-```cd && mkdir -p other_ws/src```
-
-```cd other_ws/src```
-
-```git clone https://github.com/suchetanrs/traversability_mapping```
-
-```cd traversability_mapping && sudo chmod +x clean_build.sh && ./clean_build.sh```
-
-```cd ~/other_ws/ && colcon build --symlink-install && source install/setup.bash```
-
 ## Launching the mapping
 
 ### Method 1: Launch the shell file if you are using the [Gazebo sim humble](https://github.com/suchetanrs/gz-sim-environment/tree/humble) or [Gazebo sim jazzy](https://github.com/suchetanrs/gz-sim-environment/tree/jazzy) repository
