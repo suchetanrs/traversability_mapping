@@ -47,7 +47,6 @@ target_include_directories(traversabilitySystem
     PUBLIC 
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>
-        ${Sophus_INCLUDE_DIRS}
         ${EIGEN3_INCLUDE_DIR}
         ${Boost_INCLUDE_DIRS}
         ${PCL_INCLUDE_DIRS}
@@ -69,7 +68,6 @@ endif(sensor_msgs_FOUND)
 
 # Link libraries
 target_link_libraries(traversabilitySystem
-    PRIVATE ${Sophus_LIBRARIES}
     PRIVATE ${EIGEN3_LIBS}
     PRIVATE ${Boost_LIBRARIES}
     PRIVATE ${PCL_LIBRARIES}
@@ -78,6 +76,7 @@ target_link_libraries(traversabilitySystem
     PUBLIC traversability_mapping_common
     PUBLIC grid_map_core::grid_map_core
     PUBLIC ament_index_cpp::ament_index_cpp
+    PUBLIC Sophus::Sophus
 )
 
 # Generate and install CMake configuration file

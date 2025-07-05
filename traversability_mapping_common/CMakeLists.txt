@@ -30,7 +30,6 @@ target_include_directories(traversability_mapping_common
     PUBLIC 
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>
-        ${Sophus_INCLUDE_DIRS}
         ${EIGEN3_INCLUDE_DIR}
         ${PCL_INCLUDE_DIRS}
 )
@@ -47,7 +46,7 @@ endif(sensor_msgs_FOUND)
 
 # Link libraries
 target_link_libraries(traversability_mapping_common
-    ${Sophus_LIBRARIES}
+    Sophus::Sophus
     ${EIGEN3_LIBS}
     ${PCL_LIBRARIES}
 )
@@ -93,5 +92,5 @@ install(DIRECTORY include/ DESTINATION include)
 
 ament_export_include_directories(include)
 ament_export_libraries(${PROJECT_NAME})
-ament_export_dependencies(Sophus)
+ament_export_dependencies(Sophus Eigen3 PCL sensor_msgs)
 ament_package()
