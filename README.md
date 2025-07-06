@@ -48,7 +48,7 @@ You can now visualize the gridmap and the occupancy map via RViz. To launch rviz
 
 ## Running the library with ORB-SLAM3 and a Gazebo simulation.
 
-Setup the Gazebo simulation from this repository [Gazebo sim](https://github.com/suchetanrs/gz-sim-environment)
+Setup the Gazebo simulation from this repository [Gazebo sim humble](https://github.com/suchetanrs/gz-sim-environment/tree/humble)
 
 **Important note: Before setting up the below repository. Make sure you checkout on the ```traversability_integration``` branch. This will setup the ORB-SLAM3 wrapper along with the traversability mapping integrations during the image build.**
 
