@@ -54,6 +54,9 @@ public:
         this->get_parameter("parameter_file_path", parameter_file_path_);
         RCLCPP_INFO_STREAM(this->get_logger(), "Parameter file path: " << parameter_file_path_);
 
+        this->declare_parameter("publish_grid_on_addition", rclcpp::ParameterValue(true));
+        this->get_parameter("publish_grid_on_addition", publish_grid_on_addition_);
+
         ParameterHandler::getInstance(parameter_file_path_);
 
         bool kf_opt;
@@ -125,6 +128,11 @@ private:
             kf_pose_stamped.pose = keyframe.kf_pose;
             posePublisher_->publish(kf_pose_stamped);
         }
+        if (publish_grid_on_addition_)
+        {
+            // also publish when new keyframe are added
+            publishTraversabilityData();
+        }
     }
 
     void keyFrameUpdatesCallback(const traversability_msgs::msg::KeyFrameUpdates::SharedPtr msg)
@@ -190,6 +198,7 @@ private:
     std::string robot_base_frame_id_;
     bool use_lidar_pointcloud_;
     bool publish_traversability_grid_;
+    bool publish_grid_on_addition_;
     rclcpp::TimerBase::SharedPtr publishTimer_;
 
     rclcpp::Subscription<traversability_msgs::msg::KeyFrameAdditions>::SharedPtr keyFrameAdditionsSubscriber_;
