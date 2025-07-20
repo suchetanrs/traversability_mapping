@@ -176,6 +176,7 @@ namespace traversability_mapping
     void KeyFrame::computeLocalTraversability(pcl::PointCloud<pcl::PointXYZ> &kFpcl, Eigen::Affine3f &traversabilityPose)
     {
         double resolution_ = parameterInstance.getValue<double>("resolution_local_map");
+        double resolution_by_2 = resolution_ / 2.0;
         double half_size_traversability_ = parameterInstance.getValue<double>("half_size_traversability");
         const double security_distance_ = parameterInstance.getValue<double>("security_distance");
         const double ground_clearance_ = parameterInstance.getValue<double>("ground_clearance");
@@ -233,12 +234,23 @@ namespace traversability_mapping
             {
                 float mx, my;
                 traversabilityMap->ind2meterOpt(i, j, mx, my);
-                Eigen::Vector2d meterValue(mx, my);
+                Eigen::Vector2d meterValue(mx + resolution_by_2, my + resolution_by_2);
                 Eigen::Vector4d haz = traversabilityMap->get_goodness(
                     i, j, security_distance_, ground_clearance_, max_slope_);
                 ++grid_count;
                 if (haz(0) < 0.)
                     continue;
+                
+                // check if position does not throw an exception, if it does, then continue.
+                try
+                {
+                    pGridMap_->atPosition("hazard", meterValue);
+                }
+                catch (...)
+                {
+                    continue;
+                }
+
                 if (parameterInstance.getValue<bool>("use_averaging"))
                 {
                     auto num_additions = 0.0;
