@@ -21,4 +21,4 @@
 
   traversability_threshold_node:
     ros__parameters:
-      lethal_obstacle_threshold: 55 # between 0 to 100
+      lethal_obstacle_threshold: 80 # between 0 to 100

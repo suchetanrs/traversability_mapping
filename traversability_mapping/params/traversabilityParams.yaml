@@ -15,7 +15,7 @@ use_least_squares_fit_to_compute_normals: true
 use_pca_to_compute_normals: false
 
 # --- Traversability related ---
-security_distance: 0.40
+security_distance: 0.40 # max(robot_length, robot_width)
 ground_clearance: 0.15
 max_slope: 0.4
 robot_height: 1.5

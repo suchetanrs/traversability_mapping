@@ -201,7 +201,7 @@ namespace traversability_mapping
         // Get the complete meta data for the zone and get all barycenters
         std::vector<Eigen::Vector3d> barycenters;
         NodeMetaData data_viscinity;
-        uint nb_min_vicinity = 5; // min points in vicinity
+        uint nb_min_vicinity = 15; // min points in vicinity
         for (int i = std::max(0, int(index_x - delta_ind)); i < std::min(int(index_x + delta_ind), size_x_); i++) {
             for (int j = std::max(0, int(index_y - delta_ind)); j < std::min(int(index_y + delta_ind), size_y_); j++) {
                 NodeMetaData data = _grid.at(i).at(j);
@@ -289,27 +289,27 @@ namespace traversability_mapping
             _normals.push_back({cell_barycenter, q_eig});
         }
 
-        // Find border hazard if cells are too line like using PCA
-        Eigen::Matrix2d C = Eigen::Matrix2d::Zero();
-        for (const auto& bc : barycenters)                      // you already built this vector
-        {
-            Eigen::Vector2d d = bc.head<2>() - vicinity_centroid.head<2>();
-            C.noalias() += d * d.transpose();
-        }
-        C /= barycenters.size();
+        // // Find border hazard if cells are too line like using PCA
+        // Eigen::Matrix2d C = Eigen::Matrix2d::Zero();
+        // for (const auto& bc : barycenters)                      // you already built this vector
+        // {
+        //     Eigen::Vector2d d = bc.head<2>() - vicinity_centroid.head<2>();
+        //     C.noalias() += d * d.transpose();
+        // }
+        // C /= barycenters.size();
 
-        Eigen::SelfAdjointEigenSolver<Eigen::Matrix2d> es2(C);
-        double lambda_max = es2.eigenvalues()(1);
-        double lambda_min = es2.eigenvalues()(0);
+        // Eigen::SelfAdjointEigenSolver<Eigen::Matrix2d> es2(C);
+        // double lambda_max = es2.eigenvalues()(1);
+        // double lambda_min = es2.eigenvalues()(0);
 
-        constexpr double min_shape_ratio = 0.50;   // 0 ≤ ratio ≤ 1
-        double shape_ratio = std::sqrt(lambda_min / lambda_max);
+        // constexpr double min_shape_ratio = 0.50;   // 0 ≤ ratio ≤ 1
+        // double shape_ratio = std::sqrt(lambda_min / lambda_max);
 
-        if (shape_ratio < min_shape_ratio)
-        {
-            haz[1] = 1;
-            return haz;                 // neighbourhood too 1-D
-        }
+        // if (shape_ratio < min_shape_ratio)
+        // {
+        //     haz[1] = 1;
+        //     return haz;                 // neighbourhood too 1-D
+        // }
 
         // -----------------------------------------------------------------------------------------------------------------------------
         // ELEVATION:
