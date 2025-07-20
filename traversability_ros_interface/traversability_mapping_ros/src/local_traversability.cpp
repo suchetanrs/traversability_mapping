@@ -73,7 +73,7 @@ public:
         pGridMap_ = std::make_shared<grid_map::GridMap>(gridMap_);
         RCLCPP_INFO_STREAM(this->get_logger(), "Constructor ended.");
         occupancy_grid_publisher_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("local_traversability_map", rclcpp::QoS(1).transient_local());
-        traversabilityPub_ = this->create_publisher<grid_map_msgs::msg::GridMap>("RTQuadtree_struct", rclcpp::QoS(1).transient_local());
+        traversabilityPub_ = this->create_publisher<grid_map_msgs::msg::GridMap>("RTQuadtree_struct_local", rclcpp::QoS(1).transient_local());
         last_callback_time_ = std::chrono::high_resolution_clock::now();
 
         parameterInstance.setValue<bool>("use_averaging", true);

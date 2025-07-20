@@ -55,6 +55,8 @@ ParameterHandler::ParameterHandler(std::string yaml_file_path)
     parameter_map_["average_persistence"] = loaded_node["average_persistence"].as<double>();
     parameter_map_["use_virtual_boundary"] = loaded_node["use_virtual_boundary"].as<bool>();
     parameter_map_["extend_length_every_resize_by"] = loaded_node["extend_length_every_resize_by"].as<double>();
+    parameter_map_["use_pca_to_compute_normals"] = loaded_node["use_pca_to_compute_normals"].as<bool>();
+    parameter_map_["use_least_squares_fit_to_compute_normals"] = loaded_node["use_least_squares_fit_to_compute_normals"].as<bool>();
     
     parameter_map_["global_adjustment_sleep"] = loaded_node["global_adjustment_sleep"].as<int>();
 

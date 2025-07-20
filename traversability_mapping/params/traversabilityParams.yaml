@@ -11,11 +11,13 @@ grid_center_y: 0.0
 resolution_local_map: 0.25
 half_size_traversability: 7.5 # size of the map around the robot to consider for computing on the go traversability.
 extend_length_every_resize_by: 30.0
+use_least_squares_fit_to_compute_normals: true
+use_pca_to_compute_normals: false
 
 # --- Traversability related ---
-security_distance: 0.6
-ground_clearance: 0.17
-max_slope: 0.7
+security_distance: 0.40
+ground_clearance: 0.15
+max_slope: 0.4
 robot_height: 1.5
 translation_change_threshold: 0.25
 rotation_change_threshold: 0.2
