@@ -1,0 +1,4 @@
+float32 voxel_size_x
+float32 voxel_size_y
+float32 voxel_size_z
+---

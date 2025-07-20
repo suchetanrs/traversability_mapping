@@ -20,6 +20,8 @@
 
 #include "common.hpp"
 
+#include "traversability_msgs/srv/get_global_pointcloud.hpp"
+
 class TraversabilityNode : public rclcpp::Node
 {
 public:
@@ -88,6 +90,9 @@ public:
 
         publishTimer_ = this->create_wall_timer(std::chrono::milliseconds(1000), std::bind(&TraversabilityNode::publishTraversabilityData, this));
 
+        publish_global_pointcloud_service_ = this->create_service<traversability_msgs::srv::GetGlobalPointcloud>(
+            "publish_global_pointcloud", std::bind(&TraversabilityNode::publishGlobalPointCloud, this, std::placeholders::_1, std::placeholders::_2));
+
         occupancy_grid_publisher_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("global_traversability_map", 10);
         traversabilityPub_ = this->create_publisher<grid_map_msgs::msg::GridMap>("RTQuadtree_struct", rclcpp::QoS(1).transient_local());
         pclPublisher_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("kf_pointcloud", 10);
@@ -100,6 +105,32 @@ public:
     }
 
 private:
+    void publishGlobalPointCloud(traversability_msgs::srv::GetGlobalPointcloud::Request::SharedPtr request, traversability_msgs::srv::GetGlobalPointcloud::Response::SharedPtr response)
+    {
+        (void)response;
+        // 1) grab the stitched PCL cloud (map-frame)
+        auto cloud_ptr = traversabilitySystem_->getGlobalPointCloud(request->voxel_size_x, request->voxel_size_y, request->voxel_size_z);
+        if (!cloud_ptr || cloud_ptr->empty()) {
+            RCLCPP_WARN(get_logger(), "Global cloud is empty, not publishing.");
+            return;
+        }
+
+        // 2) convert PCL<T> -> pcl::PCLPointCloud2
+        pcl::PCLPointCloud2 pcl_pc2;
+        pcl::toPCLPointCloud2(*cloud_ptr, pcl_pc2);
+
+        // 3) convert pcl::PCLPointCloud2 -> sensor_msgs::msg::PointCloud2
+        sensor_msgs::msg::PointCloud2 output;
+        pcl_conversions::fromPCL(pcl_pc2, output);
+
+        // 4) stamp & frame
+        output.header.stamp = this->now();
+        output.header.frame_id = "map";
+
+        // 5) publish
+        pclPublisher_->publish(output);
+    }
+
     void keyFrameAdditionsCallback(const traversability_msgs::msg::KeyFrameAdditions::SharedPtr msg)
     {
         // Process received KeyFrameAdditions message
@@ -208,6 +239,8 @@ private:
     rclcpp::Publisher<grid_map_msgs::msg::GridMap>::SharedPtr traversabilityPub_;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pclPublisher_;
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr posePublisher_;
+
+    rclcpp::Service<traversability_msgs::srv::GetGlobalPointcloud>::SharedPtr publish_global_pointcloud_service_;
 
     std::shared_ptr<traversability_mapping::System> traversabilitySystem_;
 

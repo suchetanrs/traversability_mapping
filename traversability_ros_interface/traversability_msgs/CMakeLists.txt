@@ -17,6 +17,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 "msg/KeyFrame.msg"
 "msg/KeyFrameAdditions.msg"
 "msg/KeyFrameUpdates.msg"
+"srv/GetGlobalPointcloud.srv"
 DEPENDENCIES builtin_interfaces geometry_msgs sensor_msgs std_msgs
 )
 

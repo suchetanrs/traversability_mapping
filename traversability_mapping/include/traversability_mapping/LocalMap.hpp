@@ -17,6 +17,8 @@
 #include <memory>
 #include <filesystem>
 #include <queue>
+#include <pcl/filters/voxel_grid.h>
+
 #include "traversability_mapping/KeyFrame.hpp"
 #include "traversability_mapping_common/type_conversion.hpp"
 #include "traversability_mapping/Helpers.hpp"
@@ -56,6 +58,8 @@ namespace traversability_mapping
         void resizeGridMap(double posOutOfRangeX, double posOutOfRangeY);
 
         void markVirtualBoundary(const std::string &csvFilePath);
+
+        std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> getStitchedPointCloud(float voxel_size_x, float voxel_size_y, float voxel_size_z);
 
         void RunUpdateQueue();
 

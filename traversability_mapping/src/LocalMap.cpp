@@ -174,6 +174,49 @@ namespace traversability_mapping
         }
     }
 
+    std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> LocalMap::getStitchedPointCloud(float voxel_size_x, float voxel_size_y, float voxel_size_z)
+    {
+        // output cloud in map frame
+        auto stitched = std::make_shared<pcl::PointCloud<pcl::PointXYZ>>();
+        {
+            // lock access to the keyframe map
+            std::lock_guard<std::mutex> lock(keyFramesMapMutex);
+            for (const auto & entry : keyFramesMap_)
+            {
+                try
+                {
+
+                    auto & kfPtr = entry.second;
+                    // get the raw lidar cloud (in velodyne frame)
+                    auto cloudLidar = kfPtr->getPointCloudLidarFrame();
+                    if (!cloudLidar || cloudLidar->empty()) continue;
+                    
+                    // get the slam‐in‐map pose, then chain the lidar→slam→map transform
+                    const Eigen::Affine3f slamInMap = kfPtr->getPose();  
+                    const Eigen::Affine3f lidarToSlam = Tsv_;            
+                    const Eigen::Affine3f lidarInMap = slamInMap * lidarToSlam;
+                    
+                    // do the actual transform
+                    pcl::PointCloud<pcl::PointXYZ> transformed;
+                    traversability_mapping::doTransformPCL(*cloudLidar, transformed, lidarInMap);
+                    
+                    // append into our stitched cloud
+                    *stitched += transformed;
+                }
+                catch (const std::exception &e)
+                {
+                    std::cerr << "Error processing keyframe: " << e.what() << std::endl;
+                }
+            }
+        }
+        pcl::PointCloud<pcl::PointXYZ> filtered;
+        pcl::VoxelGrid<pcl::PointXYZ> vg;
+        vg.setInputCloud(stitched);
+        vg.setLeafSize(voxel_size_x, voxel_size_y, voxel_size_z);
+        vg.filter(filtered);
+        return filtered.makeShared();
+    }
+
     void LocalMap::RunUpdateQueue()
     {
         // Loop runs forever.

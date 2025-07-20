@@ -106,6 +106,11 @@ namespace traversability_mapping
         return numConnections_;
     }
 
+    std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> KeyFrame::getPointCloudLidarFrame()
+    {
+        return pointCloudLidar_;
+    }
+
     void KeyFrame::setPose(const Eigen::Affine3f &pose)
     {
         std::lock_guard<std::mutex> lock(poseMutex_);

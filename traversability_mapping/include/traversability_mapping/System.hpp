@@ -63,6 +63,8 @@ namespace traversability_mapping
         void pushToBuffer(double timestamp,
                           pcl::PCLPointCloud2& pcl_pc2);
 
+        std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> getGlobalPointCloud(float voxel_size_x, float voxel_size_y, float voxel_size_z);
+
 #ifdef WITH_ROS2_SENSOR_MSGS
         void pushToBuffer(sensor_msgs::msg::PointCloud2::SharedPtr pcl2);
 #endif

@@ -343,6 +343,12 @@ namespace traversability_mapping
     }
 #endif
 
+    std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> System::getGlobalPointCloud(float voxel_size_x, float voxel_size_y, float voxel_size_z)
+    {
+        std::lock_guard<std::recursive_mutex> lock(localMapMutex_);
+        return localMap_->getStitchedPointCloud(voxel_size_x, voxel_size_y, voxel_size_z);
+    }
+
     std::shared_ptr<LocalMap> System::getLocalMap()
     {
         std::lock_guard<std::recursive_mutex> lock(localMapMutex_);
