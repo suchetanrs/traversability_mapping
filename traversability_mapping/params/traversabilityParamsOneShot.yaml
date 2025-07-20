@@ -26,7 +26,7 @@ num_local_keyframes: 10
 is_kf_optimization_enabled: true # if this is set to true, the pointclouds are stored in memory. Large pointclouds can lead to fast memory exhaustion.
 use_pointcloud_buffer: true
 use_ros_buffer: true
-use_probabilistic_update: true
+use_probabilistic_update: false
 use_averaging: false
 average_persistence: 10.0 #if a cell is averaged 20 times, it is reset to start a new averaging instance.
 global_adjustment_sleep: 0 #time between processing every keyframe outside the local window (ms)
