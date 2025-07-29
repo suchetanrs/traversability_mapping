@@ -6,7 +6,7 @@
       pointcloud_topic_name: "lidar/points"
       use_lidar_pointcloud: false
       publish_traversability_grid: true
-      is_kf_optimization_enabled: false
+      is_kf_optimization_enabled: true
       slam_frame: base_footprint
       robot_base_frame: base_footprint
       lidar_frame: lidar_link

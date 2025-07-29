@@ -136,7 +136,7 @@ public:
     Eigen::Vector4d get_goodness(float index_x, float index_y, const double distance, const double ground_clearance, const double max_pitch);
     
     // overall hazard, border hazard (sparsity), elevation, slope hazard, step hazard, roughness hazard
-    std::array<double, 6> get_goodness_v2(float index_x, float index_y, const double distance, const double ground_clearance, const double max_pitch);
+    std::array<double, 9> get_goodness_v2(float index_x, float index_y, const double distance, const double ground_clearance, const double max_pitch);
 
     // @brief
     // void get_traversability(std::vector<Eigen::Matrix<double,6,1>> &cells, const double distance, const double ground_clearance, const double max_pitch);

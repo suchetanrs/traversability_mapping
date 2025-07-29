@@ -176,9 +176,9 @@ namespace traversability_mapping
         return haz;
     }
 
-    std::array<double, 6> traversabilityGrid::get_goodness_v2(float index_x, float index_y, const double distance, const double ground_clearance, const double max_pitch)
+    std::array<double, 9> traversabilityGrid::get_goodness_v2(float index_x, float index_y, const double distance, const double ground_clearance, const double max_pitch)
     {
-        std::array<double, 6> haz;
+        std::array<double, 9> haz;
         haz.fill(std::numeric_limits<double>::quiet_NaN());
 
         int delta_ind = std::ceil((distance / 2.0) / _resolution);
@@ -288,6 +288,9 @@ namespace traversability_mapping
             Eigen::Quaterniond::FromTwoVectors(Eigen::Vector3d::UnitZ(), N);
             _normals.push_back({cell_barycenter, q_eig});
         }
+        haz[6] = N.x();
+        haz[7] = N.y();
+        haz[8] = N.z();
 
         // // Find border hazard if cells are too line like using PCA
         // Eigen::Matrix2d C = Eigen::Matrix2d::Zero();

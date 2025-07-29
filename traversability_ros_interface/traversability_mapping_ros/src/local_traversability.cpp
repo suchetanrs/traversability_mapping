@@ -67,7 +67,7 @@ public:
 
         populateTransforms(slam_frame_, robot_base_frame_id_, lidar_frame_id_, this->get_clock(), this->get_logger(), tf_buffer_ptr_, Tsv_, Tbs_);
 
-        grid_map::GridMap gridMap_({"num_additions", "hazard", "step_haz", "roughness_haz", "slope_haz", "border_haz", "elevation", "kfid"});
+        grid_map::GridMap gridMap_({"num_additions", "hazard", "step_haz", "roughness_haz", "slope_haz", "border_haz", "elevation", "kfid", "normal_x", "normal_y", "normal_z"});
         gridMap_.setFrameId("odom");
         gridMap_.setGeometry(grid_map::Length(2. * parameterInstance.getValue<double>("half_size_traversability"), 2. * parameterInstance.getValue<double>("half_size_traversability")), parameterInstance.getValue<double>("resolution_local_map"));
         pGridMap_ = std::make_shared<grid_map::GridMap>(gridMap_);

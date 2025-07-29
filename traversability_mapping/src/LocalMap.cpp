@@ -24,7 +24,7 @@ namespace traversability_mapping
         Tbs_ = parameterInstance.getValue<Eigen::Affine3f>("T_BasefootprintToSLAM");
 
         typeConversion_ = std::make_shared<TraversabilityTypeConversions>();
-        grid_map::GridMap gridMap_({"num_additions", "hazard", "step_haz", "roughness_haz", "slope_haz", "border_haz", "elevation", "kfid"});
+        grid_map::GridMap gridMap_({"num_additions", "hazard", "step_haz", "roughness_haz", "slope_haz", "border_haz", "elevation", "kfid", "normal_x", "normal_y", "normal_z"});
         gridMap_.setFrameId("map");
         gridMap_.setGeometry(grid_map::Length(2. * parameterInstance.getValue<double>("half_size_local_map"), 2. * parameterInstance.getValue<double>("half_size_local_map")), parameterInstance.getValue<double>("resolution_local_map"));
         Eigen::Vector2d slamPosition;
@@ -185,6 +185,7 @@ namespace traversability_mapping
             {
                 try
                 {
+                    std::cout << "Processing keyframe for writing to disk: " << entry.first << std::endl;
 
                     auto & kfPtr = entry.second;
                     // get the raw lidar cloud (in velodyne frame)
@@ -214,6 +215,20 @@ namespace traversability_mapping
         vg.setInputCloud(stitched);
         vg.setLeafSize(voxel_size_x, voxel_size_y, voxel_size_z);
         vg.filter(filtered);
+
+        std::time_t now = std::time(nullptr);
+        std::tm   tm  = *std::localtime(&now);
+
+        // 2) format it into a string: e.g. “20250724_153045”
+        std::ostringstream oss;
+        oss << "/root/stitched_filtered_"
+            << std::put_time(&tm, "%Y%m%d_%H%M%S")
+            << ".pcd";
+
+        // 3) write out using that filename
+        std::string filename = oss.str();
+
+        pcl::io::savePCDFileBinary(filename, filtered);
         return filtered.makeShared();
     }
 

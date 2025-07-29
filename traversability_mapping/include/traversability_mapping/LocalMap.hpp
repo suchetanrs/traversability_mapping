@@ -18,6 +18,7 @@
 #include <filesystem>
 #include <queue>
 #include <pcl/filters/voxel_grid.h>
+#include <pcl/io/pcd_io.h>
 
 #include "traversability_mapping/KeyFrame.hpp"
 #include "traversability_mapping_common/type_conversion.hpp"

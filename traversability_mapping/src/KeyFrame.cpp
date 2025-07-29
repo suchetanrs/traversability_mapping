@@ -24,24 +24,36 @@ namespace traversability_mapping
                        Eigen::Affine3f Tbs)
         : timestamp_(timestamp),
           kfID_(kfID),
-          pointCloudLidar_(std::make_shared<pcl::PointCloud<pcl::PointXYZ>>(pointCloud)),
+        //   pointCloudLidar_(std::make_shared<pcl::PointCloud<pcl::PointXYZ>>(pointCloud)),
           pGridMap_(gridMap),
           masterGridMapMutex_(masterGridMapMutex),
           parentMapID_(mapID),
           Tsv_(Tsv),
           Tsb_(Tbs.inverse())
     {
-        // TODO: Make this a parameter
-        // auto translation = Eigen::Translation3f(
-        //     static_cast<float>(0.527),
-        //     static_cast<float>(0.0),
-        //     static_cast<float>(0.662));
-        // auto quaternion = Eigen::Quaternion<float>(
-        //     static_cast<float>(0.924), // w
-        //     static_cast<float>(0.0),   // x
-        //     static_cast<float>(0.381), // y
-        //     static_cast<float>(0.0));  // z
-        // Tsv_ = translation * quaternion;
+        // Get parameters for pruning
+        const double robot_height = parameterInstance.getValue<double>("robot_height");
+        const double half_size_traversability = parameterInstance.getValue<double>("half_size_traversability");
+        const double xy_bound = half_size_traversability + 0.2;
+
+        const Eigen::Affine3f Tbv = Tbs * Tsv;
+
+        // Create a new point cloud for the filtered points
+        auto prunedPointCloud = std::make_shared<pcl::PointCloud<pcl::PointXYZ>>();
+        prunedPointCloud->reserve(pointCloud.size()); // Reserve space for efficiency
+
+        // Iterate through the input point cloud and filter points
+        for (const auto& point : pointCloud)
+        {
+            Eigen::Vector3f p_lidar_eigen(point.x, point.y, point.z);
+            Eigen::Vector3f p_base_eigen = Tbv * p_lidar_eigen;
+            if (p_base_eigen.z() < robot_height && std::abs(p_base_eigen.x()) < xy_bound && std::abs(p_base_eigen.y()) < xy_bound)
+            {
+                prunedPointCloud->push_back(point);
+            }
+        }
+        // Assign the newly pruned point cloud to the class member
+        pointCloudLidar_ = prunedPointCloud;
         numConnections_ = 0;
     }
 
@@ -296,6 +308,9 @@ namespace traversability_mapping
                 pGridMap_->atPosition("slope_haz", meterValue) = haz[3];
                 // the latest updating kf's id is stored in this position of the gridmap.
                 pGridMap_->atPosition("kfid", meterValue) = static_cast<float>(kfID_);
+                pGridMap_->atPosition("normal_x", meterValue) = haz[6];
+                pGridMap_->atPosition("normal_y", meterValue) = haz[7];
+                pGridMap_->atPosition("normal_z", meterValue) = haz[8];
                 markedCells_.push_back(meterValue);
             }
         }
