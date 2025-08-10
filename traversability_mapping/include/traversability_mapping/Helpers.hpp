@@ -29,7 +29,7 @@
 namespace traversability_mapping
 {
     void doTransformPCL(
-        const pcl::PointCloud<pcl::PointXYZ> &p_in, pcl::PointCloud<pcl::PointXYZ> &p_out,
+        const pcl::PointCloud<pcl::PointXYZRGB> &p_in, pcl::PointCloud<pcl::PointXYZRGB> &p_out,
         const Eigen::Affine3f &t);
 
 #ifdef WITH_ROS2_SENSOR_MSGS

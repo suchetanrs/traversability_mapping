@@ -36,7 +36,7 @@ namespace traversability_mapping
         void addPointCloud(sensor_msgs::msg::PointCloud2::SharedPtr pointCloud, double timestamp);
 
         // Function to find the closest point cloud to the queried timestamp
-        std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> getClosestPointCloud(const double &query_time);
+        std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGB>> getClosestPointCloud(const double &query_time);
 
         // Function to delete all points before the queried timestamp in the buffer
         void deletePointsBefore(const double &query_time);

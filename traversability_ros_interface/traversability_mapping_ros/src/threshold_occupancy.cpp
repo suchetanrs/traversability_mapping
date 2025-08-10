@@ -8,9 +8,10 @@ public:
     TraversabilityThresholdNode()
         : Node("traversability_threshold_node")
     {
+        this->declare_parameter("occupancy_map_name", rclcpp::ParameterValue("global_traversability_map"));
         // Subscription to the input occupancy map
         subscription_ = this->create_subscription<nav_msgs::msg::OccupancyGrid>(
-            "global_traversability_map", 10, std::bind(&TraversabilityThresholdNode::callback, this, std::placeholders::_1)
+            this->get_parameter("occupancy_map_name").as_string(), 10, std::bind(&TraversabilityThresholdNode::callback, this, std::placeholders::_1)
         );
 
         this->declare_parameter("lethal_obstacle_threshold", rclcpp::ParameterValue(85));

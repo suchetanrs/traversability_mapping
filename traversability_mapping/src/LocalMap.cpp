@@ -174,10 +174,10 @@ namespace traversability_mapping
         }
     }
 
-    std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> LocalMap::getStitchedPointCloud(float voxel_size_x, float voxel_size_y, float voxel_size_z)
+    std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGB>> LocalMap::getStitchedPointCloud(float voxel_size_x, float voxel_size_y, float voxel_size_z)
     {
         // output cloud in map frame
-        auto stitched = std::make_shared<pcl::PointCloud<pcl::PointXYZ>>();
+        auto stitched = std::make_shared<pcl::PointCloud<pcl::PointXYZRGB>>();
         {
             // lock access to the keyframe map
             std::lock_guard<std::mutex> lock(keyFramesMapMutex);
@@ -198,7 +198,7 @@ namespace traversability_mapping
                     const Eigen::Affine3f lidarInMap = slamInMap * lidarToSlam;
                     
                     // do the actual transform
-                    pcl::PointCloud<pcl::PointXYZ> transformed;
+                    pcl::PointCloud<pcl::PointXYZRGB> transformed;
                     traversability_mapping::doTransformPCL(*cloudLidar, transformed, lidarInMap);
                     
                     // append into our stitched cloud
@@ -210,8 +210,8 @@ namespace traversability_mapping
                 }
             }
         }
-        pcl::PointCloud<pcl::PointXYZ> filtered;
-        pcl::VoxelGrid<pcl::PointXYZ> vg;
+        pcl::PointCloud<pcl::PointXYZRGB> filtered;
+        pcl::VoxelGrid<pcl::PointXYZRGB> vg;
         vg.setInputCloud(stitched);
         vg.setLeafSize(voxel_size_x, voxel_size_y, voxel_size_z);
         vg.filter(filtered);
@@ -381,7 +381,7 @@ namespace traversability_mapping
 
     std::shared_ptr<KeyFrame> LocalMap::addNewKeyFrame(double timestamp,
                                                        long unsigned int kfID,
-                                                       pcl::PointCloud<pcl::PointXYZ> &pointCloud,
+                                                       pcl::PointCloud<pcl::PointXYZRGB> &pointCloud,
                                                        long unsigned int mapID)
     {
         std::shared_ptr<KeyFrame> keyFrame = std::make_shared<KeyFrame>(timestamp, kfID, pointCloud, pGridMap_, masterGridMapMutex_, mapID, Tsv_, Tbs_);

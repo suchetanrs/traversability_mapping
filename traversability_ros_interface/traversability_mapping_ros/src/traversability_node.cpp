@@ -143,9 +143,9 @@ private:
                 traversabilitySystem_->addNewKeyFrameTsULong(keyframe.kf_timestamp_in_nanosec, keyframe.kf_id, keyframe.map_id);
             else
             {
-                pcl::PointCloud<pcl::PointXYZ> pointcloudInput;
+                pcl::PointCloud<pcl::PointXYZRGB> pointcloudInput;
                 pcl::fromROSMsg(keyframe.kf_pointcloud, pointcloudInput);
-                std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> pclPtr = std::make_shared<pcl::PointCloud<pcl::PointXYZ>>(pointcloudInput);
+                std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGB>> pclPtr = std::make_shared<pcl::PointCloud<pcl::PointXYZRGB>>(pointcloudInput);
                 traversabilitySystem_->addNewKeyFrameWithPCL(keyframe.kf_timestamp_in_nanosec, keyframe.kf_id, keyframe.map_id, pclPtr);
             }
             Eigen::Affine3d keyFramePoseEigen;

@@ -15,7 +15,7 @@
 namespace traversability_mapping
 {
     void doTransformPCL(
-        const pcl::PointCloud<pcl::PointXYZ> &p_in, pcl::PointCloud<pcl::PointXYZ> &p_out,
+        const pcl::PointCloud<pcl::PointXYZRGB> &p_in, pcl::PointCloud<pcl::PointXYZRGB> &p_out,
         const Eigen::Affine3f &t)
     {
         pcl:: transformPointCloud(p_in, p_out, t);

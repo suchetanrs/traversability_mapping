@@ -60,7 +60,7 @@ namespace traversability_mapping
 
         void markVirtualBoundary(const std::string &csvFilePath);
 
-        std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> getStitchedPointCloud(float voxel_size_x, float voxel_size_y, float voxel_size_z);
+        std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGB>> getStitchedPointCloud(float voxel_size_x, float voxel_size_y, float voxel_size_z);
 
         void RunUpdateQueue();
 
@@ -73,7 +73,7 @@ namespace traversability_mapping
         // Function to add a new keyframe to the map
         std::shared_ptr<KeyFrame> addNewKeyFrame(double timestamp,
                                                  long unsigned int kfID,
-                                                 pcl::PointCloud<pcl::PointXYZ> &pointCloud,
+                                                 pcl::PointCloud<pcl::PointXYZRGB> &pointCloud,
                                                  long unsigned int mapID);
 
         void addAlreadyDeclaredKF(std::shared_ptr<KeyFrame> keyFrame);

@@ -16,7 +16,7 @@ namespace traversability_mapping
 {
     KeyFrame::KeyFrame(double timestamp,
                        long unsigned int kfID,
-                       pcl::PointCloud<pcl::PointXYZ> &pointCloud,
+                       pcl::PointCloud<pcl::PointXYZRGB> &pointCloud,
                        std::shared_ptr<grid_map::GridMap> gridMap,
                        std::shared_ptr<std::mutex> masterGridMapMutex,
                        long unsigned int mapID,
@@ -24,7 +24,7 @@ namespace traversability_mapping
                        Eigen::Affine3f Tbs)
         : timestamp_(timestamp),
           kfID_(kfID),
-        //   pointCloudLidar_(std::make_shared<pcl::PointCloud<pcl::PointXYZ>>(pointCloud)),
+        //   pointCloudLidar_(std::make_shared<pcl::PointCloud<pcl::PointXYZRGB>>(pointCloud)),
           pGridMap_(gridMap),
           masterGridMapMutex_(masterGridMapMutex),
           parentMapID_(mapID),
@@ -39,7 +39,7 @@ namespace traversability_mapping
         const Eigen::Affine3f Tbv = Tbs * Tsv;
 
         // Create a new point cloud for the filtered points
-        auto prunedPointCloud = std::make_shared<pcl::PointCloud<pcl::PointXYZ>>();
+        auto prunedPointCloud = std::make_shared<pcl::PointCloud<pcl::PointXYZRGB>>();
         prunedPointCloud->reserve(pointCloud.size()); // Reserve space for efficiency
 
         // Iterate through the input point cloud and filter points
@@ -118,7 +118,7 @@ namespace traversability_mapping
         return numConnections_;
     }
 
-    std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> KeyFrame::getPointCloudLidarFrame()
+    std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGB>> KeyFrame::getPointCloudLidarFrame()
     {
         return pointCloudLidar_;
     }
@@ -185,7 +185,7 @@ namespace traversability_mapping
         numConnections_ = numConnections;
     }
 
-    void KeyFrame::computeLocalTraversability(pcl::PointCloud<pcl::PointXYZ> &kFpcl, Eigen::Affine3f &traversabilityPose)
+    void KeyFrame::computeLocalTraversability(pcl::PointCloud<pcl::PointXYZRGB> &kFpcl, Eigen::Affine3f &traversabilityPose)
     {
         double resolution_ = parameterInstance.getValue<double>("resolution_local_map");
         double resolution_by_2 = resolution_ / 2.0;
@@ -350,7 +350,7 @@ namespace traversability_mapping
         // transform from map frame to slam frame * transform from slam frame to velodyne (lidar) frame.
         auto Tmv = Tms_ * Tsv_;
         auto Tmb = Tms_ * Tsb_;
-        pcl::PointCloud<pcl::PointXYZ> pointCloudCorrected_;
+        pcl::PointCloud<pcl::PointXYZRGB> pointCloudCorrected_;
         // correct the pointcloud from velodyne frame to map frame.
         if (pointCloudLidar_ == nullptr)
         {

@@ -36,7 +36,7 @@ namespace traversability_mapping
     }
 
     // Function to find the closest point cloud to the queried timestamp
-    std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> PointCloudBufferROS::getClosestPointCloud(const double &query_time)
+    std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGB>> PointCloudBufferROS::getClosestPointCloud(const double &query_time)
     {
         std::lock_guard<std::recursive_mutex> lock(bufferMutex_);
         // Check if buffer is empty
@@ -58,7 +58,7 @@ namespace traversability_mapping
         
         pcl::PCLPointCloud2 pcl_pc2;
         toPCL(*(closest_cloud_iter->second), pcl_pc2);
-        std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> pointcloudInput = std::make_shared<pcl::PointCloud<pcl::PointXYZ>>();
+        std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGB>> pointcloudInput = std::make_shared<pcl::PointCloud<pcl::PointXYZRGB>>();
         pcl::fromPCLPointCloud2(pcl_pc2, *pointcloudInput);
         
         return pointcloudInput;

@@ -41,7 +41,7 @@ namespace traversability_mapping
     void System::addNewKeyFrameToMap(const double timestamp,
                                      long unsigned int kfID,
                                      long unsigned int mapID,
-                                     std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> sensorPointCloud)
+                                     std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGB>> sensorPointCloud)
     {
         // std::cout << "addNewKeyFrameToMap" << std::endl;
         // std::cout << "traversability_mapping::System::addNewKeyFrameToMap with id: " << kfID << " and ts: " << timestamp << std::endl;
@@ -80,7 +80,7 @@ namespace traversability_mapping
             throw std::runtime_error(errorMsg);
         }
         long unsigned int kfIDlong = static_cast<long unsigned int>(kfID);
-        std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> sensorPointCloud;
+        std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGB>> sensorPointCloud;
 #ifdef WITH_ROS2_SENSOR_MSGS
         if(useROSBuffer_)
             sensorPointCloud = pointCloudBufferROS_->getClosestPointCloud(timestamp);
@@ -118,7 +118,7 @@ namespace traversability_mapping
             throw std::runtime_error(errorMsg);
         }
         long unsigned int kfIDlong = static_cast<long unsigned int>(kfID);
-        std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> sensorPointCloud;
+        std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGB>> sensorPointCloud;
 #ifdef WITH_ROS2_SENSOR_MSGS
         if(useROSBuffer_)
             sensorPointCloud = pointCloudBufferROS_->getClosestPointCloud(timestampDouble);
@@ -143,7 +143,7 @@ namespace traversability_mapping
     void System::addNewKeyFrameWithPCL(const unsigned long long timestamp,
                                        int kfID,
                                        long unsigned int mapID,
-                                       std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> sensorPointCloud)
+                                       std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGB>> sensorPointCloud)
     {
         // std::cout << "addNewKeyFrame4" << std::endl;
         const unsigned long long timestampSecond = timestamp / 1e9;
@@ -320,7 +320,7 @@ namespace traversability_mapping
     }
 
     void System::pushToBuffer(double timestamp,
-                              std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> &pcl2)
+                              std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGB>> &pcl2)
     {
         pointCloudBuffer_->addPointCloud(pcl2, timestamp);
     }
@@ -336,14 +336,14 @@ namespace traversability_mapping
     {
         // pcl::PCLPointCloud2 pcl_pc2;
         // toPCL(*pcl2, pcl_pc2);
-        // std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> pointcloudInput = std::make_shared<pcl::PointCloud<pcl::PointXYZ>>();
+        // std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGB>> pointcloudInput = std::make_shared<pcl::PointCloud<pcl::PointXYZRGB>>();
         // pcl::fromPCLPointCloud2(pcl_pc2, *pointcloudInput);
         double seconds = pcl2->header.stamp.sec + (pcl2->header.stamp.nanosec * pow(10, -9));
         pointCloudBufferROS_->addPointCloud(pcl2, seconds);
     }
 #endif
 
-    std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> System::getGlobalPointCloud(float voxel_size_x, float voxel_size_y, float voxel_size_z)
+    std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGB>> System::getGlobalPointCloud(float voxel_size_x, float voxel_size_y, float voxel_size_z)
     {
         std::lock_guard<std::recursive_mutex> lock(localMapMutex_);
         return localMap_->getStitchedPointCloud(voxel_size_x, voxel_size_y, voxel_size_z);

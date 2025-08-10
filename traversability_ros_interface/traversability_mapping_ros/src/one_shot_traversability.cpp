@@ -63,7 +63,7 @@ private:
     void pointCloudCallback(sensor_msgs::msg::PointCloud2::SharedPtr msg)
     {
         auto current_time = std::chrono::high_resolution_clock::now();
-        pcl::PointCloud<pcl::PointXYZ> pointcloudInput;
+        pcl::PointCloud<pcl::PointXYZRGB> pointcloudInput;
         pcl::PCLPointCloud2 pcl_pc2;
         pcl_conversions::toPCL(*msg, pcl_pc2);
         pcl::fromPCLPointCloud2(pcl_pc2, pointcloudInput);
@@ -98,7 +98,7 @@ private:
 
             auto Tmv = Tms_ * Tsv_;
             auto Tmb = Tms_ * Tbs_.inverse();
-            pcl::PointCloud<pcl::PointXYZ> pointCloudCorrected_;
+            pcl::PointCloud<pcl::PointXYZRGB> pointCloudCorrected_;
             traversability_mapping::doTransformPCL(pointcloudInput, pointCloudCorrected_, Tmv);
 
             keyframe_->computeLocalTraversability(pointCloudCorrected_, Tmb); // Assuming keyframe_ is a shared pointer to your KeyFrame object

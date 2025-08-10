@@ -41,7 +41,7 @@ namespace traversability_mapping
         void addNewKeyFrameWithPCL(const unsigned long long timestamp,
                                    int kfID,
                                    long unsigned int mapID,
-                                   std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> sensorPointCloud);
+                                   std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGB>> sensorPointCloud);
 
         void informLoopClosure();
 
@@ -58,12 +58,12 @@ namespace traversability_mapping
         void addNewLocalMap(long unsigned int mapID);
 
         void pushToBuffer(double timestamp,
-                          std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> &pcl2);
+                          std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGB>> &pcl2);
         
         void pushToBuffer(double timestamp,
                           pcl::PCLPointCloud2& pcl_pc2);
 
-        std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> getGlobalPointCloud(float voxel_size_x, float voxel_size_y, float voxel_size_z);
+        std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGB>> getGlobalPointCloud(float voxel_size_x, float voxel_size_y, float voxel_size_z);
 
 #ifdef WITH_ROS2_SENSOR_MSGS
         void pushToBuffer(sensor_msgs::msg::PointCloud2::SharedPtr pcl2);
@@ -78,7 +78,7 @@ namespace traversability_mapping
         void addNewKeyFrameToMap(const double timestamp,
                                  long unsigned int kfID,
                                  long unsigned int mapID,
-                                 std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> sensorPointCloud);
+                                 std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGB>> sensorPointCloud);
 
         void setCurrentMap(long unsigned int mapID);
 

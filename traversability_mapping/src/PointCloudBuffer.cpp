@@ -22,7 +22,7 @@ namespace traversability_mapping
         buffer_.clear();
     }
 
-    void PointCloudBuffer::addPointCloud(std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> pointCloud, double timestamp)
+    void PointCloudBuffer::addPointCloud(std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGB>> pointCloud, double timestamp)
     {
         std::lock_guard<std::recursive_mutex> lock(bufferMutex_);
         auto pair = std::make_pair(timestamp, pointCloud);
@@ -35,7 +35,7 @@ namespace traversability_mapping
     }
 
     // Function to find the closest point cloud to the queried timestamp
-    std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> PointCloudBuffer::getClosestPointCloud(const double &query_time)
+    std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGB>> PointCloudBuffer::getClosestPointCloud(const double &query_time)
     {
         std::lock_guard<std::recursive_mutex> lock(bufferMutex_);
         // Check if buffer is empty

@@ -40,7 +40,7 @@ namespace traversability_mapping
         // Tbs: T_basefootprint_to_slam
         KeyFrame(double timestamp,
                  long unsigned int kfID,
-                 pcl::PointCloud<pcl::PointXYZ> &pointCloud,
+                 pcl::PointCloud<pcl::PointXYZRGB> &pointCloud,
                  std::shared_ptr<grid_map::GridMap> gridMap,
                  std::shared_ptr<std::mutex> masterGridMapMutex,
                  long unsigned int mapID,
@@ -68,7 +68,7 @@ namespace traversability_mapping
 
         const long unsigned int &getConnections();
 
-        std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> getPointCloudLidarFrame();
+        std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGB>> getPointCloudLidarFrame();
 
         // SETTERS
         void setPose(const Eigen::Affine3f &pose);
@@ -82,7 +82,7 @@ namespace traversability_mapping
         // TRAVERSABILITY FUNCTION
         // kFpcl : pointcloud transformed into the world frame.
         // traversabilityPose : the pose of the robot in map frame. This is the !!base_footprint!! in the map frame.
-        void computeLocalTraversability(pcl::PointCloud<pcl::PointXYZ> &kFpcl, Eigen::Affine3f& traversabilityPose);
+        void computeLocalTraversability(pcl::PointCloud<pcl::PointXYZRGB> &kFpcl, Eigen::Affine3f& traversabilityPose);
 
         // CACHE RECOMPUTE
         void recomputeCache(bool useHashGrid);
@@ -97,7 +97,7 @@ namespace traversability_mapping
         // set only one time in constructor. thread safety not needed since it is only read.
         double timestamp_;
         long unsigned int kfID_;
-        std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> pointCloudLidar_;
+        std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGB>> pointCloudLidar_;
         Eigen::Affine3f Tsv_; // transform from slam frame to velodyne (lidar) frame.
         Eigen::Affine3f Tsb_; // transform from slam frame to base_footprint frame.
 
