@@ -9,7 +9,7 @@ inline void populateTransforms(std::string slam_frame_id, std::string robot_base
     bool tf1_found = false;
     bool tf2_found = false;
 
-    while(!tf1_found)
+    while(!tf1_found && rclcpp::ok())
     {
         geometry_msgs::msg::TransformStamped tf_stamped;
         try {
@@ -44,7 +44,7 @@ inline void populateTransforms(std::string slam_frame_id, std::string robot_base
         tf_SlamToLidar = translation_slam_lidar * quaternion_slam_lidar;
     }
 
-    while(!tf2_found)
+    while(!tf2_found && rclcpp::ok())
     {
         geometry_msgs::msg::TransformStamped tf_stamped;
         try {

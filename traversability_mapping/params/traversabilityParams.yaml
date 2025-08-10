@@ -17,11 +17,12 @@ use_pca_to_compute_normals: false
 # --- Traversability related ---
 security_distance: 0.40 # max(robot_length, robot_width)
 ground_clearance: 0.15
-max_slope: 0.6
-robot_height: 5.5
+max_slope: 0.4
+robot_height: 1.5
 translation_change_threshold: 0.25
 rotation_change_threshold: 0.2
 compute_roughness: true
+save_normals_to_csv: false
 
 # --- Mapping related ---
 num_local_keyframes: 10

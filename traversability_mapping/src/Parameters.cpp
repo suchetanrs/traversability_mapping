@@ -57,6 +57,7 @@ ParameterHandler::ParameterHandler(std::string yaml_file_path)
     parameter_map_["extend_length_every_resize_by"] = loaded_node["extend_length_every_resize_by"].as<double>();
     parameter_map_["use_pca_to_compute_normals"] = loaded_node["use_pca_to_compute_normals"].as<bool>();
     parameter_map_["use_least_squares_fit_to_compute_normals"] = loaded_node["use_least_squares_fit_to_compute_normals"].as<bool>();
+    parameter_map_["save_normals_to_csv"] = loaded_node["save_normals_to_csv"].as<bool>();
     
     parameter_map_["global_adjustment_sleep"] = loaded_node["global_adjustment_sleep"].as<int>();
 

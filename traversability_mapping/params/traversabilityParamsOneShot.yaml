@@ -22,6 +22,7 @@ robot_height: 5.5
 translation_change_threshold: 0.25
 rotation_change_threshold: 0.2
 compute_roughness: true
+save_normals_to_csv: false
 
 # --- Mapping related ---
 num_local_keyframes: 10
