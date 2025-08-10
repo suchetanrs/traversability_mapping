@@ -20,30 +20,26 @@
 #include <cmath>
 #include <iostream>
 #include <vector>
+#include <iomanip>
+#include <fstream>
+
+#include <traversability_mapping/Parameters.hpp>
 namespace traversability_mapping {
 class NodeMetaData{
 
 public:
     NodeMetaData(){
-        z_min_robot_frame = 100.;
-        z_max_robot_frame = -100.;
         sx = 0; sy = 0; sz = 0;  sx2 = 0; sy2 = 0; sz2 =0; sxy =0; sxz =0; syz = 0;
         N = 0;
     }
 
     void reset(){
-        z_min_robot_frame = 100.;
-        z_max_robot_frame = -100.;
         sx = 0; sy = 0; sz = 0;  sx2 = 0; sy2 = 0; sz2 =0; sxy =0; sxz =0; syz = 0;
         N = 0;
     }
 
-    void insert(const float xp, const float yp, const float zp, float xrp, float yrp, float zrp){
+    void insert(const float xp, const float yp, const float zp){
         N++;
-        // deal with min max
-        // TODO: Check logic of min and max.
-        z_min_robot_frame = std::min(zrp, z_min_robot_frame);
-        z_max_robot_frame = std::max(zrp, z_max_robot_frame);
 
         // update momentums
         sx += xp;
@@ -57,9 +53,21 @@ public:
         syz += yp*zp;
     }
 
+    void fuseWith(const NodeMetaData& data){
+        N     += data.N;
+        
+        sx    += data.sx;
+        sy    += data.sy;
+        sz    += data.sz;
+        sx2   += data.sx2;
+        sy2   += data.sy2;
+        sz2   += data.sz2;
+        sxy   += data.sxy;
+        sxz   += data.sxz;
+        syz   += data.syz;
+    }
+
     unsigned int N=0;
-    float z_min_robot_frame=0.;
-    float z_max_robot_frame=0.;
     float sx = 0.;
     float sy = 0.;
     float sz = 0.;
@@ -71,7 +79,11 @@ public:
     float syz = 0.;
 };
 
-
+struct Normals
+{
+    Eigen::Vector3d center;
+    Eigen::Quaterniond quaternion;
+};
 
 class traversabilityGrid {
 public:
@@ -93,11 +105,22 @@ public:
         halfsideY = _halfside.y();
         // _computeRoughness = parameterInstance.getValue<bool>("compute_roughness");
         _computeRoughness = false;
+
+        use_pca_to_compute_normals = parameterInstance.getValue<bool>("use_pca_to_compute_normals");
+        use_least_squares_fit_to_compute_normals = parameterInstance.getValue<bool>("use_least_squares_fit_to_compute_normals");
+        if (use_pca_to_compute_normals && use_least_squares_fit_to_compute_normals)
+        {
+            throw std::runtime_error("Both PCA and least squares fit are enabled. Please disable one of them.");
+        }
+        if (!use_pca_to_compute_normals && !use_least_squares_fit_to_compute_normals)
+        {
+            throw std::runtime_error("Both PCA and least squares fit are disabled. Please enable one of them.");
+        }
     }
 
     // @brief responsible for inserting a 3D point into the appropriate cell within the grid.
     // The appropriate cell here is that all points with the same x and y coordinates as the node in the grid map are grouped regardless of the z direction.
-    void insert_data(float xp, float yp, float zp, float xrp, float yrp, float zrp);
+    void insert_data(float xp, float yp, float zp);
 
     // @brief resets metadata for all cells in the grid.
     void reset(){ 
@@ -112,6 +135,9 @@ public:
     // @brief takes vector2d coordinates for which goodness needs to be calculated. These coordinates must be in indices (row and column of the traversability grid map).
     Eigen::Vector4d get_goodness(float index_x, float index_y, const double distance, const double ground_clearance, const double max_pitch);
     
+    // overall hazard, border hazard (sparsity), elevation, slope hazard, step hazard, roughness hazard
+    std::array<double, 6> get_goodness_v2(float index_x, float index_y, const double distance, const double ground_clearance, const double max_pitch);
+
     // @brief
     // void get_traversability(std::vector<Eigen::Matrix<double,6,1>> &cells, const double distance, const double ground_clearance, const double max_pitch);
 
@@ -141,7 +167,10 @@ public:
     std::vector<std::vector<NodeMetaData>>& getGrid() {
         return _grid;
     }
+    
+    void saveNormals(const std::string& filename) const;
 
+    std::vector<Normals> _normals;
 private :
     double _resolution;                           /// cell size
     bool _computeRoughness;
@@ -159,6 +188,8 @@ private :
     int size_y_;
 
     std::vector<std::vector<NodeMetaData>> _grid;
+    bool use_pca_to_compute_normals = false;
+    bool use_least_squares_fit_to_compute_normals = true;
 };
 }
 

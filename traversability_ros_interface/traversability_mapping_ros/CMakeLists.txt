@@ -97,9 +97,14 @@ add_executable(virtual_boundary_maker src/virtual_boundary_maker.cpp)
 ament_target_dependencies(virtual_boundary_maker ${dependencies})
 target_link_libraries(virtual_boundary_maker ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem traversability_mapping_common)
 
+# Add executable
+add_executable(one_shot_traversability src/one_shot_traversability.cpp)
+ament_target_dependencies(one_shot_traversability ${dependencies})
+target_link_libraries(one_shot_traversability ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem traversability_mapping_common)
+
 # Install executable 
 install(TARGETS
-    traversability_node multi_map_merge local_traversability threshold_occupancy virtual_boundary_maker
+    traversability_node multi_map_merge local_traversability threshold_occupancy virtual_boundary_maker one_shot_traversability
     DESTINATION lib/${PROJECT_NAME}
 )
 

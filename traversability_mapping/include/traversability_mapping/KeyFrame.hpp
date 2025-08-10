@@ -68,6 +68,8 @@ namespace traversability_mapping
 
         const long unsigned int &getConnections();
 
+        std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> getPointCloudLidarFrame();
+
         // SETTERS
         void setPose(const Eigen::Affine3f &pose);
 

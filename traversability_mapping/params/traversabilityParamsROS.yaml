@@ -15,6 +15,7 @@ max_slope: 0.8
 robot_height: 1.5
 translation_change_threshold: 0.25
 rotation_change_threshold: 0.30
+save_normals_to_csv: false
 
 # --- Mapping related ---
 num_local_keyframes: 10
