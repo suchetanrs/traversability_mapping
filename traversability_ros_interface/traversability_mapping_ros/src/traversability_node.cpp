@@ -107,7 +107,7 @@ public:
 private:
     void publishGlobalPointCloud(traversability_msgs::srv::GetGlobalPointcloud::Request::SharedPtr request, traversability_msgs::srv::GetGlobalPointcloud::Response::SharedPtr response)
     {
-        if (pclPublisher_->get_subscriber_count() == 0) {
+        if (pclPublisher_->get_subscription_count() == 0) {
             RCLCPP_WARN(get_logger(), "No subscribers for global pointcloud, not publishing.");
             return;
         }
