@@ -107,6 +107,13 @@ public:
 private:
     void publishGlobalPointCloud(traversability_msgs::srv::GetGlobalPointcloud::Request::SharedPtr request, traversability_msgs::srv::GetGlobalPointcloud::Response::SharedPtr response)
     {
+        if (pclPublisher_->get_subscriber_count() == 0) {
+            RCLCPP_WARN(get_logger(), "No subscribers for global pointcloud, not publishing.");
+            return;
+        }
+        if (pclPublisher_->get_subscription_count() > 1) {
+            RCLCPP_WARN_STREAM(get_logger(), "Subscription count " << pclPublisher_->get_subscription_count() << " is > 1, can cause problem with large pointclouds.");
+        }
         (void)response;
         // 1) grab the stitched PCL cloud (map-frame)
         auto cloud_ptr = traversabilitySystem_->getGlobalPointCloud(request->voxel_size_x, request->voxel_size_y, request->voxel_size_z);

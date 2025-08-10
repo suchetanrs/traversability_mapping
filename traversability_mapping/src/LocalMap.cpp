@@ -185,6 +185,7 @@ namespace traversability_mapping
             {
                 try
                 {
+                    std::cout << "Processing keyframe for writing to disk: " << entry.first << std::endl;
 
                     auto & kfPtr = entry.second;
                     // get the raw lidar cloud (in velodyne frame)
@@ -209,11 +210,13 @@ namespace traversability_mapping
                 }
             }
         }
+        std::cout << "Completed processing keyframes. Filtering using voxel filter..." << std::endl;
         pcl::PointCloud<pcl::PointXYZ> filtered;
         pcl::VoxelGrid<pcl::PointXYZ> vg;
         vg.setInputCloud(stitched);
         vg.setLeafSize(voxel_size_x, voxel_size_y, voxel_size_z);
         vg.filter(filtered);
+        std::cout << "Completed. Returning built pointcloud." << std::endl;
         return filtered.makeShared();
     }
 

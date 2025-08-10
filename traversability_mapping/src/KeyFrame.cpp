@@ -182,6 +182,7 @@ namespace traversability_mapping
         const double ground_clearance_ = parameterInstance.getValue<double>("ground_clearance");
         const double max_slope_ = parameterInstance.getValue<double>("max_slope");
         double robot_height_ = parameterInstance.getValue<double>("robot_height");
+        bool save_normals_to_csv = parameterInstance.getValue<bool>("save_normals_to_csv");
         Eigen::Vector2d traversabilityPose2D;
         traversabilityPose2D.x() = traversabilityPose.translation().x();
         traversabilityPose2D.y() = traversabilityPose.translation().y();
@@ -301,7 +302,10 @@ namespace traversability_mapping
         }
         // std::cout << "Grid count: " << grid_count << " KF ID: " << kfID_;
         // map.setPosition(traversabilityPose2D);
-        traversabilityMap->saveNormals("/root/cell_normals.txt");
+        if(save_normals_to_csv)
+        {
+            traversabilityMap->saveNormals("/root/cell_normals.txt");
+        }
     }
 
     void KeyFrame::recomputeCache(bool useHashGrid)
