@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.14)
 project(traversability_mapping_common VERSION 1.0)
 
 IF(NOT CMAKE_BUILD_TYPE)
@@ -37,9 +37,7 @@ target_include_directories(traversability_mapping_common
 if(sensor_msgs_FOUND)
     ADD_DEFINITIONS("-DWITH_ROS2_SENSOR_MSGS")
     target_include_directories(traversability_mapping_common
-        PUBLIC 
-            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-            $<INSTALL_INTERFACE:include>
+        PUBLIC
             ${sensor_msgs_INCLUDE_DIRS}
     )
 endif(sensor_msgs_FOUND)
