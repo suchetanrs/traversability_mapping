@@ -59,7 +59,7 @@ public:
         this->declare_parameter("publish_grid_on_addition", rclcpp::ParameterValue(true));
         this->get_parameter("publish_grid_on_addition", publish_grid_on_addition_);
 
-        ParameterHandler::getInstance(parameter_file_path_);
+        traversability_mapping::ParameterHandler::getInstance(parameter_file_path_);
 
         bool kf_opt;
         this->declare_parameter("is_kf_optimization_enabled", rclcpp::ParameterValue(false));
@@ -67,7 +67,6 @@ public:
 
         RCLCPP_WARN_STREAM(this->get_logger(), "Using lidar pointcloud? " << use_lidar_pointcloud_);
         parameterInstance.setValue<bool>("is_kf_optimization_enabled", kf_opt);
-        parameterInstance.setValue<std::string>("SLAM_System", "ISAE");
 
         tf_buffer_ptr_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
         tf_listener_ptr_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_ptr_);

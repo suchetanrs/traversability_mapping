@@ -57,7 +57,7 @@ public:
         this->get_parameter("parameter_file_path", parameter_file_path_);
         RCLCPP_INFO_STREAM(this->get_logger(), "Parameter file path: " << parameter_file_path_);
 
-        ParameterHandler::getInstance(parameter_file_path_);
+        traversability_mapping::ParameterHandler::getInstance(parameter_file_path_);
 
         pcl_subscriber_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
             pointcloud_topic_name_, 1, std::bind(&LocalTraversabilityNode::pointCloudCallback, this, std::placeholders::_1));

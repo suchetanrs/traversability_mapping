@@ -10,28 +10,22 @@
  * License along with this library.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-#ifndef PARAMETER_HPP_
-#define PARAMETER_HPP_
+#ifndef TRAVERSABILITY_PARAMETERS_HPP_
+#define TRAVERSABILITY_PARAMETERS_HPP_
 
 #include <iostream>
+#include <memory>
 #include <unordered_map>
-#include <chrono>
 #include <string>
-#include <fstream>
-#include <thread>
 #include <mutex>
-#include <random>
-#include <ctime>
-
-#include <iomanip>
-#include <sstream>
-#include <ctime>
 #include <stdexcept>
 #include <yaml-cpp/yaml.h>
 #include <boost/any.hpp>
 
 #include "ament_index_cpp/get_package_share_directory.hpp"
 
+namespace traversability_mapping
+{
 class ParameterHandler
 {
   public:
@@ -46,20 +40,18 @@ class ParameterHandler
     }
 
     template <typename T>
-    T getValue(std::string parameterKey)
+    T getValue(const std::string& parameterKey) const
     {
-        if (parameter_map_.find(parameterKey) != parameter_map_.end())
+        auto it = parameter_map_.find(parameterKey);
+        if (it != parameter_map_.end())
         {
             // std::cout << "\e[0;106m" << "Got request for: " << parameterKey << "\e[m" << std::endl;
-            // std::cout << "\e[0;106m" << "Returning value " << boost::any_cast<T>(parameter_map_[parameterKey]) << " for parameter " << parameterKey
+            // std::cout << "\e[0;106m" << "Returning value " << boost::any_cast<T>(it->second) << " for parameter " << parameterKey
             //           << "\e[m" << std::endl;
-            return boost::any_cast<T>(parameter_map_[parameterKey]);
+            return boost::any_cast<T>(it->second);
         }
-        else
-        {
-            // TODO : Handle this runtime error.
-            throw std::runtime_error("Parameter " + parameterKey + " is not found in the map");
-        }
+        // TODO : Handle this runtime error.
+        throw std::runtime_error("Parameter " + parameterKey + " is not found in the map");
     }
 
     template <typename T>
@@ -74,7 +66,8 @@ class ParameterHandler
     static std::mutex instanceMutex_;
     std::unordered_map<std::string, boost::any> parameter_map_;
 };
+} // namespace traversability_mapping
 
-#define parameterInstance (ParameterHandler::getInstance())
+#define parameterInstance (::traversability_mapping::ParameterHandler::getInstance())
 
 #endif
