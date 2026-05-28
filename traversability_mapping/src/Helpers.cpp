@@ -18,7 +18,7 @@ namespace traversability_mapping
         const pcl::PointCloud<pcl::PointXYZ> &p_in, pcl::PointCloud<pcl::PointXYZ> &p_out,
         const Eigen::Affine3f &t)
     {
-        pcl:: transformPointCloud(p_in, p_out, t);
+        pcl::transformPointCloud(p_in, p_out, t);
     }
 #ifdef WITH_ROS2_SENSOR_MSGS
     void gridMapToOccupancyGrid(

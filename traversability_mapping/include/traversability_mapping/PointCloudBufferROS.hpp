@@ -18,19 +18,19 @@
 #include <chrono>
 #include <iostream>
 #include <mutex>
+
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
+
 #include "traversability_mapping/Helpers.hpp"
 #include "traversability_mapping_common/type_conversion.hpp"
-
-using namespace std::chrono_literals;
 
 namespace traversability_mapping
 {
     class PointCloudBufferROS
     {
     public:
-        PointCloudBufferROS();
+        PointCloudBufferROS() = default;
 #ifdef WITH_ROS2_SENSOR_MSGS
 
         void addPointCloud(sensor_msgs::msg::PointCloud2::SharedPtr pointCloud, double timestamp);
@@ -48,4 +48,4 @@ namespace traversability_mapping
     };
 }
 
-#endif // POINTCLOUDBUFFER_HPP_
+#endif // POINTCLOUDBUFFERROS_HPP_
