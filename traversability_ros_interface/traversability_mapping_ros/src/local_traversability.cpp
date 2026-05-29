@@ -106,7 +106,7 @@ private:
         try
         {
             // transformStamped = tf_buffer_ptr_->lookupTransform("odom", static_cast<std::string>(this->get_namespace()).substr(1) + "/map", tf2::TimePointZero);
-            transformStamped = tf_buffer_ptr_->lookupTransform("odom", slam_frame_, tf2::TimePointZero);
+            transformStamped = tf_buffer_ptr_->lookupTransform("map", slam_frame_, tf2::TimePointZero);
         }
         catch (tf2::TransformException &ex)
         {
@@ -141,6 +141,10 @@ private:
             if (publish_local_gridmap_)
             {
                 auto message = *grid_map::GridMapRosConverter::toMessage(*pGridMap_);
+                message.info.pose.position.x = transformStamped.transform.translation.x - parameterInstance.getValue<double>("half_size_traversability");
+                message.info.pose.position.y = transformStamped.transform.translation.y - parameterInstance.getValue<double>("half_size_traversability");
+                message.header.frame_id = "odom";
+                message.header.stamp = msg->header.stamp;
                 traversabilityPub_->publish(message);
             }
             keyframe_->clearStrayValuesInGrid();

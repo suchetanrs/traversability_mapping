@@ -30,7 +30,7 @@ namespace traversability_mapping
     class PointCloudBufferROS
     {
     public:
-        PointCloudBufferROS() = default;
+        PointCloudBufferROS();
 #ifdef WITH_ROS2_SENSOR_MSGS
 
         void addPointCloud(sensor_msgs::msg::PointCloud2::SharedPtr pointCloud, double timestamp);

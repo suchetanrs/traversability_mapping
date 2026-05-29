@@ -18,6 +18,7 @@
       slam_frame: base_footprint
       robot_base_frame: base_footprint
       lidar_frame: lidar_link
+      publish_local_gridmap: true
 
   traversability_threshold_node:
     ros__parameters:
