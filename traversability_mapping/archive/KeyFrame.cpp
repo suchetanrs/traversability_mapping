@@ -111,16 +111,6 @@ namespace traversability_mapping
         }
         else
         {
-            // // Measure if the pose has significantly changed wrt the the thresholds.
-            // Eigen::Vector3f eulerAnglesDiff = (poseTraversabilityCoord_->rotation() * pose.rotation().transpose()).eulerAngles(2, 0, 1);
-            // Eigen::Vector3f translationDiff = poseTraversabilityCoord_->translation() - pose.translation();
-            // // std::cout << "Max angle:" << eulerAnglesDiff.maxCoeff() << std::endl;
-            // // std::cout << "Max adist:" << translationDiff.maxCoeff() << std::endl;
-            // if (eulerAnglesDiff.maxCoeff() > parameterInstance.getValue<double>("rotation_change_threshold") ||
-            //     translationDiff.maxCoeff() > parameterInstance.getValue<double>("translation_change_threshold"))
-            // {
-            // }
-
             *poseTraversabilityCoord_ = pose;
             newPose = true;
         }

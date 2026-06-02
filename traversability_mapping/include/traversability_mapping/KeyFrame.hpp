@@ -13,110 +13,58 @@
 #ifndef KEYFRAME_HPP_
 #define KEYFRAME_HPP_
 
-#include <mutex>
-#include <vector>
-#include <thread>
-#include <deque>
-#include <sophus/se3.hpp>
-#include <pcl/point_cloud.h>
-#include <pcl/point_types.h>
-#ifdef WITH_ROS2_SENSOR_MSGS
-#include <nav_msgs/msg/occupancy_grid.hpp>
-#endif
-#include <grid_map_core/GridMap.hpp>
-#include <grid_map_core/iterators/GridMapIterator.hpp>
+// Lean, ROS-free keyframe record for the moment-fused global map.
+//
+// A keyframe owns ONLY its own contribution to the global grid:
+//   * its latest (post-PGO) pose,
+//   * the per-cell moments it added, keyed by ABSOLUTE lattice cell id.
+//
+// The cell-id keys ARE the "list of cells it wrote to" (set M). They are stored
+// exactly (no neighbours) so the contribution can be subtracted out exactly when
+// the keyframe's pose is later corrected. The node owns the global grid_map and
+// performs all grid arithmetic; the keyframe never touches the grid directly.
+//
+// The raw lidar cloud is intentionally NOT stored yet (the partition is frozen,
+// so no re-binning is needed for small PGO updates). It will be added back when
+// true re-binning for large pose changes is implemented.
 
-#include "traversability_mapping/TraversabilityGrid.hpp"
-#include "traversability_mapping/Helpers.hpp"
-#include "traversability_mapping/Parameters.hpp"
-#include "traversability_mapping/HashGrid.hpp"
+#include <cstdint>
+#include <unordered_map>
+#include <Eigen/Geometry>
+
+#include "traversability_mapping/Moments.hpp"
 
 namespace traversability_mapping
 {
     class KeyFrame
     {
     public:
-        // Tsv: T_slam_to_velodyne
-        // Tbs: T_basefootprint_to_slam
-        KeyFrame(double timestamp,
-                 long unsigned int kfID,
-                 pcl::PointCloud<pcl::PointXYZ> &pointCloud,
-                 std::shared_ptr<grid_map::GridMap> gridMap,
-                 std::shared_ptr<std::mutex> masterGridMapMutex,
-                 long unsigned int mapID,
-                 Eigen::Affine3f Tsv,
-                 Eigen::Affine3f Tbs);
+        KeyFrame(std::uint64_t id, const Eigen::Affine3f &Tm_base)
+            : id_(id), pose_(Tm_base) {}
 
-        // Tsv: T_slam_to_velodyne
-        // Tbs: T_basefootprint_to_slam
-        KeyFrame(long unsigned int kfID,
-                 std::shared_ptr<grid_map::GridMap> gridMap,
-                 std::shared_ptr<std::mutex> masterGridMapMutex,
-                 Eigen::Affine3f Tsv,
-                 Eigen::Affine3f Tbs);
-        
-        ~KeyFrame();
+        std::uint64_t id() const { return id_; }
 
-        // GETTERS
-        const double &getTimestamp();
+        const Eigen::Affine3f &pose() const { return pose_; }
+        void setPose(const Eigen::Affine3f &p) { pose_ = p; }
 
-        const long unsigned int &getKfID();
+        /// Accumulate one point (already expressed in the cell-local frame of
+        /// `cellId`, i.e. relative to that cell's centre) into this keyframe's
+        /// contribution.
+        inline void addPoint(std::uint64_t cellId, double lx, double ly, double lz)
+        {
+            partials_[cellId].insert(lx, ly, lz);
+        }
 
-        const Eigen::Affine3f &getPose();
+        std::unordered_map<std::uint64_t, NodeMetaData> &partials() { return partials_; }
+        const std::unordered_map<std::uint64_t, NodeMetaData> &partials() const { return partials_; }
 
-        const Sophus::SE3f &getSLAMPose();
-
-        const long unsigned int &getConnections();
-
-        std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> getPointCloudLidarFrame();
-
-        // SETTERS
-        void setPose(const Eigen::Affine3f &pose);
-
-        void setSLAMPose(const Sophus::SE3f &pose);
-
-        void setMap(long unsigned int mapID, std::shared_ptr<grid_map::GridMap> gridMap, std::shared_ptr<std::mutex> masterGridMapMutex);
-
-        void setConnections(long unsigned int numConnections);
-
-        // TRAVERSABILITY FUNCTION
-        // kFpcl : pointcloud transformed into the world frame.
-        // traversabilityPose : the pose of the robot in map frame. This is the !!base_footprint!! in the map frame.
-        void computeLocalTraversability(pcl::PointCloud<pcl::PointXYZ> &kFpcl, Eigen::Affine3f& traversabilityPose);
-
-        // CACHE RECOMPUTE
-        void recomputeCache(bool useHashGrid);
-
-        void processUpdateQueue();
-
-        void updateGridAfterMapChange();
-
-        void clearStrayValuesInGrid();
+        bool empty() const { return partials_.empty(); }
 
     private:
-        // set only one time in constructor. thread safety not needed since it is only read.
-        double timestamp_;
-        long unsigned int kfID_;
-        std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> pointCloudLidar_;
-        Eigen::Affine3f Tsv_; // transform from slam frame to velodyne (lidar) frame.
-        Eigen::Affine3f Tsb_; // transform from slam frame to base_footprint frame.
-
-        std::mutex connectionMutex_;
-        long unsigned int numConnections_;
-
-        std::mutex poseMutex_;
-        std::unique_ptr<Sophus::SE3f> poseSLAMCoord_;
-        std::unique_ptr<Eigen::Affine3f> poseTraversabilityCoord_;
-        
-        std::mutex gridMapMutex_; // this mutex prevents access of pGridMap_ when pGridMap_ itself is changing.
-        std::shared_ptr<std::mutex> masterGridMapMutex_; // this mutex prevents concurrency between kfs.
-        std::shared_ptr<grid_map::GridMap> pGridMap_;
-        long unsigned int parentMapID_;
-        std::vector<Eigen::Vector2d> markedCells_;
-
-        std::mutex poseUpdateQueueMutex_;
-        std::deque<Eigen::Affine3f> poseUpdates_; //< Vector to store the pose updates to be processed later.
+        std::uint64_t id_;
+        Eigen::Affine3f pose_;                                       ///< map <- base_footprint
+        std::unordered_map<std::uint64_t, NodeMetaData> partials_;   ///< cellId -> cell-local moments
     };
-}
+}  // namespace traversability_mapping
 
-#endif // KEYFRAME_HPP_
+#endif  // KEYFRAME_HPP_

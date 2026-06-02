@@ -28,16 +28,11 @@ find_package(nav_msgs)
 find_package(ament_cmake REQUIRED)
 find_package(ament_index_cpp REQUIRED)
 # Create library target
+# Moment-fused core: KeyFrame and the moment/PCA maths are header-only
+# (Moments.hpp / KeyFrame.hpp); only Parameters and Helpers need compiling.
 set(SOURCE_FILES
     src/Parameters.cpp
     src/Helpers.cpp
-    src/HashGrid.cpp
-    src/TraversabilityGrid.cpp
-    src/KeyFrame.cpp
-    src/LocalMap.cpp
-    src/PointCloudBuffer.cpp
-    src/PointCloudBufferROS.cpp
-    src/System.cpp
 )
 
 add_library(traversabilitySystem SHARED ${SOURCE_FILES})
@@ -95,12 +90,13 @@ configure_package_config_file(
 )
 
 # Add executable
-add_executable(traversabilityMapping src/main.cpp)
+# add_executable(traversabilityMapping src/main.cpp)
 
-# Link the executable with the traversabilitySystem library
-target_link_libraries(traversabilityMapping traversabilitySystem)
+# # Link the executable with the traversabilitySystem library
+# target_link_libraries(traversabilityMapping traversabilitySystem)
 
-install(TARGETS traversabilitySystem traversabilityMapping
+install(TARGETS traversabilitySystem 
+# traversabilityMapping
     EXPORT export_${PROJECT_NAME}
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
@@ -125,6 +121,16 @@ install(FILES
 install(DIRECTORY include/ DESTINATION include)
 install(DIRECTORY params/ DESTINATION params)
 install(DIRECTORY params/ DESTINATION share/${PROJECT_NAME}/params/)
+
+# --- Tests (Eigen-only moment core; no ROS needed) ---
+if(BUILD_TESTING)
+    find_package(ament_cmake_gtest REQUIRED)
+    ament_add_gtest(test_moments test/test_moments.cpp)
+    target_include_directories(test_moments PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${EIGEN3_INCLUDE_DIR}
+    )
+endif()
 
 ament_export_include_directories(include)
 ament_export_libraries(traversabilitySystem)
