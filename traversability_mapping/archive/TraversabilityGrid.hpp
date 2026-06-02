@@ -128,12 +128,6 @@ public:
             for(int j=0; j < size_y_; ++j)
                 _grid.at(i).at(j).reset();
     }
-
-    // @brief takes vector2d coordinates for which goodness needs to be calculated. These coordinates can be in meters.
-    Eigen::Vector4d get_goodness_m(float xp, float yp, const double distance, const double ground_clearance, const double max_pitch);
-    
-    // @brief takes vector2d coordinates for which goodness needs to be calculated. These coordinates must be in indices (row and column of the traversability grid map).
-    Eigen::Vector4d get_goodness(float index_x, float index_y, const double distance, const double ground_clearance, const double max_pitch);
     
     // overall hazard, border hazard (sparsity), elevation, slope hazard, step hazard, roughness hazard
     std::array<double, 6> get_goodness_v2(float index_x, float index_y, const double distance, const double ground_clearance, const double max_pitch);

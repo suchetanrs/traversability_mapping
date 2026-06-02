@@ -52,8 +52,17 @@ def generate_launch_description():
             namespace=namespace,
             output='screen',
             parameters=[params_file, {"parameter_file_path": traversability_params_file}])
-        
-        return [declare_params_file_cmd, declare_traversability_params_file_cmd, traversability_mapping_ros]
+
+        # Ground-truth keyframe source: publishes KeyFrameAdditions from odom + cloud.
+        keyframe_simulator = Node(
+            package='ground_truth_kfs',
+            executable='slam_keyframe_pcl_simulator',
+            namespace=namespace,
+            output='screen',
+            parameters=[params_file])
+
+        return [declare_params_file_cmd, declare_traversability_params_file_cmd,
+                traversability_mapping_ros, keyframe_simulator]
 
     opaque_function = OpaqueFunction(function=all_nodes_launch)
 #---------------------------------------------
