@@ -39,21 +39,17 @@ namespace traversability_mapping
     class KeyFrame
     {
     public:
-        KeyFrame(std::uint64_t id, const Eigen::Affine3f &Tm_base)
-            : id_(id), pose_(Tm_base) {}
+        KeyFrame(std::uint64_t id, const Eigen::Affine3f &Tm_base);
 
         std::uint64_t id() const { return id_; }
 
         const Eigen::Affine3f &pose() const { return pose_; }
-        void setPose(const Eigen::Affine3f &p) { pose_ = p; }
+        void setPose(const Eigen::Affine3f &p);
 
         /// Accumulate one point (already expressed in the cell-local frame of
         /// `cellId`, i.e. relative to that cell's centre) into this keyframe's
         /// contribution.
-        inline void addPoint(std::uint64_t cellId, double lx, double ly, double lz)
-        {
-            partials_[cellId].insert(lx, ly, lz);
-        }
+        void addPoint(std::uint64_t cellId, double lx, double ly, double lz);
 
         std::unordered_map<std::uint64_t, NodeMetaData> &partials() { return partials_; }
         const std::unordered_map<std::uint64_t, NodeMetaData> &partials() const { return partials_; }

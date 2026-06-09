@@ -46,6 +46,8 @@ ParameterHandler::ParameterHandler(std::string yaml_file_path)
     parameter_map_["ground_clearance"] = loaded_node["ground_clearance"].as<double>();
     parameter_map_["max_slope"] = loaded_node["max_slope"].as<double>();
     parameter_map_["robot_height"] = loaded_node["robot_height"].as<double>();
+    parameter_map_["max_range_base_frame"] = loaded_node["max_range_base_frame"].as<double>();
+    parameter_map_["min_range_base_frame"] = loaded_node["min_range_base_frame"].as<double>();
 
     // --- Plane-fit gates ---
     parameter_map_["min_vicinity_points"] = loaded_node["min_vicinity_points"].as<int>();

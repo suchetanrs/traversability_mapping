@@ -6,6 +6,7 @@ Panels:
       Expanded:
         - /Global Options1
         - /Status1
+        - /PointCloud21
         - /GridMap1
         - /Base link1
         - /Local traversability1
@@ -29,7 +30,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: PointCloud2
+    SyncSource: ""
 Visualization Manager:
   Class: ""
   Displays:
@@ -54,14 +55,14 @@ Visualization Manager:
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
-        Max Value: 1.4847359657287598
-        Min Value: -0.014816522598266602
+        Max Value: 6.988055229187012
+        Min Value: -0.05824613571166992
         Value: true
       Axis: Z
       Channel Name: intensity
       Class: rviz_default_plugins/PointCloud2
       Color: 255; 255; 255
-      Color Transformer: FlatColor
+      Color Transformer: AxisColor
       Decay Time: 0
       Enabled: true
       Invert Rainbow: false
@@ -88,10 +89,10 @@ Visualization Manager:
       Autocompute Intensity Bounds: true
       Class: grid_map_rviz_plugin/GridMap
       Color: 200; 200; 200
-      Color Layer: slope_haz
+      Color Layer: step_haz
       Color Transformer: IntensityLayer
       Enabled: true
-      Height Layer: slope_haz
+      Height Layer: elevation
       Height Transformer: GridMapLayer
       History Length: 1
       Invert Rainbow: false
@@ -107,14 +108,14 @@ Visualization Manager:
         Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /RTQuadtree_struct
+        Value: /global_traversability_gridmap
       Use Rainbow: true
       Value: true
     - Class: rviz_default_plugins/Axes
       Enabled: true
-      Length: 2
+      Length: 1
       Name: Base link
-      Radius: 0.6000000238418579
+      Radius: 0.20000000298023224
       Reference Frame: base_link
       Value: true
     - Alpha: 0.699999988079071
@@ -223,25 +224,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/ThirdPersonFollower
-      Distance: 26.407211303710938
+      Distance: 8.383753776550293
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -5.093364238739014
-        Y: 6.44915246963501
-        Z: 0.1500067114830017
+        X: -0.9717378616333008
+        Y: 0.6148520708084106
+        Z: 0.14999523758888245
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.4347979426383972
-      Target Frame: robot_0/base_link
+      Pitch: 0.3047966957092285
+      Target Frame: base_link
       Value: ThirdPersonFollower (rviz_default_plugins)
-      Yaw: 2.418576240539551
+      Yaw: 3.122389793395996
     Saved: ~
 Window Geometry:
   Displays:

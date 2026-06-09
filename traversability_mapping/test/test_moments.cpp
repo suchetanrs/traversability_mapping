@@ -6,7 +6,9 @@
  */
 #include <gtest/gtest.h>
 #include <traversability_mapping/Moments.hpp>
+#include <traversability_mapping/TraversabilityMetrics.hpp>
 
+#include <functional>
 #include <random>
 
 using traversability_mapping::NodeMetaData;
