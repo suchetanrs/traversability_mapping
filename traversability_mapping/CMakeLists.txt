@@ -28,11 +28,12 @@ find_package(nav_msgs)
 find_package(ament_cmake REQUIRED)
 find_package(ament_index_cpp REQUIRED)
 # Create library target
-# Moment-fused core: KeyFrame and the moment/PCA maths are header-only
-# (Moments.hpp / KeyFrame.hpp); only Parameters and Helpers need compiling.
 set(SOURCE_FILES
     src/Parameters.cpp
     src/Helpers.cpp
+    src/Moments.cpp
+    src/TraversabilityMetrics.cpp
+    src/KeyFrame.cpp
 )
 
 add_library(traversabilitySystem SHARED ${SOURCE_FILES})
@@ -122,7 +123,10 @@ install(DIRECTORY include/ DESTINATION include)
 install(DIRECTORY params/ DESTINATION params)
 install(DIRECTORY params/ DESTINATION share/${PROJECT_NAME}/params/)
 
-# --- Tests (Eigen-only moment core; no ROS needed) ---
+# --- Tests (moment core + metrics; no ROS needed) ---
+# Linking traversabilitySystem gives the moment/metric symbols and, transitively,
+# grid_map_core's include dir + the Eigen-plugin compile definition it injects
+# (both are needed together, otherwise Eigen can't find the plugin header).
 if(BUILD_TESTING)
     find_package(ament_cmake_gtest REQUIRED)
     ament_add_gtest(test_moments test/test_moments.cpp)
@@ -130,6 +134,7 @@ if(BUILD_TESTING)
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${EIGEN3_INCLUDE_DIR}
     )
+    target_link_libraries(test_moments traversabilitySystem)
 endif()
 
 ament_export_include_directories(include)

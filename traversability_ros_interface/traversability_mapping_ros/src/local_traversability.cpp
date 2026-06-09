@@ -36,6 +36,7 @@
 
 #include "traversability_mapping/KeyFrame.hpp"
 #include "traversability_mapping/Moments.hpp"
+#include "traversability_mapping/TraversabilityMetrics.hpp"
 #include "traversability_mapping/Helpers.hpp"
 #include "traversability_mapping/Parameters.hpp"
 
@@ -78,6 +79,8 @@ public:
         ground_clearance_ = parameterInstance.getValue<double>("ground_clearance");
         max_slope_ = parameterInstance.getValue<double>("max_slope");
         robot_height_ = parameterInstance.getValue<double>("robot_height");
+        max_range_base_frame_ = parameterInstance.getValue<double>("max_range_base_frame");
+        min_range_base_frame_ = parameterInstance.getValue<double>("min_range_base_frame");
         security_distance_ = parameterInstance.getValue<double>("security_distance");
         min_vicinity_points_ = static_cast<unsigned int>(parameterInstance.getValue<int>("min_vicinity_points"));
         min_occupied_fraction_ = parameterInstance.getValue<double>("min_occupied_fraction");
@@ -340,6 +343,10 @@ private:
             const Eigen::Vector3f p_base = Tbv_ * Eigen::Vector3f(p.x, p.y, p.z);
             if (p_base.z() > static_cast<float>(robot_height_))
                 continue;  // ceiling / overhang
+            const float range = p_base.norm();
+            if (range > static_cast<float>(max_range_base_frame_) ||
+                range < static_cast<float>(min_range_base_frame_))
+                continue;  // out of range
             const Eigen::Vector3f p_map = Tmb * p_base;
             map_pts.push_back(p_map);
             minx = std::min(minx, (double)p_map.x()); maxx = std::max(maxx, (double)p_map.x());
@@ -414,19 +421,21 @@ private:
 
     void publish()
     {
-        if (occupancy_pub_->get_subscription_count() == 0 &&
-            gridmap_pub_->get_subscription_count() == 0)
-            return;
+        if (occupancy_pub_->get_subscription_count() > 0)
+        {
+            nav_msgs::msg::OccupancyGrid og;
+            tmap::gridMapToOccupancyGrid(gridMap_, "hazard", 0.f, 1.f, og);  // sets frame + origin
+            og.header.stamp = now();
+            occupancy_pub_->publish(og);
+        }
 
-        nav_msgs::msg::OccupancyGrid og;
-        tmap::gridMapToOccupancyGrid(gridMap_, "hazard", 0.f, 1.f, og);  // sets frame + origin
-        og.header.stamp = now();
-        occupancy_pub_->publish(og);
-
-        auto gm = grid_map::GridMapRosConverter::toMessage(gridMap_);
-        gm->header.frame_id = map_frame_;
-        gm->header.stamp = now();
-        gridmap_pub_->publish(*gm);
+        if (gridmap_pub_->get_subscription_count() > 0)
+        {
+            auto gm = grid_map::GridMapRosConverter::toMessage(gridMap_);
+            gm->header.frame_id = map_frame_;
+            gm->header.stamp = now();
+            gridmap_pub_->publish(*gm);
+        }
     }
 
     // ---- members ------------------------------------------------------------
@@ -441,6 +450,7 @@ private:
     Eigen::Affine3f Tsv_, Tbs_, Tbv_;
 
     double res_, ground_clearance_, max_slope_, robot_height_, security_distance_, min_occupied_fraction_;
+    double max_range_base_frame_, min_range_base_frame_;
     unsigned int min_vicinity_points_;
     int delta_ind_;
 
