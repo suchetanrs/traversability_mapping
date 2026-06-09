@@ -12,13 +12,13 @@
  * Pipeline (additions, GT-driven):
  *   KeyFrameAdditions -> transform cloud to map -> filter -> bin into
  *   cell-local moments on the absolute lattice -> ADD into the grid moment
- *   layers -> recompute hazards over the dilated dirty set. A 1 Hz timer
- *   publishes the whole map. KeyFrameUpdates (PGO) subtract the old
+ *   layers -> recompute hazards over the dilated dirty set. A timer publishes
+ *   only the nav-facing subset of layers (nav_layers_) as a grid_map message
+ *   from the single internal map. KeyFrameUpdates (PGO) subtract the old
  *   contribution, transform it, and re-add (frozen partition).
  */
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
-#include <nav_msgs/msg/occupancy_grid.hpp>
 
 #include <grid_map_core/GridMap.hpp>
 #include <grid_map_core/iterators/GridMapIterator.hpp>
@@ -101,7 +101,13 @@ public:
 
         // --- Global grid_map ---
         layers_ = {"N", "sx", "sy", "sz", "sx2", "sy2", "sz2", "sxy", "sxz", "syz",
-                   "hazard", "elevation", "slope_haz", "step_haz", "roughness_haz"};
+                   "hazard", "elevation", "slope_haz", "step_haz", "roughness_haz",
+                   "normal_x", "normal_y", "normal_z"};
+        // Subset of layers_ published to navigation. This is the ONLY thing nav
+        // receives; edit this list (entries must exist in layers_) to add/remove
+        // a nav layer without touching the internal map.
+        nav_layers_ = {"normal_x", "normal_y", "normal_z",
+                       "step_haz", "elevation", "roughness_haz"};
         const double half = parameterInstance.getValue<double>("half_size_traversability");
         gridMap_ = freshMap(half, half);
 
@@ -113,8 +119,6 @@ public:
             updates_topic_, 10,
             std::bind(&GlobalTraversabilityNode::updatesCallback, this, std::placeholders::_1));
 
-        occupancy_pub_ = create_publisher<nav_msgs::msg::OccupancyGrid>(
-            "global_traversability_map", rclcpp::QoS(1).transient_local());
         gridmap_pub_ = create_publisher<grid_map_msgs::msg::GridMap>(
             "global_traversability_gridmap", rclcpp::QoS(1).transient_local());
 
@@ -292,12 +296,18 @@ private:
                 gridMap_.atPosition("slope_haz", qp) = std::numeric_limits<float>::quiet_NaN();
                 gridMap_.atPosition("step_haz", qp) = std::numeric_limits<float>::quiet_NaN();
                 gridMap_.atPosition("roughness_haz", qp) = std::numeric_limits<float>::quiet_NaN();
+                gridMap_.atPosition("normal_x", qp) = std::numeric_limits<float>::quiet_NaN();
+                gridMap_.atPosition("normal_y", qp) = std::numeric_limits<float>::quiet_NaN();
+                gridMap_.atPosition("normal_z", qp) = std::numeric_limits<float>::quiet_NaN();
                 continue;
             }
             gridMap_.atPosition("hazard", qp) = static_cast<float>(haz[tmap::HAZ_OVERALL]);
             gridMap_.atPosition("slope_haz", qp) = static_cast<float>(haz[tmap::HAZ_SLOPE]);
             gridMap_.atPosition("step_haz", qp) = static_cast<float>(haz[tmap::HAZ_STEP]);
             gridMap_.atPosition("roughness_haz", qp) = static_cast<float>(haz[tmap::HAZ_ROUGHNESS]);
+            gridMap_.atPosition("normal_x", qp) = static_cast<float>(haz[tmap::HAZ_NORMAL_X]);
+            gridMap_.atPosition("normal_y", qp) = static_cast<float>(haz[tmap::HAZ_NORMAL_Y]);
+            gridMap_.atPosition("normal_z", qp) = static_cast<float>(haz[tmap::HAZ_NORMAL_Z]);
         }
     }
 
@@ -421,21 +431,13 @@ private:
 
     void publish()
     {
-        if (occupancy_pub_->get_subscription_count() > 0)
-        {
-            nav_msgs::msg::OccupancyGrid og;
-            tmap::gridMapToOccupancyGrid(gridMap_, "hazard", 0.f, 1.f, og);  // sets frame + origin
-            og.header.stamp = now();
-            occupancy_pub_->publish(og);
-        }
-
-        if (gridmap_pub_->get_subscription_count() > 0)
-        {
-            auto gm = grid_map::GridMapRosConverter::toMessage(gridMap_);
-            gm->header.frame_id = map_frame_;
-            gm->header.stamp = now();
-            gridmap_pub_->publish(*gm);
-        }
+        if (gridmap_pub_->get_subscription_count() == 0)
+            return;
+        // Publish ONLY the nav subset of layers from the single internal map.
+        auto gm = grid_map::GridMapRosConverter::toMessage(gridMap_, nav_layers_);
+        gm->header.frame_id = map_frame_;
+        gm->header.stamp = now();
+        gridmap_pub_->publish(*gm);
     }
 
     // ---- members ------------------------------------------------------------
@@ -443,7 +445,8 @@ private:
     std::string slam_frame_, robot_base_frame_, lidar_frame_, map_frame_;
 
     tmap::Lattice lattice_;
-    std::vector<std::string> layers_;
+    std::vector<std::string> layers_;       // all internal layers (moments + hazards)
+    std::vector<std::string> nav_layers_;   // subset published to navigation
     grid_map::GridMap gridMap_;
     std::unordered_map<std::uint64_t, std::shared_ptr<tmap::KeyFrame>> keyframes_;
 
@@ -458,7 +461,6 @@ private:
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
     rclcpp::Subscription<traversability_msgs::msg::KeyFrameAdditions>::SharedPtr additions_sub_;
     rclcpp::Subscription<traversability_msgs::msg::KeyFrameUpdates>::SharedPtr updates_sub_;
-    rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr occupancy_pub_;
     rclcpp::Publisher<grid_map_msgs::msg::GridMap>::SharedPtr gridmap_pub_;
     rclcpp::TimerBase::SharedPtr publish_timer_;
 };

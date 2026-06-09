@@ -23,7 +23,7 @@
 
 namespace traversability_mapping
 {
-    /// Indices into the hazard array returned by computeGoodness.
+    /// Indices into the result array returned by computeGoodness.
     enum Hazard : std::size_t
     {
         HAZ_OVERALL = 0,
@@ -31,7 +31,12 @@ namespace traversability_mapping
         HAZ_ELEVATION = 2,
         HAZ_SLOPE = 3,
         HAZ_STEP = 4,
-        HAZ_ROUGHNESS = 5
+        HAZ_ROUGHNESS = 5,
+        // Surface normal components (map frame) of the fitted plane.
+        HAZ_NORMAL_X = 6,
+        HAZ_NORMAL_Y = 7,
+        HAZ_NORMAL_Z = 8,
+        HAZ_COUNT = 9
     };
 
     /// PCA over ALL points in the vicinity:
@@ -45,7 +50,7 @@ namespace traversability_mapping
     /// @param occupied          occupied cells in the vicinity window (must include query) - these are the neighbours
     /// @param vicinity_cell_count total cells in the window incl. empty (for the
     ///                          occupied-fraction gate)
-    std::array<double, 6> computeGoodness(
+    std::array<double, HAZ_COUNT> computeGoodness(
         const CellMoment &query,
         const std::vector<CellMoment> &occupied,
         int vicinity_cell_count,

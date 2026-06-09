@@ -19,7 +19,7 @@
 
 namespace traversability_mapping
 {
-    std::array<double, 6> computeGoodness(
+    std::array<double, HAZ_COUNT> computeGoodness(
         const CellMoment &query,
         const std::vector<CellMoment> &occupied,
         int vicinity_cell_count,
@@ -28,7 +28,7 @@ namespace traversability_mapping
         unsigned int min_vicinity_points,
         double min_occupied_fraction)
     {
-        std::array<double, 6> haz;
+        std::array<double, HAZ_COUNT> haz;
         haz.fill(std::numeric_limits<double>::quiet_NaN());
 
         if (query.data.N < 1)
@@ -88,6 +88,11 @@ namespace traversability_mapping
         if (n.z() < 0.0)
             n = -n;
         n.normalize();
+
+        // Expose the fitted surface normal components (map frame).
+        haz[HAZ_NORMAL_X] = n.x();
+        haz[HAZ_NORMAL_Y] = n.y();
+        haz[HAZ_NORMAL_Z] = n.z();
 
         // Slope: tilt of the surface normal from map up.
         const double slope = std::acos(std::min(1.0, std::abs(n.z())));
