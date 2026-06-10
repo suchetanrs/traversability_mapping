@@ -13,8 +13,10 @@
  *   KeyFrameAdditions -> transform cloud to map -> filter -> bin into
  *   cell-local moments on the absolute lattice -> ADD into the grid moment
  *   layers -> recompute hazards over the dilated dirty set. A timer publishes
- *   only the nav-facing subset of layers (nav_layers_) as a grid_map message
- *   from the single internal map. KeyFrameUpdates (PGO) subtract the old
+ *   two subscription-gated outputs: (1) a SPARSE update to nav (only the cells
+ *   touched since the last tick, just the nav_layers_, keyed by absolute lattice
+ *   id; first publish / any (re)connect sends a full snapshot), and (2) the full
+ *   nav grid_map for visualization. KeyFrameUpdates (PGO) subtract the old
  *   contribution, transform it, and re-add (frozen partition).
  */
 #include <rclcpp/rclcpp.hpp>
@@ -33,6 +35,7 @@
 
 #include <traversability_msgs/msg/key_frame_additions.hpp>
 #include <traversability_msgs/msg/key_frame_updates.hpp>
+#include <traversability_msgs/msg/traversability_sparse_update.hpp>
 
 #include "traversability_mapping/KeyFrame.hpp"
 #include "traversability_mapping/Moments.hpp"
@@ -119,8 +122,16 @@ public:
             updates_topic_, 10,
             std::bind(&GlobalTraversabilityNode::updatesCallback, this, std::placeholders::_1));
 
+        // Full nav grid_map, for visualization only (RViz grid_map plugin).
         gridmap_pub_ = create_publisher<grid_map_msgs::msg::GridMap>(
             "global_traversability_gridmap", rclcpp::QoS(1).transient_local());
+
+        // Sparse updates for navigation. Reliable, ordered, volatile: deltas must
+        // arrive in order and must not be replayed stale (transient_local would
+        // resend only the last delta). Late joiners are served a full snapshot on
+        // (re)connect instead.
+        sparse_pub_ = create_publisher<traversability_msgs::msg::TraversabilitySparseUpdate>(
+            "global_traversability_updates", rclcpp::QoS(10).reliable());
 
         const double rate = parameterInstance.getValue<double>("publish_rate_hz");
         publish_timer_ = create_wall_timer(
@@ -213,8 +224,12 @@ private:
         addToLayer("sx2", p, sign * m.sx2); addToLayer("sy2", p, sign * m.sy2); addToLayer("sz2", p, sign * m.sz2);
         addToLayer("sxy", p, sign * m.sxy); addToLayer("sxz", p, sign * m.sxz); addToLayer("syz", p, sign * m.syz);
         // If a subtraction emptied the cell, blank its moment + derived layers.
+        // Mark it dirty so nav is told the cell is now cleared (NaN).
         if (sign < 0 && std::lround(gridMap_.atPosition("N", p)) <= 0)
+        {
             blankCell(p);
+            dirty_for_nav_.insert(cellId);
+        }
     }
 
     void blankCell(const grid_map::Position &p)
@@ -268,6 +283,10 @@ private:
             tmap::NodeMetaData qd;
             if (!readCellMoment(ci, cj, qd))
                 continue;  // query cell unobserved -> nothing to write
+
+            // From here the cell's nav layers are (re)written (values or NaN),
+            // so flag it for the next sparse update to nav.
+            dirty_for_nav_.insert(id);
 
             tmap::CellMoment query{qd, Eigen::Vector3d(qp.x(), qp.y(), 0.0)};
             std::vector<tmap::CellMoment> occupied;
@@ -429,15 +448,96 @@ private:
 
     // ---- publish ------------------------------------------------------------
 
+    // Serialize the given cells' nav layers into a sparse-update message.
+    // Cells whose nav layers are all NaN are still emitted (they tell nav to
+    // clear that cell). keys must be valid absolute lattice ids inside the map.
+    void fillMessage(traversability_msgs::msg::TraversabilitySparseUpdate &msg,
+                     const std::vector<std::uint64_t> &keys, bool full) const
+    {
+        msg.header.frame_id = map_frame_;
+        msg.resolution = res_;
+        msg.origin_x = lattice_.x0;
+        msg.origin_y = lattice_.y0;
+        msg.layers = nav_layers_;
+        msg.is_full_snapshot = full;
+        msg.cell_keys.reserve(keys.size());
+        msg.values.reserve(keys.size() * nav_layers_.size());
+        for (auto id : keys)
+        {
+            int ci, cj;
+            tmap::Lattice::unkey(id, ci, cj);
+            const grid_map::Position p = cellPos(ci, cj);
+            if (!gridMap_.isInside(p))
+                continue;
+            msg.cell_keys.push_back(id);
+            for (const auto &l : nav_layers_)
+                msg.values.push_back(gridMap_.atPosition(l, p));
+        }
+    }
+
+    // Every occupied cell currently in the map (for a full snapshot).
+    std::vector<std::uint64_t> allOccupiedKeys() const
+    {
+        std::vector<std::uint64_t> keys;
+        for (grid_map::GridMapIterator it(gridMap_); !it.isPastEnd(); ++it)
+        {
+            const float n = gridMap_.at("N", *it);
+            if (std::isnan(n) || n < 1.f)
+                continue;
+            grid_map::Position p;
+            gridMap_.getPosition(*it, p);
+            int ci, cj;
+            lattice_.cellOf(p.x(), p.y(), ci, cj);
+            keys.push_back(tmap::Lattice::key(ci, cj));
+        }
+        return keys;
+    }
+
     void publish()
+    {
+        publishFullMap();
+        publishSparse();
+    }
+
+    // Full nav grid_map for visualization. Independent of the sparse path.
+    void publishFullMap()
     {
         if (gridmap_pub_->get_subscription_count() == 0)
             return;
-        // Publish ONLY the nav subset of layers from the single internal map.
         auto gm = grid_map::GridMapRosConverter::toMessage(gridMap_, nav_layers_);
         gm->header.frame_id = map_frame_;
         gm->header.stamp = now();
         gridmap_pub_->publish(*gm);
+    }
+
+    void publishSparse()
+    {
+        // No consumer: drop accumulated deltas and arm a full snapshot so the
+        // next subscriber starts from a consistent state.
+        if (sparse_pub_->get_subscription_count() == 0)
+        {
+            dirty_for_nav_.clear();
+            need_full_snapshot_ = true;
+            return;
+        }
+
+        traversability_msgs::msg::TraversabilitySparseUpdate msg;
+        if (need_full_snapshot_)
+        {
+            fillMessage(msg, allOccupiedKeys(), /*full=*/true);
+            need_full_snapshot_ = false;
+            dirty_for_nav_.clear();
+        }
+        else
+        {
+            if (dirty_for_nav_.empty())
+                return;
+            const std::vector<std::uint64_t> keys(dirty_for_nav_.begin(), dirty_for_nav_.end());
+            fillMessage(msg, keys, /*full=*/false);
+            dirty_for_nav_.clear();
+        }
+        msg.header.stamp = now();
+        sparse_pub_->publish(msg);
     }
 
     // ---- members ------------------------------------------------------------
@@ -450,6 +550,10 @@ private:
     grid_map::GridMap gridMap_;
     std::unordered_map<std::uint64_t, std::shared_ptr<tmap::KeyFrame>> keyframes_;
 
+    // Cells whose nav layers changed since the last publish (sparse update set).
+    std::unordered_set<std::uint64_t> dirty_for_nav_;
+    bool need_full_snapshot_ = true;        // send a full snapshot on first publish
+
     Eigen::Affine3f Tsv_, Tbs_, Tbv_;
 
     double res_, ground_clearance_, max_slope_, robot_height_, security_distance_, min_occupied_fraction_;
@@ -461,7 +565,8 @@ private:
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
     rclcpp::Subscription<traversability_msgs::msg::KeyFrameAdditions>::SharedPtr additions_sub_;
     rclcpp::Subscription<traversability_msgs::msg::KeyFrameUpdates>::SharedPtr updates_sub_;
-    rclcpp::Publisher<grid_map_msgs::msg::GridMap>::SharedPtr gridmap_pub_;
+    rclcpp::Publisher<grid_map_msgs::msg::GridMap>::SharedPtr gridmap_pub_;          // full map, viz only
+    rclcpp::Publisher<traversability_msgs::msg::TraversabilitySparseUpdate>::SharedPtr sparse_pub_;  // sparse updates, nav
     rclcpp::TimerBase::SharedPtr publish_timer_;
 };
 
