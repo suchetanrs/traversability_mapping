@@ -13,8 +13,8 @@ security_distance: 0.40   # max(robot_length, robot_width); sets the plane-fit v
 ground_clearance: 0.15
 max_slope: 0.4            # rad; slope hazard normaliser
 robot_height: 1.5         # points more than this above the base are dropped (ceilings/overhangs)
-max_range_base_frame: 10.0  # points further than this from the base are dropped (m)
-min_range_base_frame: 0.3   # points closer than this to the base are dropped (m, ego-filter)
+max_range_base_frame: 3.0  # points further than this from the base are dropped (m)
+min_range_base_frame: 0.15   # points closer than this to the base are dropped (m, ego-filter)
 
 # --- Plane-fit gates ---
 min_vicinity_points: 15      # min points in the vicinity to attempt a plane fit

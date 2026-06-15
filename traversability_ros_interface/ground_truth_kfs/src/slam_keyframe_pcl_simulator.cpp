@@ -1,5 +1,6 @@
 #include "rclcpp/rclcpp.hpp"
 #include "nav_msgs/msg/odometry.hpp"
+#include "geometry_msgs/msg/pose_stamped.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
 #include "message_filters/subscriber.h"
 #include "message_filters/sync_policies/approximate_time.h"
@@ -10,143 +11,131 @@
 class SLAMKeyFrameSimulator : public rclcpp::Node {
 public:
     SLAMKeyFrameSimulator() : Node("slam_keyframe_pcl_simulator") {
-        std::string odom_topic_;
-        std::string pcl_topic_;
+        std::string pose_topic;
+        std::string pcl_topic;
         this->declare_parameter("odom_topic", "ground_truth_pose");
-        this->get_parameter("odom_topic", odom_topic_);
+        this->get_parameter("odom_topic", pose_topic);
         this->declare_parameter("pcl_topic", "lidar/points");
-        this->get_parameter("pcl_topic", pcl_topic_);
-
+        this->get_parameter("pcl_topic", pcl_topic);
+        this->declare_parameter("pose_type", "odom");  // "odom" or "pose_stamped"
+        this->get_parameter("pose_type", pose_type_);
         this->declare_parameter("keyframe_publish_rate_hz", 2.5);
         this->get_parameter("keyframe_publish_rate_hz", keyframe_publish_rate_hz_);
 
-        RCLCPP_INFO(this->get_logger(), "SLAMKeyFrameSimulator initialized with odom_topic: %s, pcl_topic: %s, keyframe_publish_rate_hz: %f", odom_topic_.c_str(), pcl_topic_.c_str(), keyframe_publish_rate_hz_);
-        
-        // Subscribers for the topics
-        odom_subscriber_ = std::make_shared<message_filters::Subscriber<nav_msgs::msg::Odometry>>(this, odom_topic_);
-        pcl_subscriber_ = std::make_shared<message_filters::Subscriber<sensor_msgs::msg::PointCloud2>>(this, pcl_topic_);
+        RCLCPP_INFO(this->get_logger(),
+            "SLAMKeyFrameSimulator initialized: pose_topic=%s, pcl_topic=%s, pose_type=%s, rate=%.2f hz",
+            pose_topic.c_str(), pcl_topic.c_str(), pose_type_.c_str(), keyframe_publish_rate_hz_);
 
-        subscription_ = this->create_subscription<nav_msgs::msg::Odometry>(
-            odom_topic_, 10, std::bind(&SLAMKeyFrameSimulator::topic_callback, this, std::placeholders::_1));
-
-        // Approximate Time Synchronization
-        sync_ = std::make_shared<message_filters::Synchronizer<MySyncPolicy>>(MySyncPolicy(10), *odom_subscriber_, *pcl_subscriber_);
-        sync_->registerCallback(std::bind(&SLAMKeyFrameSimulator::callback, this, std::placeholders::_1, std::placeholders::_2));
-        
+        pcl_subscriber_ = std::make_shared<message_filters::Subscriber<sensor_msgs::msg::PointCloud2>>(this, pcl_topic);
         tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
-
         keyframe_addition_publisher_ = this->create_publisher<traversability_msgs::msg::KeyFrameAdditions>("traversability_keyframe_additions", 10);
+
+        if (pose_type_ == "pose_stamped") {
+            pose_subscriber_ = std::make_shared<message_filters::Subscriber<geometry_msgs::msg::PoseStamped>>(this, pose_topic);
+            pose_sync_ = std::make_shared<message_filters::Synchronizer<PoseSyncPolicy>>(PoseSyncPolicy(10), *pose_subscriber_, *pcl_subscriber_);
+            pose_sync_->registerCallback(std::bind(&SLAMKeyFrameSimulator::poseCallback, this, std::placeholders::_1, std::placeholders::_2));
+            pose_subscription_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
+                pose_topic, 10, std::bind(&SLAMKeyFrameSimulator::poseTopicCallback, this, std::placeholders::_1));
+        } else {
+            odom_subscriber_ = std::make_shared<message_filters::Subscriber<nav_msgs::msg::Odometry>>(this, pose_topic);
+            odom_sync_ = std::make_shared<message_filters::Synchronizer<OdomSyncPolicy>>(OdomSyncPolicy(10), *odom_subscriber_, *pcl_subscriber_);
+            odom_sync_->registerCallback(std::bind(&SLAMKeyFrameSimulator::odomCallback, this, std::placeholders::_1, std::placeholders::_2));
+            odom_subscription_ = this->create_subscription<nav_msgs::msg::Odometry>(
+                pose_topic, 10, std::bind(&SLAMKeyFrameSimulator::odomTopicCallback, this, std::placeholders::_1));
+        }
 
         current_kf_id_ = 0;
         prev_time = std::chrono::high_resolution_clock::now();
     }
 
 private:
-    using MySyncPolicy = message_filters::sync_policies::ApproximateTime<nav_msgs::msg::Odometry, sensor_msgs::msg::PointCloud2>;
+    using OdomSyncPolicy = message_filters::sync_policies::ApproximateTime<nav_msgs::msg::Odometry, sensor_msgs::msg::PointCloud2>;
+    using PoseSyncPolicy = message_filters::sync_policies::ApproximateTime<geometry_msgs::msg::PoseStamped, sensor_msgs::msg::PointCloud2>;
 
-    void callback(const nav_msgs::msg::Odometry::ConstSharedPtr &odom_msg,
-                  const sensor_msgs::msg::PointCloud2::ConstSharedPtr &pcl_msg) {
-        rclcpp::Time time1 = odom_msg->header.stamp;
-        rclcpp::Time time2 = pcl_msg->header.stamp;
+    void publishKeyframe(const geometry_msgs::msg::Pose &pose, const sensor_msgs::msg::PointCloud2::ConstSharedPtr &pcl_msg) {
+        std::chrono::duration<double> elapsed = std::chrono::high_resolution_clock::now() - prev_time;
+        if (elapsed.count() < 1.0 / keyframe_publish_rate_hz_) return;
 
-        // Calculate time difference
-        auto time_diff = (time1 - time2).seconds();
-
-        // RCLCPP_INFO(this->get_logger(), "Time difference: %f seconds", time_diff);
-
-        // Process the synchronized messages with closest timestamps
-        // RCLCPP_INFO(this->get_logger(), "Synchronized messages received.");
-        // RCLCPP_INFO(this->get_logger(), "Odometry timestamp: %f", odom_msg->header.stamp.sec + odom_msg->header.stamp.nanosec * 1e-9);
-        // RCLCPP_INFO(this->get_logger(), "PointCloud2 timestamp: %f", pcl_msg->header.stamp.sec + pcl_msg->header.stamp.nanosec * 1e-9);
-        
-        std::chrono::duration<double> elapsed_time = std::chrono::high_resolution_clock::now() - prev_time;
-        double dt = elapsed_time.count();
-
-        if(dt > 1 / keyframe_publish_rate_hz_)
-        {
-            // RCLCPP_INFO(this->get_logger(), "Time difference: %f seconds", dt);
-            ++current_kf_id_;
-            // RCLCPP_WARN_STREAM(this->get_logger(), "Publishing with KF ID:" << current_kf_id_);
-            auto keyframePose = convertOdomToPose(*odom_msg);
-            traversability_msgs::msg::KeyFrame current_kf_;
-            current_kf_.kf_timestamp_in_nanosec = (pcl_msg->header.stamp.sec * 1e9) + (pcl_msg->header.stamp.nanosec);
-            current_kf_.kf_id = current_kf_id_;
-            current_kf_.kf_pose = keyframePose;
-            current_kf_.map_id = 0;
-            current_kf_.kf_pointcloud = *pcl_msg;
-            traversability_msgs::msg::KeyFrameAdditions kf_additions_msg_;
-            kf_additions_msg_.keyframes.push_back(current_kf_);
-            keyframe_addition_publisher_->publish(kf_additions_msg_);
-            prev_time = std::chrono::high_resolution_clock::now();
-        }
-        // Add your processing logic here
+        ++current_kf_id_;
+        traversability_msgs::msg::KeyFrame kf;
+        kf.kf_timestamp_in_nanosec = (pcl_msg->header.stamp.sec * 1e9) + pcl_msg->header.stamp.nanosec;
+        kf.kf_id = current_kf_id_;
+        kf.kf_pose = pose;
+        kf.map_id = 0;
+        kf.kf_pointcloud = *pcl_msg;
+        traversability_msgs::msg::KeyFrameAdditions additions;
+        additions.keyframes.push_back(kf);
+        keyframe_addition_publisher_->publish(additions);
+        prev_time = std::chrono::high_resolution_clock::now();
     }
 
-    geometry_msgs::msg::Pose convertOdomToPose(nav_msgs::msg::Odometry odomMsg)
-    {
-        geometry_msgs::msg::Pose poseMsg;
-        poseMsg.position = odomMsg.pose.pose.position;
-        poseMsg.orientation = odomMsg.pose.pose.orientation;
-        return poseMsg;
+    void odomCallback(const nav_msgs::msg::Odometry::ConstSharedPtr &odom_msg,
+                      const sensor_msgs::msg::PointCloud2::ConstSharedPtr &pcl_msg) {
+        RCLCPP_INFO(this->get_logger(), "Sync time difference (odom - pcl): %.6f seconds",
+                    (rclcpp::Time(odom_msg->header.stamp) - rclcpp::Time(pcl_msg->header.stamp)).seconds());
+        geometry_msgs::msg::Pose pose;
+        pose.position = odom_msg->pose.pose.position;
+        pose.orientation = odom_msg->pose.pose.orientation;
+        publishKeyframe(pose, pcl_msg);
     }
 
-
-    void topic_callback(nav_msgs::msg::Odometry::SharedPtr msg)
-    {
-        // RCLCPP_INFO(this->get_logger(), "Received odometry message: x: '%f', y: '%f'", msg->pose.pose.position.x, msg->pose.pose.position.y);
-    
-        geometry_msgs::msg::TransformStamped transform_stamped;
-
-        // odom to base_footprint
-        transform_stamped.header.stamp = msg->header.stamp;
-        if(static_cast<std::string>(this->get_namespace()) == "/")
-        {
-            transform_stamped.header.frame_id = "odom";
-            transform_stamped.child_frame_id = "base_footprint";
-        }
-        else
-        {
-            transform_stamped.header.frame_id = static_cast<std::string>(this->get_namespace()) + "/odom";
-            transform_stamped.child_frame_id = static_cast<std::string>(this->get_namespace()) + "/base_footprint";
-        }
-
-        transform_stamped.transform.translation.x = msg->pose.pose.position.x;
-        transform_stamped.transform.translation.y = msg->pose.pose.position.y;
-        transform_stamped.transform.translation.z = msg->pose.pose.position.z;
-        transform_stamped.transform.rotation = msg->pose.pose.orientation;
-
-        tf_broadcaster_->sendTransform(transform_stamped);
-
-        // map to odom (0 transform)
-        transform_stamped.header.stamp = msg->header.stamp;
-        transform_stamped.header.frame_id = "map";
-        if(static_cast<std::string>(this->get_namespace()) == "/")
-        {
-            transform_stamped.child_frame_id = "odom";
-        }
-        else
-        {
-            transform_stamped.child_frame_id = static_cast<std::string>(this->get_namespace()) + "/odom";
-        }
-
-        transform_stamped.transform.translation.x = 0.0;
-        transform_stamped.transform.translation.y = 0.0;
-        transform_stamped.transform.translation.z = 0.0;
-        geometry_msgs::msg::Quaternion default_quat;
-        transform_stamped.transform.rotation = default_quat;
-
-        tf_broadcaster_->sendTransform(transform_stamped);
+    void poseCallback(const geometry_msgs::msg::PoseStamped::ConstSharedPtr &pose_msg,
+                      const sensor_msgs::msg::PointCloud2::ConstSharedPtr &pcl_msg) {
+        RCLCPP_INFO(this->get_logger(), "Sync time difference (pose - pcl): %.6f seconds",
+                    (rclcpp::Time(pose_msg->header.stamp) - rclcpp::Time(pcl_msg->header.stamp)).seconds());
+        publishKeyframe(pose_msg->pose, pcl_msg);
     }
 
-    std::shared_ptr<message_filters::Subscriber<nav_msgs::msg::Odometry>> odom_subscriber_;
-    std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::PointCloud2>> pcl_subscriber_;
-    std::shared_ptr<message_filters::Synchronizer<MySyncPolicy>> sync_;
-    std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
-    rclcpp::Publisher<traversability_msgs::msg::KeyFrameAdditions>::SharedPtr keyframe_addition_publisher_;
-    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr subscription_;
+    void broadcastTF(const geometry_msgs::msg::Pose &pose, const rclcpp::Time &stamp) {
+        std::string ns = static_cast<std::string>(this->get_namespace());
+        geometry_msgs::msg::TransformStamped tf;
+
+        // odom -> base_footprint
+        tf.header.stamp = stamp;
+        tf.header.frame_id = (ns == "/") ? "odom" : ns + "/odom";
+        tf.child_frame_id  = (ns == "/") ? "base_footprint" : ns + "/base_footprint";
+        tf.transform.translation.x = pose.position.x;
+        tf.transform.translation.y = pose.position.y;
+        tf.transform.translation.z = pose.position.z;
+        tf.transform.rotation = pose.orientation;
+        tf_broadcaster_->sendTransform(tf);
+
+        // map -> odom (identity)
+        tf.header.stamp = stamp;
+        tf.header.frame_id = "map";
+        tf.child_frame_id  = (ns == "/") ? "odom" : ns + "/odom";
+        tf.transform.translation.x = 0.0;
+        tf.transform.translation.y = 0.0;
+        tf.transform.translation.z = 0.0;
+        tf.transform.rotation = geometry_msgs::msg::Quaternion();
+        tf_broadcaster_->sendTransform(tf);
+    }
+
+    void odomTopicCallback(nav_msgs::msg::Odometry::SharedPtr msg) {
+        geometry_msgs::msg::Pose pose;
+        pose.position = msg->pose.pose.position;
+        pose.orientation = msg->pose.pose.orientation;
+        broadcastTF(pose, msg->header.stamp);
+    }
+
+    void poseTopicCallback(geometry_msgs::msg::PoseStamped::SharedPtr msg) {
+        broadcastTF(msg->pose, msg->header.stamp);
+    }
+
+    std::string pose_type_;
+    double keyframe_publish_rate_hz_;
     long unsigned current_kf_id_;
     std::chrono::_V2::system_clock::time_point prev_time;
-    double keyframe_publish_rate_hz_;
+
+    std::shared_ptr<message_filters::Subscriber<nav_msgs::msg::Odometry>> odom_subscriber_;
+    std::shared_ptr<message_filters::Subscriber<geometry_msgs::msg::PoseStamped>> pose_subscriber_;
+    std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::PointCloud2>> pcl_subscriber_;
+    std::shared_ptr<message_filters::Synchronizer<OdomSyncPolicy>> odom_sync_;
+    std::shared_ptr<message_filters::Synchronizer<PoseSyncPolicy>> pose_sync_;
+    std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
+    rclcpp::Publisher<traversability_msgs::msg::KeyFrameAdditions>::SharedPtr keyframe_addition_publisher_;
+    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_subscription_;
+    rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr pose_subscription_;
 };
 
 int main(int argc, char **argv) {
