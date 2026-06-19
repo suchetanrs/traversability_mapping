@@ -15,21 +15,27 @@
 
 // Lean, ROS-free keyframe record for the moment-fused global map.
 //
-// A keyframe owns ONLY its own contribution to the global grid:
-//   * its latest (post-PGO) pose,
-//   * the per-cell moments it added, keyed by ABSOLUTE lattice cell id.
+// A keyframe owns:
+//   * its latest (post-PGO) pose (map <- base_footprint),
+//   * its pruned raw cloud in the ROBOT BASE frame (pose-invariant, rigidly
+//     attached to the robot, so it stays valid across any pose correction),
+//   * the per-cell moments it currently contributes to the global grid, keyed by
+//     ABSOLUTE lattice cell id.
 //
-// The cell-id keys ARE the "list of cells it wrote to" (set M). They are stored
-// exactly (no neighbours) so the contribution can be subtracted out exactly when
-// the keyframe's pose is later corrected. The node owns the global grid_map and
-// performs all grid arithmetic; the keyframe never touches the grid directly.
+// The partition is NOT frozen. On a PGO pose correction the node re-transforms
+// the stored base-frame cloud by the new pose and RE-BINS from scratch via
+// rebin(): the cell membership is recomputed each time (handles both relabel and
+// split exactly), regardless of how small the pose change is. The partials' keys
+// ARE the "list of cells it wrote to" (set M) and are used by the node to
+// subtract the keyframe's previous contribution before re-adding the new one.
 //
-// The raw lidar cloud is intentionally NOT stored yet (the partition is frozen,
-// so no re-binning is needed for small PGO updates). It will be added back when
-// true re-binning for large pose changes is implemented.
+// The node owns the global grid_map and performs all grid arithmetic; the
+// keyframe never touches the grid directly. The keyframe is kept PCL-free
+// (Eigen only) so it can be unit-tested in isolation.
 
 #include <cstdint>
 #include <unordered_map>
+#include <vector>
 #include <Eigen/Geometry>
 
 #include "traversability_mapping/Moments.hpp"
@@ -39,17 +45,22 @@ namespace traversability_mapping
     class KeyFrame
     {
     public:
-        KeyFrame(std::uint64_t id, const Eigen::Affine3f &Tm_base);
+        /// `cloud_base` is the already-pruned cloud expressed in the robot base
+        /// frame; it is moved in and retained for re-binning under PGO.
+        KeyFrame(std::uint64_t id, const Eigen::Affine3f &Tm_base,
+                 std::vector<Eigen::Vector3f> &&cloud_base);
 
         std::uint64_t id() const { return id_; }
 
         const Eigen::Affine3f &pose() const { return pose_; }
+        /// Cheap, non-blocking. Does NOT re-bin; call rebin() explicitly after.
         void setPose(const Eigen::Affine3f &p);
 
-        /// Accumulate one point (already expressed in the cell-local frame of
-        /// `cellId`, i.e. relative to that cell's centre) into this keyframe's
-        /// contribution.
-        void addPoint(std::uint64_t cellId, double lx, double ly, double lz);
+        /// (Re)compute this keyframe's contribution: transform the stored
+        /// base-frame cloud by the current pose, bin into cell-local moments on
+        /// `lattice` (origin at each cell's centre, z about 0), and REPLACE the
+        /// partials. Clears any previous partials first.
+        void rebin(const Lattice &lattice);
 
         std::unordered_map<std::uint64_t, NodeMetaData> &partials() { return partials_; }
         const std::unordered_map<std::uint64_t, NodeMetaData> &partials() const { return partials_; }
@@ -59,6 +70,7 @@ namespace traversability_mapping
     private:
         std::uint64_t id_;
         Eigen::Affine3f pose_;                                       ///< map <- base_footprint
+        std::vector<Eigen::Vector3f> cloud_base_;                    ///< pruned cloud, base frame
         std::unordered_map<std::uint64_t, NodeMetaData> partials_;   ///< cellId -> cell-local moments
     };
 }  // namespace traversability_mapping

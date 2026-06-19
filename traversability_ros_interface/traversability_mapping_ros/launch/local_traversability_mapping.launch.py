@@ -56,7 +56,7 @@ def generate_launch_description():
         # Ground-truth keyframe source: publishes KeyFrameAdditions from odom + cloud.
         keyframe_simulator = Node(
             package='ground_truth_kfs',
-            executable='slam_keyframe_pcl_simulator',
+            executable='slam_keyframe_sim_with_drift',
             namespace=namespace,
             output='screen',
             parameters=[params_file])
