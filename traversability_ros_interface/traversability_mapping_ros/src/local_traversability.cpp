@@ -283,64 +283,82 @@ private:
         return out;
     }
 
+    // Recompute one query cell's derived (nav) layers from the FUSED moments in
+    // its vicinity. Reads only moment layers (never written here) + neighbour
+    // cells; writes only THIS cell's derived layers. Because distinct cells write
+    // disjoint elements and the moment layers are read-only during recompute,
+    // this is safe to run concurrently across cells. Returns true iff the cell's
+    // nav layers were (re)written (values or NaN) -> caller flags it for nav.
+    bool recomputeCell(std::uint64_t id)
+    {
+        int ci, cj;
+        tmap::Lattice::unkey(id, ci, cj);
+        const grid_map::Position qp = cellPos(ci, cj);
+        if (!gridMap_.isInside(qp))
+            return false;
+
+        tmap::NodeMetaData qd;
+        if (!readCellMoment(ci, cj, qd))
+            return false;  // query cell unobserved -> nothing to write
+
+        tmap::CellMoment query{qd, Eigen::Vector3d(qp.x(), qp.y(), 0.0)};
+        std::vector<tmap::CellMoment> occupied;
+        int total = 0;
+        for (int i = ci - delta_ind_; i <= ci + delta_ind_; ++i)
+            for (int j = cj - delta_ind_; j <= cj + delta_ind_; ++j)
+            {
+                ++total;
+                tmap::NodeMetaData d;
+                if (readCellMoment(i, j, d))
+                {
+                    const Eigen::Vector2d c2 = lattice_.centerOf(i, j);
+                    occupied.push_back({d, Eigen::Vector3d(c2.x(), c2.y(), 0.0)});
+                }
+            }
+
+        const auto haz = tmap::computeGoodness(query, occupied, total, ground_clearance_,
+                                               max_slope_, min_vicinity_points_, min_occupied_fraction_);
+
+        if (!std::isnan(haz[tmap::HAZ_ELEVATION]))
+            gridMap_.atPosition("elevation", qp) = static_cast<float>(haz[tmap::HAZ_ELEVATION]);
+
+        if (std::isnan(haz[tmap::HAZ_OVERALL]))
+        {
+            gridMap_.atPosition("hazard", qp) = std::numeric_limits<float>::quiet_NaN();
+            gridMap_.atPosition("slope_haz", qp) = std::numeric_limits<float>::quiet_NaN();
+            gridMap_.atPosition("step_haz", qp) = std::numeric_limits<float>::quiet_NaN();
+            gridMap_.atPosition("roughness_haz", qp) = std::numeric_limits<float>::quiet_NaN();
+            gridMap_.atPosition("normal_x", qp) = std::numeric_limits<float>::quiet_NaN();
+            gridMap_.atPosition("normal_y", qp) = std::numeric_limits<float>::quiet_NaN();
+            gridMap_.atPosition("normal_z", qp) = std::numeric_limits<float>::quiet_NaN();
+            return true;
+        }
+        gridMap_.atPosition("hazard", qp) = static_cast<float>(haz[tmap::HAZ_OVERALL]);
+        gridMap_.atPosition("slope_haz", qp) = static_cast<float>(haz[tmap::HAZ_SLOPE]);
+        gridMap_.atPosition("step_haz", qp) = static_cast<float>(haz[tmap::HAZ_STEP]);
+        gridMap_.atPosition("roughness_haz", qp) = static_cast<float>(haz[tmap::HAZ_ROUGHNESS]);
+        gridMap_.atPosition("normal_x", qp) = static_cast<float>(haz[tmap::HAZ_NORMAL_X]);
+        gridMap_.atPosition("normal_y", qp) = static_cast<float>(haz[tmap::HAZ_NORMAL_Y]);
+        gridMap_.atPosition("normal_z", qp) = static_cast<float>(haz[tmap::HAZ_NORMAL_Z]);
+        return true;
+    }
+
+    // Recompute the dirty set in parallel (one cell per task; disjoint writes).
+    // dirty_for_nav_ is not thread-safe, so flags are gathered per cell and
+    // merged serially afterwards.
     void recomputeDirty(const std::unordered_set<std::uint64_t> &dirty)
     {
-        for (auto id : dirty)
-        {
-            int ci, cj;
-            tmap::Lattice::unkey(id, ci, cj);
-            const grid_map::Position qp = cellPos(ci, cj);
-            if (!gridMap_.isInside(qp))
-                continue;
+        const std::vector<std::uint64_t> cells(dirty.begin(), dirty.end());
+        const std::size_t n = cells.size();
+        std::vector<char> wrote(n, 0);
 
-            tmap::NodeMetaData qd;
-            if (!readCellMoment(ci, cj, qd))
-                continue;  // query cell unobserved -> nothing to write
+        #pragma omp parallel for schedule(dynamic, 64)
+        for (std::size_t k = 0; k < n; ++k)
+            wrote[k] = recomputeCell(cells[k]) ? 1 : 0;
 
-            // From here the cell's nav layers are (re)written (values or NaN),
-            // so flag it for the next sparse update to nav.
-            dirty_for_nav_.insert(id);
-
-            tmap::CellMoment query{qd, Eigen::Vector3d(qp.x(), qp.y(), 0.0)};
-            std::vector<tmap::CellMoment> occupied;
-            int total = 0;
-            for (int i = ci - delta_ind_; i <= ci + delta_ind_; ++i)
-                for (int j = cj - delta_ind_; j <= cj + delta_ind_; ++j)
-                {
-                    ++total;
-                    tmap::NodeMetaData d;
-                    if (readCellMoment(i, j, d))
-                    {
-                        const Eigen::Vector2d c2 = lattice_.centerOf(i, j);
-                        occupied.push_back({d, Eigen::Vector3d(c2.x(), c2.y(), 0.0)});
-                    }
-                }
-
-            const auto haz = tmap::computeGoodness(query, occupied, total, ground_clearance_,
-                                                   max_slope_, min_vicinity_points_, min_occupied_fraction_);
-
-            if (!std::isnan(haz[tmap::HAZ_ELEVATION]))
-                gridMap_.atPosition("elevation", qp) = static_cast<float>(haz[tmap::HAZ_ELEVATION]);
-
-            if (std::isnan(haz[tmap::HAZ_OVERALL]))
-            {
-                gridMap_.atPosition("hazard", qp) = std::numeric_limits<float>::quiet_NaN();
-                gridMap_.atPosition("slope_haz", qp) = std::numeric_limits<float>::quiet_NaN();
-                gridMap_.atPosition("step_haz", qp) = std::numeric_limits<float>::quiet_NaN();
-                gridMap_.atPosition("roughness_haz", qp) = std::numeric_limits<float>::quiet_NaN();
-                gridMap_.atPosition("normal_x", qp) = std::numeric_limits<float>::quiet_NaN();
-                gridMap_.atPosition("normal_y", qp) = std::numeric_limits<float>::quiet_NaN();
-                gridMap_.atPosition("normal_z", qp) = std::numeric_limits<float>::quiet_NaN();
-                continue;
-            }
-            gridMap_.atPosition("hazard", qp) = static_cast<float>(haz[tmap::HAZ_OVERALL]);
-            gridMap_.atPosition("slope_haz", qp) = static_cast<float>(haz[tmap::HAZ_SLOPE]);
-            gridMap_.atPosition("step_haz", qp) = static_cast<float>(haz[tmap::HAZ_STEP]);
-            gridMap_.atPosition("roughness_haz", qp) = static_cast<float>(haz[tmap::HAZ_ROUGHNESS]);
-            gridMap_.atPosition("normal_x", qp) = static_cast<float>(haz[tmap::HAZ_NORMAL_X]);
-            gridMap_.atPosition("normal_y", qp) = static_cast<float>(haz[tmap::HAZ_NORMAL_Y]);
-            gridMap_.atPosition("normal_z", qp) = static_cast<float>(haz[tmap::HAZ_NORMAL_Z]);
-        }
+        for (std::size_t k = 0; k < n; ++k)
+            if (wrote[k])
+                dirty_for_nav_.insert(cells[k]);
     }
 
     // ---- callbacks ----------------------------------------------------------

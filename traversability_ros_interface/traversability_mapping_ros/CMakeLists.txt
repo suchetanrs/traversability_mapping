@@ -36,6 +36,7 @@ find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(PCL REQUIRED)
 find_package(pcl_ros REQUIRED)
+find_package(OpenMP)
 ADD_DEFINITIONS("-DWITH_ROS2_SENSOR_MSGS")
 
 set(dependencies
@@ -86,6 +87,9 @@ include_directories(
 add_executable(local_traversability src/local_traversability.cpp)
 ament_target_dependencies(local_traversability ${dependencies})
 target_link_libraries(local_traversability ${PCL_LIBRARIES} ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem traversability_mapping_common)
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(local_traversability OpenMP::OpenMP_CXX)
+endif()
 
 # # Add executable
 # add_executable(threshold_occupancy src/threshold_occupancy.cpp)
