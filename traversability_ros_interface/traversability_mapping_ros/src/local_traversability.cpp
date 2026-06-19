@@ -119,7 +119,7 @@ public:
         // receives; edit this list (entries must exist in layers_) to add/remove
         // a nav layer without touching the internal map.
         nav_layers_ = {"normal_x", "normal_y", "normal_z", "slope_haz",
-                       "step_haz", "elevation", "roughness_haz"};
+                       "step_haz", "elevation", "roughness_haz", "hazard"};
         const double half = parameterInstance.getValue<double>("half_size_traversability");
         gridMap_ = freshMap(half, half);
 
