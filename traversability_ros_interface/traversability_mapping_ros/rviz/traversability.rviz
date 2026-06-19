@@ -91,7 +91,7 @@ Visualization Manager:
       Color: 200; 200; 200
       Color Layer: slope_haz
       Color Transformer: IntensityLayer
-      Enabled: false
+      Enabled: true
       Height Layer: elevation
       Height Transformer: GridMapLayer
       History Length: 1
@@ -110,7 +110,7 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /global_traversability_gridmap
       Use Rainbow: true
-      Value: false
+      Value: true
     - Class: rviz_default_plugins/Axes
       Enabled: true
       Length: 1
@@ -124,7 +124,7 @@ Visualization Manager:
       Class: rviz_default_plugins/Map
       Color Scheme: map
       Draw Behind: false
-      Enabled: true
+      Enabled: false
       Name: Local traversability
       Topic:
         Depth: 5
@@ -140,7 +140,7 @@ Visualization Manager:
         Reliability Policy: Best Effort
         Value: /global_traversability_occupancy_updates
       Use Timestamp: false
-      Value: true
+      Value: false
     - Alpha: 0.699999988079071
       Binary representation: false
       Binary threshold: 100
@@ -246,7 +246,7 @@ Visualization Manager:
   Value: true
   Views:
     Current:
-      Angle: -1.5749998092651367
+      Angle: -1.519999623298645
       Class: rviz_default_plugins/TopDownOrtho
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
@@ -256,11 +256,11 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Scale: 41.54243469238281
+      Scale: 32.93962860107422
       Target Frame: base_link
       Value: TopDownOrtho (rviz_default_plugins)
-      X: -2.6680078506469727
-      Y: -3.9901957511901855
+      X: 2.268521785736084
+      Y: 9.083247184753418
     Saved: ~
 Window Geometry:
   Displays:
