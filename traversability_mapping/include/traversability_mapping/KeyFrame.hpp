@@ -108,6 +108,10 @@ namespace traversability_mapping
 
         bool empty() const { return partials_.empty(); }
 
+        /// The retained pruned cloud in the robot base frame (empty once dropped).
+        /// Used by LocalMap::getStitchedPointCloud to rebuild map-frame geometry.
+        const std::vector<Eigen::Vector3f> &cloudBase() const { return cloud_base_; }
+
         /// Whether the pruned base-frame cloud is still retained (false once it has
         /// been dropped under !is_kf_optimization_enabled — keyframe then cannot be
         /// re-binned).

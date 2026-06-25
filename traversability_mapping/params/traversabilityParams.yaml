@@ -25,3 +25,7 @@ publish_rate_hz: 1.0         # whole-map publish cadence, decoupled from ingesti
 
 # --- Mapping ---
 is_kf_optimization_enabled: false # retain raw clouds for future true re-binning (off = save memory)
+
+# --- Worker threads (per LocalMap) ---
+num_local_keyframes: 10      # last-N keyframes serviced by the fast local worker
+global_adjustment_sleep: 0   # ms between per-keyframe passes in the slow global worker

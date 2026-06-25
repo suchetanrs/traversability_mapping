@@ -58,6 +58,10 @@ ParameterHandler::ParameterHandler(std::string yaml_file_path)
 
     // --- Mapping (cloud retention; used once true re-binning lands) ---
     parameter_map_["is_kf_optimization_enabled"] = loaded_node["is_kf_optimization_enabled"].as<bool>();
+
+    // --- Worker threads (per LocalMap) ---
+    parameter_map_["num_local_keyframes"] = loaded_node["num_local_keyframes"].as<int>();
+    parameter_map_["global_adjustment_sleep"] = loaded_node["global_adjustment_sleep"].as<int>();
 }
 
 } // namespace traversability_mapping

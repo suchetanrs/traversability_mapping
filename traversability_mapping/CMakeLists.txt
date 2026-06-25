@@ -35,6 +35,7 @@ set(SOURCE_FILES
     src/Moments.cpp
     src/TraversabilityMetrics.cpp
     src/KeyFrame.cpp
+    src/LocalMap.cpp
 )
 
 add_library(traversabilitySystem SHARED ${SOURCE_FILES})
