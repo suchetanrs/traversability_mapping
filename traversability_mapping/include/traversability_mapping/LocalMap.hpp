@@ -121,6 +121,9 @@ namespace traversability_mapping
         const grid_map::GridMap &getGridMap() const { return gridMap_; }
         std::mutex &getGridMapMutex() { return mapMutex_; }
 
+        /// The nav-layer subset (for the debug grid_map message).
+        const std::vector<std::string> &navLayers() const { return nav_layers_; }
+
         /// Voxel-downsampled stitch of every retained keyframe cloud in the map
         /// frame (legacy getStitchedPointCloud).
         std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> getStitchedPointCloud(
