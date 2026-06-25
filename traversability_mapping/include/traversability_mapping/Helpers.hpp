@@ -15,16 +15,12 @@
 
 #include <chrono>
 #include <Eigen/Geometry>
-#include <grid_map_core/GridMapMath.hpp>
-#include <grid_map_core/iterators/GridMapIterator.hpp>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl/common/transforms.h>
 
-#ifdef WITH_ROS2_SENSOR_MSGS
-#include <sensor_msgs/msg/point_cloud2.hpp>
-#include <nav_msgs/msg/occupancy_grid.hpp>
-#endif
+// NOTE: the ROS occupancy-grid conversion (gridMapToOccupancyGrid) lives in the ROS
+// adapter, not here, so the core library carries zero ROS headers.
 
 namespace traversability_mapping
 {
@@ -32,13 +28,6 @@ namespace traversability_mapping
     void doTransformPCL(
         const pcl::PointCloud<pcl::PointXYZ> &p_in, pcl::PointCloud<pcl::PointXYZ> &p_out,
         const Eigen::Affine3f &t);
-
-#ifdef WITH_ROS2_SENSOR_MSGS
-    void gridMapToOccupancyGrid(
-        const grid_map::GridMap &gridMap,
-        const std::string &layer, float dataMin, float dataMax,
-        nav_msgs::msg::OccupancyGrid &occupancyGrid);
-#endif
 
     inline double probabilityToLogOdds(double p) {
         // Clamp away from {0, 1} so log-odds stays finite

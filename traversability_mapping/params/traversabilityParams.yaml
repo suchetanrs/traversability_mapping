@@ -29,3 +29,7 @@ is_kf_optimization_enabled: false # retain raw clouds for future true re-binning
 # --- Worker threads (per LocalMap) ---
 num_local_keyframes: 10      # last-N keyframes serviced by the fast local worker
 global_adjustment_sleep: 0   # ms between per-keyframe passes in the slow global worker
+
+# --- Cloud ingestion (System) ---
+use_pointcloud_buffer: false # buffer clouds and fetch by timestamp (SLAM-announces-by-ts path)
+use_ros_buffer: false        # when buffering, use the sensor_msgs buffer instead of the PCL one

@@ -23,9 +23,9 @@ find_package(PCL REQUIRED)
 find_package(traversability_mapping_common REQUIRED)
 find_package(grid_map_core REQUIRED)
 find_package(yaml-cpp REQUIRED)
-# ROS Packages
+# ROS Packages (optional: only the sensor_msgs buffer needs them; the core builds
+# fully without ROS when sensor_msgs is absent)
 find_package(sensor_msgs)
-find_package(nav_msgs)
 find_package(ament_cmake REQUIRED)
 find_package(ament_index_cpp REQUIRED)
 # Create library target
@@ -36,6 +36,9 @@ set(SOURCE_FILES
     src/TraversabilityMetrics.cpp
     src/KeyFrame.cpp
     src/LocalMap.cpp
+    src/System.cpp
+    src/PointCloudBuffer.cpp
+    src/PointCloudBufferROS.cpp
 )
 
 add_library(traversabilitySystem SHARED ${SOURCE_FILES})
@@ -56,11 +59,10 @@ target_include_directories(traversabilitySystem
 if(sensor_msgs_FOUND)
     ADD_DEFINITIONS("-DWITH_ROS2_SENSOR_MSGS")
     target_include_directories(traversabilitySystem
-        PUBLIC 
+        PUBLIC
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
             $<INSTALL_INTERFACE:include>
             ${sensor_msgs_INCLUDE_DIRS}
-            ${nav_msgs_INCLUDE_DIRS}
     )
 endif(sensor_msgs_FOUND)
 
@@ -154,6 +156,5 @@ ament_export_dependencies(
     grid_map_core
     yaml-cpp
     sensor_msgs
-    nav_msgs
 )
 ament_package()

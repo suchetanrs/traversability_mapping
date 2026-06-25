@@ -315,15 +315,16 @@ namespace traversability_mapping
 
     void LocalMap::addKeyFrame(const std::shared_ptr<KeyFrame> &kf)
     {
-        {
-            std::lock_guard<std::mutex> lock(mapMutex_);
-            kf->setMap(mapID_);
-            keyframes_[kf->id()] = kf;
-            window_.push_front(kf);
-            while (window_.size() > windowCap_)
-                window_.pop_back();
-        }
-        kf->markDirty();
+        // Pure registration: does NOT mark the keyframe dirty. The caller marks it
+        // dirty once it is ready to be (re)processed -- additions wait for the pose
+        // via System::updateKeyFrame; re-parent marks it dirty itself. This avoids
+        // ever binning at the placeholder identity pose.
+        std::lock_guard<std::mutex> lock(mapMutex_);
+        kf->setMap(mapID_);
+        keyframes_[kf->id()] = kf;
+        window_.push_front(kf);
+        while (window_.size() > windowCap_)
+            window_.pop_back();
     }
 
     std::shared_ptr<KeyFrame> LocalMap::detachKeyFrame(std::uint64_t id)

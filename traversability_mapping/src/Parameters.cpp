@@ -62,6 +62,10 @@ ParameterHandler::ParameterHandler(std::string yaml_file_path)
     // --- Worker threads (per LocalMap) ---
     parameter_map_["num_local_keyframes"] = loaded_node["num_local_keyframes"].as<int>();
     parameter_map_["global_adjustment_sleep"] = loaded_node["global_adjustment_sleep"].as<int>();
+
+    // --- Cloud ingestion (System) ---
+    parameter_map_["use_pointcloud_buffer"] = loaded_node["use_pointcloud_buffer"].as<bool>();
+    parameter_map_["use_ros_buffer"] = loaded_node["use_ros_buffer"].as<bool>();
 }
 
 } // namespace traversability_mapping
