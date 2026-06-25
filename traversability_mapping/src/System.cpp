@@ -46,7 +46,7 @@ namespace traversability_mapping
         Tbv_ = Tbs_ * Tsv_;  // base <- lidar
     }
 
-    void System::addNewLocalMap(std::uint64_t mapID)
+    void System::addNewLocalMap(std::uint64_t mapID, std::function<void()> onUpdate)
     {
         std::lock_guard<std::recursive_mutex> lock(mutex_);
         if (maps_.count(mapID))
@@ -54,7 +54,7 @@ namespace traversability_mapping
             std::cerr << "[System] Local map " << mapID << " already exists; not recreating." << std::endl;
             return;
         }
-        maps_[mapID] = std::make_shared<LocalMap>(mapID, lattice_, mapFrame_);
+        maps_[mapID] = std::make_shared<LocalMap>(mapID, lattice_, mapFrame_, std::move(onUpdate));
         if (!haveActive_)
         {
             activeMapID_ = mapID;
@@ -115,11 +115,14 @@ namespace traversability_mapping
         }
         // Identity placeholder pose: the keyframe is NOT marked dirty here, so no
         // worker bins it until updateKeyFrame supplies the real pose.
+        const std::size_t npts = cloud_base.size();
         auto kf = std::make_shared<KeyFrame>(kfID, timestamp, Eigen::Affine3f::Identity(),
                                              std::move(cloud_base), mapID);
         keyframes_[kfID] = kf;
         kfToMap_[kfID] = mapID;
         mapIt->second->addKeyFrame(kf);
+        std::cout << "[System] ADD kf " << kfID << " -> map " << mapID << " (" << npts
+                  << " base pts; registry now holds " << keyframes_.size() << " kfs)." << std::endl;
     }
 
     void System::addNewKeyFrameWithPCL(unsigned long long timestamp_ns, std::uint64_t kfID,
@@ -170,6 +173,7 @@ namespace traversability_mapping
         // map's workers pick it up on their next sweep.
         kf->setPendingPose(pose_map_base);
         kf->markDirty();
+        std::cout << "[System] UPDATE kf " << kfID << ": pose queued + marked dirty." << std::endl;
     }
 
     void System::updateKeyFrame(std::uint64_t kfID, const Sophus::SE3f &pose_map_base,

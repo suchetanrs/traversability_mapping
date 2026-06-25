@@ -39,6 +39,7 @@
 #include <mutex>
 #include <thread>
 #include <atomic>
+#include <functional>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -73,7 +74,12 @@ namespace traversability_mapping
         /// `lattice` is the shared absolute lattice (same across all maps so a
         /// keyframe's partials transfer on re-parent). `mapFrame` is the grid frame
         /// id (cosmetic in the core; the adapter sets the published header frame).
-        LocalMap(std::uint64_t mapID, const Lattice &lattice, std::string mapFrame = "map");
+        /// `onUpdate`, if set, is invoked by a worker AFTER it finishes a keyframe
+        /// op and AFTER releasing the grid lock (so the callback may read the grid /
+        /// drain nav deltas without deadlocking). Used by the adapter to publish on
+        /// every recompute. Must be set at construction (read by the worker threads).
+        LocalMap(std::uint64_t mapID, const Lattice &lattice, std::string mapFrame = "map",
+                 std::function<void()> onUpdate = {});
         ~LocalMap();
 
         LocalMap(const LocalMap &) = delete;
@@ -148,7 +154,9 @@ namespace traversability_mapping
         void recomputeDirty(const std::unordered_set<std::uint64_t> &dirty);
 
         // ---- per-keyframe op (mapMutex_ held by caller) ----
-        void processKeyframeLocked(const std::shared_ptr<KeyFrame> &kf);
+        // Returns true iff it actually (re)wrote the grid (false on a skip), so the
+        // worker only fires onUpdate_ when something changed.
+        bool processKeyframeLocked(const std::shared_ptr<KeyFrame> &kf);
 
         // ---- nav output helpers (mapMutex_ held by caller) ----
         std::vector<std::uint64_t> allOccupiedKeys() const;
@@ -169,6 +177,7 @@ namespace traversability_mapping
         std::size_t windowCap_;
         int globalSleepMs_;
         bool kfOptimizationEnabled_;
+        std::function<void()> onUpdate_;        // fired after each grid-changing keyframe op
 
         std::vector<std::string> layers_;       // all internal layers (moments + derived)
         std::vector<std::string> nav_layers_;   // subset handed to navigation

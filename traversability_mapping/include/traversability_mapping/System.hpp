@@ -28,6 +28,7 @@
 // placeholder identity pose).
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -64,7 +65,9 @@ namespace traversability_mapping
 
         /// Create a map (and its two worker threads). The first one created becomes
         /// the active map. Multi-map-ready; today only map_id = 0 is used.
-        void addNewLocalMap(std::uint64_t mapID);
+        /// `onUpdate` (optional) is invoked by the map's workers after each
+        /// grid-changing keyframe op (e.g. for the adapter to publish on recompute).
+        void addNewLocalMap(std::uint64_t mapID, std::function<void()> onUpdate = {});
 
         // --- additions ---------------------------------------------------------
         /// Add a keyframe with a directly supplied LIDAR-frame cloud.

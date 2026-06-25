@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <iostream>
 #include <limits>
 #include <utility>
 
@@ -31,8 +32,10 @@ namespace traversability_mapping
         constexpr float kNaN = std::numeric_limits<float>::quiet_NaN();
     }
 
-    LocalMap::LocalMap(std::uint64_t mapID, const Lattice &lattice, std::string mapFrame)
-        : mapID_(mapID), lattice_(lattice), frameId_(std::move(mapFrame)), res_(lattice.res)
+    LocalMap::LocalMap(std::uint64_t mapID, const Lattice &lattice, std::string mapFrame,
+                       std::function<void()> onUpdate)
+        : mapID_(mapID), lattice_(lattice), frameId_(std::move(mapFrame)), res_(lattice.res),
+          onUpdate_(std::move(onUpdate))
     {
         ground_clearance_ = parameterInstance.getValue<double>("ground_clearance");
         max_slope_ = parameterInstance.getValue<double>("max_slope");
@@ -268,19 +271,31 @@ namespace traversability_mapping
 
     // ---- per-keyframe op (mapMutex_ held by caller) -------------------------
 
-    void LocalMap::processKeyframeLocked(const std::shared_ptr<KeyFrame> &kf)
+    bool LocalMap::processKeyframeLocked(const std::shared_ptr<KeyFrame> &kf)
     {
         // Deleted between snapshot and now?
         if (keyframes_.find(kf->id()) == keyframes_.end())
-            return;
+        {
+            std::cout << "[LocalMap " << mapID_ << "] kf " << kf->id()
+                      << ": not in working set (deleted?); skip." << std::endl;
+            return false;
+        }
         // Cloud dropped (optimization off, already binned once): cannot reprocess;
-        // leave the existing contribution intact.
+        // leave the existing contribution intact. THIS is why a PGO pose update has
+        // no effect when is_kf_optimization_enabled is false.
         if (!kf->hasCloud())
-            return;
+        {
+            std::cout << "[LocalMap " << mapID_ << "] kf " << kf->id()
+                      << ": SKIP reprocess -- no retained cloud "
+                         "(is_kf_optimization_enabled=false); pose update NOT applied."
+                      << std::endl;
+            return false;
+        }
 
         std::unordered_set<std::uint64_t> touched;  // M_old (subtracted) U M_new (added)
 
         // 1. subtract the OLD contribution (computed at the old pose).
+        const std::size_t nOld = kf->partials().size();
         for (auto &kv : kf->partials())
         {
             addPartialToGrid(kv.first, kv.second, -1.0);
@@ -289,7 +304,8 @@ namespace traversability_mapping
 
         // 2. commit any pending PGO pose BEFORE re-binning.
         Eigen::Affine3f newPose;
-        if (kf->takePendingPose(newPose))
+        const bool posed = kf->takePendingPose(newPose);
+        if (posed)
             kf->setPose(newPose);
 
         // 3. re-bin the stored base-frame cloud at the current pose (partition NOT frozen).
@@ -297,6 +313,7 @@ namespace traversability_mapping
 
         // 4. grow to fit, then add the fresh contribution.
         growToIncludeCells(kf->partials());
+        const std::size_t nNew = kf->partials().size();
         for (auto &kv : kf->partials())
         {
             addPartialToGrid(kv.first, kv.second, +1.0);
@@ -304,11 +321,20 @@ namespace traversability_mapping
         }
 
         // 5. recompute hazards over the dilated union of cells left and newly occupied.
-        recomputeDirty(dilate(touched));
+        const auto dirty = dilate(touched);
+        recomputeDirty(dirty);
+
+        std::cout << "[LocalMap " << mapID_ << "] kf " << kf->id()
+                  << (posed ? " [pose updated]" : " [first bin / no new pose]")
+                  << ": -" << nOld << " cells, +" << nNew << " cells, recomputed "
+                  << dirty.size() << " cells, dirty_for_nav=" << dirty_for_nav_.size()
+                  << "." << std::endl;
 
         // 6. drop the cloud if optimization is disabled (keyframe becomes non-rebinnable).
         if (!kfOptimizationEnabled_)
             kf->dropCloud();
+
+        return true;
     }
 
     // ---- keyframe lifecycle -------------------------------------------------
@@ -481,8 +507,15 @@ namespace traversability_mapping
                     return;
                 if (kf->claim())
                 {
-                    std::lock_guard<std::mutex> lock(mapMutex_);
-                    processKeyframeLocked(kf);
+                    bool changed = false;
+                    {
+                        std::lock_guard<std::mutex> lock(mapMutex_);
+                        changed = processKeyframeLocked(kf);
+                    }
+                    // Fire OUTSIDE the lock so the adapter can read the grid / drain
+                    // nav deltas (which take the same mutex) without deadlocking.
+                    if (changed && onUpdate_)
+                        onUpdate_();
                 }
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -508,8 +541,13 @@ namespace traversability_mapping
                     return;
                 if (kf->claim())
                 {
-                    std::lock_guard<std::mutex> lock(mapMutex_);
-                    processKeyframeLocked(kf);
+                    bool changed = false;
+                    {
+                        std::lock_guard<std::mutex> lock(mapMutex_);
+                        changed = processKeyframeLocked(kf);
+                    }
+                    if (changed && onUpdate_)
+                        onUpdate_();
                 }
                 if (globalSleepMs_ > 0)
                     std::this_thread::sleep_for(std::chrono::milliseconds(globalSleepMs_));

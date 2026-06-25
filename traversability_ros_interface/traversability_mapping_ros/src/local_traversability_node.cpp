@@ -73,15 +73,20 @@ public:
                            tf_buffer_, Tsv, Tbs);
         system_->setExtrinsicParameters(Tsv, Tbs);
 
-        // Single map for now (multi-map-ready).
-        system_->addNewLocalMap(0);
+        // Single map for now (multi-map-ready). The worker fires onMapUpdated()
+        // after every grid-changing keyframe op so the debug grid_map + occupancy
+        // refresh on every recompute (not just on the timer).
+        system_->addNewLocalMap(0, [this]() { onMapUpdated(); });
 
         // --- ROS I/O ---
+        // Deep queues: additions carry clouds and binning can briefly block the
+        // callback on the map mutex; a shallow queue would drop keyframes under load
+        // (showing up later as "update for unknown keyframe N").
         additions_sub_ = create_subscription<traversability_msgs::msg::KeyFrameAdditions>(
-            additions_topic_, 10,
+            additions_topic_, 100,
             std::bind(&GlobalTraversabilityNode::additionsCallback, this, std::placeholders::_1));
         updates_sub_ = create_subscription<traversability_msgs::msg::KeyFrameUpdates>(
-            updates_topic_, 10,
+            updates_topic_, 100,
             std::bind(&GlobalTraversabilityNode::updatesCallback, this, std::placeholders::_1));
 
         // Optional raw-cloud buffering path (SLAM that announces keyframes by ts).
@@ -114,6 +119,14 @@ public:
         RCLCPP_INFO(get_logger(), "Thin traversability adapter ready.");
     }
 
+    ~GlobalTraversabilityNode() override
+    {
+        // Tear down the core (joins the LocalMap worker threads) BEFORE the node's
+        // publishers are destroyed, so an in-flight onMapUpdated() callback running
+        // on a worker thread can't touch a dead publisher.
+        system_.reset();
+    }
+
 private:
     // ---- callbacks ----------------------------------------------------------
 
@@ -142,9 +155,21 @@ private:
 
     // ---- publish ------------------------------------------------------------
 
+    // Timer: sparse deltas only (the deployment path, steady cadence). The full
+    // grid_map + occupancy publish per-recompute via onMapUpdated() instead.
     void publish()
     {
         publishSparse();
+    }
+
+    // Fired by a LocalMap worker after each grid-changing keyframe op (every
+    // recompute). Runs on the worker thread; rclcpp publishers are thread-safe and
+    // the worker has released the grid lock, so reading the grid here is safe.
+    // Subscriber-gated inside each publish*, so it costs nothing when nobody is
+    // viewing. NOTE: during a large PGO batch this serializes the full grid once per
+    // keyframe -- heavy but matches the legacy real-time-morph behavior.
+    void onMapUpdated()
+    {
         publishFullMap();
         publishOccupancy();
     }

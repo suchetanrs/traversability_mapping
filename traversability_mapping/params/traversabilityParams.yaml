@@ -24,7 +24,10 @@ min_occupied_fraction: 0.5   # >= this fraction of vicinity cells must be observ
 publish_rate_hz: 1.0         # whole-map publish cadence, decoupled from ingestion
 
 # --- Mapping ---
-is_kf_optimization_enabled: false # retain raw clouds for future true re-binning (off = save memory)
+# MUST be true for PGO / loop-closure: keyframes retain their pruned base-frame
+# cloud so a corrected pose can re-bin them. false = drop the cloud after the first
+# bin (saves memory) but then pose updates are silently skipped (no PGO).
+is_kf_optimization_enabled: true
 
 # --- Worker threads (per LocalMap) ---
 num_local_keyframes: 10      # last-N keyframes serviced by the fast local worker
