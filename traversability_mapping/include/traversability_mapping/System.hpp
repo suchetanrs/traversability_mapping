@@ -108,8 +108,9 @@ namespace traversability_mapping
             float voxel_size_x, float voxel_size_y, float voxel_size_z);
 
     private:
-        void addKeyFrameToMap(double timestamp, std::uint64_t kfID, std::uint64_t mapID,
-                              const pcl::PointCloud<pcl::PointXYZ> &sensorPointCloud);
+        void addNewKeyFrameToMap(double timestamp, std::uint64_t kfID, std::uint64_t mapID,
+                                 const pcl::PointCloud<pcl::PointXYZ> &sensorPointCloud);
+        void setCurrentMap(std::uint64_t mapID);
         std::vector<Eigen::Vector3f> pruneToBase(const pcl::PointCloud<pcl::PointXYZ> &cloud_lidar) const;
         static double nanosecToSec(unsigned long long timestamp_ns);
 
@@ -120,17 +121,16 @@ namespace traversability_mapping
         Eigen::Affine3f Tbv_ = Eigen::Affine3f::Identity();   // base <- lidar
         double robot_height_, max_range_base_frame_, min_range_base_frame_;
 
-        std::recursive_mutex mutex_;
-        std::unordered_map<std::uint64_t, std::shared_ptr<LocalMap>> maps_;
-        std::unordered_map<std::uint64_t, std::shared_ptr<KeyFrame>> keyframes_;   // authoritative
-        std::unordered_map<std::uint64_t, std::uint64_t> kfToMap_;                 // routing
-        std::uint64_t activeMapID_ = 0;
-        bool haveActive_ = false;
+        std::recursive_mutex localMapMutex_;
+        std::unordered_map<std::uint64_t, std::shared_ptr<LocalMap>> localMapsSet_;
+        std::unordered_map<std::uint64_t, std::shared_ptr<KeyFrame>> keyFramesMap_;   // authoritative
+        std::unordered_map<std::uint64_t, std::uint64_t> allKeyFramesSet_;            // kfID -> mapID routing
+        std::shared_ptr<LocalMap> localMap_ = nullptr;                                // current/active map
 
         bool usePointCloudBuffer_ = false;
         bool useROSBuffer_ = false;
-        std::shared_ptr<PointCloudBuffer> buffer_;
-        std::shared_ptr<PointCloudBufferROS> bufferROS_;
+        std::shared_ptr<PointCloudBuffer> pointCloudBuffer_;
+        std::shared_ptr<PointCloudBufferROS> pointCloudBufferROS_;
     };
 }  // namespace traversability_mapping
 

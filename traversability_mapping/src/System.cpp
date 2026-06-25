@@ -33,14 +33,14 @@ namespace traversability_mapping
         useROSBuffer_ = parameterInstance.getValue<bool>("use_ros_buffer");
         if (usePointCloudBuffer_)
         {
-            buffer_ = std::make_shared<PointCloudBuffer>();
-            bufferROS_ = std::make_shared<PointCloudBufferROS>();
+            pointCloudBuffer_ = std::make_shared<PointCloudBuffer>();
+            pointCloudBufferROS_ = std::make_shared<PointCloudBufferROS>();
         }
     }
 
     void System::setExtrinsicParameters(const Eigen::Affine3f &Tsv, const Eigen::Affine3f &Tbs)
     {
-        std::lock_guard<std::recursive_mutex> lock(mutex_);
+        std::lock_guard<std::recursive_mutex> lock(localMapMutex_);
         Tsv_ = Tsv;
         Tbs_ = Tbs;
         Tbv_ = Tbs_ * Tsv_;  // base <- lidar
@@ -48,18 +48,24 @@ namespace traversability_mapping
 
     void System::addNewLocalMap(std::uint64_t mapID, std::function<void()> onUpdate)
     {
-        std::lock_guard<std::recursive_mutex> lock(mutex_);
-        if (maps_.count(mapID))
+        std::lock_guard<std::recursive_mutex> lock(localMapMutex_);
+        if (localMapsSet_.count(mapID))
         {
             std::cerr << "[System] Local map " << mapID << " already exists; not recreating." << std::endl;
             return;
         }
-        maps_[mapID] = std::make_shared<LocalMap>(mapID, lattice_, mapFrame_, std::move(onUpdate));
-        if (!haveActive_)
-        {
-            activeMapID_ = mapID;
-            haveActive_ = true;
-        }
+        localMapsSet_[mapID] = std::make_shared<LocalMap>(mapID, lattice_, mapFrame_, std::move(onUpdate));
+        setCurrentMap(mapID);
+    }
+
+    void System::setCurrentMap(std::uint64_t mapID)
+    {
+        std::lock_guard<std::recursive_mutex> lock(localMapMutex_);
+        auto it = localMapsSet_.find(mapID);
+        if (it != localMapsSet_.end())
+            localMap_ = it->second;
+        else
+            std::cerr << "[System] cannot set current map " << mapID << "; not initialized." << std::endl;
     }
 
     // ---- additions ----------------------------------------------------------
@@ -91,17 +97,17 @@ namespace traversability_mapping
         return cloud_base;
     }
 
-    void System::addKeyFrameToMap(double timestamp, std::uint64_t kfID, std::uint64_t mapID,
+    void System::addNewKeyFrameToMap(double timestamp, std::uint64_t kfID, std::uint64_t mapID,
                                   const pcl::PointCloud<pcl::PointXYZ> &sensorPointCloud)
     {
-        std::lock_guard<std::recursive_mutex> lock(mutex_);
-        if (keyframes_.count(kfID))
+        std::lock_guard<std::recursive_mutex> lock(localMapMutex_);
+        if (keyFramesMap_.count(kfID))
         {
             std::cerr << "[System] keyframe " << kfID << " already added; ignoring." << std::endl;
             return;
         }
-        auto mapIt = maps_.find(mapID);
-        if (mapIt == maps_.end())
+        auto mapIt = localMapsSet_.find(mapID);
+        if (mapIt == localMapsSet_.end())
         {
             std::cerr << "[System] map " << mapID << " not initialized; keyframe " << kfID
                       << " dropped." << std::endl;
@@ -118,11 +124,11 @@ namespace traversability_mapping
         const std::size_t npts = cloud_base.size();
         auto kf = std::make_shared<KeyFrame>(kfID, timestamp, Eigen::Affine3f::Identity(),
                                              std::move(cloud_base), mapID);
-        keyframes_[kfID] = kf;
-        kfToMap_[kfID] = mapID;
-        mapIt->second->addKeyFrame(kf);
+        keyFramesMap_[kfID] = kf;
+        allKeyFramesSet_[kfID] = mapID;
+        mapIt->second->addAlreadyDeclaredKF(kf);
         std::cout << "[System] ADD kf " << kfID << " -> map " << mapID << " (" << npts
-                  << " base pts; registry now holds " << keyframes_.size() << " kfs)." << std::endl;
+                  << " base pts; registry now holds " << keyFramesMap_.size() << " kfs)." << std::endl;
     }
 
     void System::addNewKeyFrameWithPCL(unsigned long long timestamp_ns, std::uint64_t kfID,
@@ -131,21 +137,21 @@ namespace traversability_mapping
     {
         if (!sensorPointCloud)
             return;
-        addKeyFrameToMap(nanosecToSec(timestamp_ns), kfID, mapID, *sensorPointCloud);
+        addNewKeyFrameToMap(nanosecToSec(timestamp_ns), kfID, mapID, *sensorPointCloud);
     }
 
     void System::addNewKeyFrameTsDouble(double timestamp, std::uint64_t kfID, std::uint64_t mapID)
     {
         std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> cloud;
 #ifdef WITH_ROS2_SENSOR_MSGS
-        cloud = useROSBuffer_ ? bufferROS_->getClosestPointCloud(timestamp)
-                              : buffer_->getClosestPointCloud(timestamp);
+        cloud = useROSBuffer_ ? pointCloudBufferROS_->getClosestPointCloud(timestamp)
+                              : pointCloudBuffer_->getClosestPointCloud(timestamp);
 #else
-        cloud = buffer_ ? buffer_->getClosestPointCloud(timestamp) : nullptr;
+        cloud = pointCloudBuffer_ ? pointCloudBuffer_->getClosestPointCloud(timestamp) : nullptr;
 #endif
         if (!cloud)
             return;
-        addKeyFrameToMap(timestamp, kfID, mapID, *cloud);
+        addNewKeyFrameToMap(timestamp, kfID, mapID, *cloud);
     }
 
     void System::addNewKeyFrameTsULong(unsigned long long timestamp_ns, std::uint64_t kfID, std::uint64_t mapID)
@@ -160,9 +166,9 @@ namespace traversability_mapping
     {
         std::shared_ptr<KeyFrame> kf;
         {
-            std::lock_guard<std::recursive_mutex> lock(mutex_);
-            auto it = keyframes_.find(kfID);
-            if (it == keyframes_.end())
+            std::lock_guard<std::recursive_mutex> lock(localMapMutex_);
+            auto it = keyFramesMap_.find(kfID);
+            if (it == keyFramesMap_.end())
             {
                 std::cerr << "[System] update for unknown keyframe " << kfID << "; ignored." << std::endl;
                 return;
@@ -192,30 +198,30 @@ namespace traversability_mapping
 
     void System::deleteKeyFrame(std::uint64_t kfID)
     {
-        std::lock_guard<std::recursive_mutex> lock(mutex_);
-        auto rit = kfToMap_.find(kfID);
-        if (rit == kfToMap_.end())
+        std::lock_guard<std::recursive_mutex> lock(localMapMutex_);
+        auto rit = allKeyFramesSet_.find(kfID);
+        if (rit == allKeyFramesSet_.end())
         {
             std::cerr << "[System] cannot delete unknown keyframe " << kfID << "." << std::endl;
             return;
         }
-        auto mapIt = maps_.find(rit->second);
-        if (mapIt != maps_.end())
+        auto mapIt = localMapsSet_.find(rit->second);
+        if (mapIt != localMapsSet_.end())
             mapIt->second->deleteKeyFrame(kfID);
-        keyframes_.erase(kfID);
-        kfToMap_.erase(rit);
+        keyFramesMap_.erase(kfID);
+        allKeyFramesSet_.erase(rit);
     }
 
     void System::updateKFMap(std::uint64_t kfID, std::uint64_t mapID)
     {
-        std::lock_guard<std::recursive_mutex> lock(mutex_);
-        auto rit = kfToMap_.find(kfID);
-        if (rit == kfToMap_.end())
+        std::lock_guard<std::recursive_mutex> lock(localMapMutex_);
+        auto rit = allKeyFramesSet_.find(kfID);
+        if (rit == allKeyFramesSet_.end())
         {
             std::cerr << "[System] cannot move unknown keyframe " << kfID << "." << std::endl;
             return;
         }
-        if (maps_.find(mapID) == maps_.end())
+        if (localMapsSet_.find(mapID) == localMapsSet_.end())
         {
             std::cerr << "[System] target map " << mapID << " does not exist." << std::endl;
             return;
@@ -223,20 +229,20 @@ namespace traversability_mapping
         const std::uint64_t oldMapID = rit->second;
         if (oldMapID == mapID)
             return;
-        auto kf = maps_[oldMapID]->detachKeyFrame(kfID);  // subtract from old grid + recompute
+        auto kf = localMapsSet_[oldMapID]->detachKeyFrame(kfID);  // subtract from old grid + recompute
         if (!kf)
             return;
         kf->setMap(mapID);
-        maps_[mapID]->addKeyFrame(kf);   // register in the new map (not yet binned)
+        localMapsSet_[mapID]->addAlreadyDeclaredKF(kf);   // register in the new map (not yet binned)
         kf->markDirty();                 // trigger rebin + add in the new map
         rit->second = mapID;
     }
 
     void System::informLoopClosure()
     {
-        std::lock_guard<std::recursive_mutex> lock(mutex_);
-        auto it = maps_.find(0);
-        if (it != maps_.end())
+        std::lock_guard<std::recursive_mutex> lock(localMapMutex_);
+        auto it = localMapsSet_.find(0);
+        if (it != localMapsSet_.end())
             it->second->clearEntireMap();
     }
 
@@ -244,17 +250,17 @@ namespace traversability_mapping
 
     void System::pushToBuffer(double timestamp, std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> pcl)
     {
-        if (buffer_)
-            buffer_->addPointCloud(pcl, timestamp);
+        if (pointCloudBuffer_)
+            pointCloudBuffer_->addPointCloud(pcl, timestamp);
     }
 
 #ifdef WITH_ROS2_SENSOR_MSGS
     void System::pushToBuffer(sensor_msgs::msg::PointCloud2::SharedPtr pcl)
     {
-        if (!bufferROS_)
+        if (!pointCloudBufferROS_)
             return;
         const double seconds = pcl->header.stamp.sec + pcl->header.stamp.nanosec * 1e-9;
-        bufferROS_->addPointCloud(pcl, seconds);
+        pointCloudBufferROS_->addPointCloud(pcl, seconds);
     }
 #endif
 
@@ -262,23 +268,15 @@ namespace traversability_mapping
 
     std::shared_ptr<LocalMap> System::getLocalMap()
     {
-        std::lock_guard<std::recursive_mutex> lock(mutex_);
-        if (haveActive_)
-        {
-            auto it = maps_.find(activeMapID_);
-            if (it != maps_.end())
-                return it->second;
-        }
-        if (!maps_.empty())
-            return maps_.begin()->second;
-        return nullptr;
+        std::lock_guard<std::recursive_mutex> lock(localMapMutex_);
+        return localMap_;
     }
 
     std::shared_ptr<LocalMap> System::getLocalMap(std::uint64_t mapID)
     {
-        std::lock_guard<std::recursive_mutex> lock(mutex_);
-        auto it = maps_.find(mapID);
-        return it != maps_.end() ? it->second : nullptr;
+        std::lock_guard<std::recursive_mutex> lock(localMapMutex_);
+        auto it = localMapsSet_.find(mapID);
+        return it != localMapsSet_.end() ? it->second : nullptr;
     }
 
     std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> System::getGlobalPointCloud(
@@ -286,8 +284,8 @@ namespace traversability_mapping
     {
         std::vector<std::shared_ptr<LocalMap>> maps;
         {
-            std::lock_guard<std::recursive_mutex> lock(mutex_);
-            for (auto &kv : maps_)
+            std::lock_guard<std::recursive_mutex> lock(localMapMutex_);
+            for (auto &kv : localMapsSet_)
                 maps.push_back(kv.second);
         }
         auto out = std::make_shared<pcl::PointCloud<pcl::PointXYZ>>();

@@ -92,7 +92,7 @@ namespace traversability_mapping
         /// Register a keyframe in this map's working set, push it to the local
         /// window, and mark it dirty so a worker bins+adds it. Used for both fresh
         /// additions and re-parented keyframes.
-        void addKeyFrame(const std::shared_ptr<KeyFrame> &kf);
+        void addAlreadyDeclaredKF(const std::shared_ptr<KeyFrame> &kf);
 
         /// Subtract a keyframe's contribution from the grid (recomputing the cells
         /// it vacated), remove it from the working set/window, and return it (or
@@ -108,9 +108,9 @@ namespace traversability_mapping
         /// dropped (optimization off) cannot be rebuilt.
         void clearEntireMap();
 
-        const std::unordered_map<std::uint64_t, std::shared_ptr<KeyFrame>> &keyframes() const
+        const std::unordered_map<std::uint64_t, std::shared_ptr<KeyFrame>> &getKeyFramesMap() const
         {
-            return keyframes_;
+            return keyFramesMap_;
         }
 
         // --- outputs -----------------------------------------------------------
@@ -125,10 +125,10 @@ namespace traversability_mapping
         /// Live grid + its mutex, for the debug (grid_map / occupancy) publish path.
         /// The caller must hold getGridMapMutex() while touching getGridMap().
         const grid_map::GridMap &getGridMap() const { return gridMap_; }
-        std::mutex &getGridMapMutex() { return mapMutex_; }
+        std::mutex &getGridMapMutex() { return masterGridMapMutex_; }
 
         /// The nav-layer subset (for the debug grid_map message).
-        const std::vector<std::string> &navLayers() const { return nav_layers_; }
+        const std::vector<std::string> &navLayers() const { return navLayers_; }
 
         /// Voxel-downsampled stitch of every retained keyframe cloud in the map
         /// frame (legacy getStitchedPointCloud).
@@ -153,12 +153,12 @@ namespace traversability_mapping
         bool recomputeCell(std::uint64_t id);
         void recomputeDirty(const std::unordered_set<std::uint64_t> &dirty);
 
-        // ---- per-keyframe op (mapMutex_ held by caller) ----
+        // ---- per-keyframe op (masterGridMapMutex_ held by caller) ----
         // Returns true iff it actually (re)wrote the grid (false on a skip), so the
         // worker only fires onUpdate_ when something changed.
-        bool processKeyframeLocked(const std::shared_ptr<KeyFrame> &kf);
+        bool recomputeKeyFrame(const std::shared_ptr<KeyFrame> &kf);
 
-        // ---- nav output helpers (mapMutex_ held by caller) ----
+        // ---- nav output helpers (masterGridMapMutex_ held by caller) ----
         std::vector<std::uint64_t> allOccupiedKeys() const;
         NavDelta fillNav(const std::vector<std::uint64_t> &keys, bool full) const;
 
@@ -171,23 +171,23 @@ namespace traversability_mapping
         Lattice lattice_;
         std::string frameId_;
         double res_;
-        double ground_clearance_, max_slope_, min_occupied_fraction_;
-        unsigned int min_vicinity_points_;
-        int delta_ind_;
+        double groundClearance_, maxSlope_, minOccupiedFraction_;
+        unsigned int minVicinityPoints_;
+        int deltaInd_;
         std::size_t windowCap_;
         int globalSleepMs_;
         bool kfOptimizationEnabled_;
         std::function<void()> onUpdate_;        // fired after each grid-changing keyframe op
 
         std::vector<std::string> layers_;       // all internal layers (moments + derived)
-        std::vector<std::string> nav_layers_;   // subset handed to navigation
+        std::vector<std::string> navLayers_;    // subset handed to navigation
 
-        // ---- state guarded by mapMutex_ ----
-        std::mutex mapMutex_;                    // guards gridMap_, keyframes_, window_, dirty_for_nav_
+        // ---- state guarded by masterGridMapMutex_ ----
+        std::mutex masterGridMapMutex_;          // guards gridMap_, keyFramesMap_, mLocalKeyFrames_, dirtyNavCells_
         grid_map::GridMap gridMap_;
-        std::unordered_map<std::uint64_t, std::shared_ptr<KeyFrame>> keyframes_;
-        std::deque<std::shared_ptr<KeyFrame>> window_;        // last-N, newest at front
-        std::unordered_set<std::uint64_t> dirty_for_nav_;     // cells changed since last drain
+        std::unordered_map<std::uint64_t, std::shared_ptr<KeyFrame>> keyFramesMap_;
+        std::deque<std::shared_ptr<KeyFrame>> mLocalKeyFrames_;   // last-N, newest at front
+        std::unordered_set<std::uint64_t> dirtyNavCells_;         // cells changed since last drain
 
         // ---- threads ----
         std::atomic<bool> running_{true};

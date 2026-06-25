@@ -37,13 +37,13 @@ namespace traversability_mapping
         : mapID_(mapID), lattice_(lattice), frameId_(std::move(mapFrame)), res_(lattice.res),
           onUpdate_(std::move(onUpdate))
     {
-        ground_clearance_ = parameterInstance.getValue<double>("ground_clearance");
-        max_slope_ = parameterInstance.getValue<double>("max_slope");
-        min_occupied_fraction_ = parameterInstance.getValue<double>("min_occupied_fraction");
-        min_vicinity_points_ = static_cast<unsigned int>(parameterInstance.getValue<int>("min_vicinity_points"));
+        groundClearance_ = parameterInstance.getValue<double>("ground_clearance");
+        maxSlope_ = parameterInstance.getValue<double>("max_slope");
+        minOccupiedFraction_ = parameterInstance.getValue<double>("min_occupied_fraction");
+        minVicinityPoints_ = static_cast<unsigned int>(parameterInstance.getValue<int>("min_vicinity_points"));
         const double security_distance = parameterInstance.getValue<double>("security_distance");
-        // Vicinity radius in cells (symmetric window of side 2*delta_ind_+1).
-        delta_ind_ = std::max(1, static_cast<int>(std::ceil((security_distance / 2.0) / res_)));
+        // Vicinity radius in cells (symmetric window of side 2*deltaInd_+1).
+        deltaInd_ = std::max(1, static_cast<int>(std::ceil((security_distance / 2.0) / res_)));
         windowCap_ = static_cast<std::size_t>(std::max(1, parameterInstance.getValue<int>("num_local_keyframes")));
         globalSleepMs_ = parameterInstance.getValue<int>("global_adjustment_sleep");
         kfOptimizationEnabled_ = parameterInstance.getValue<bool>("is_kf_optimization_enabled");
@@ -51,7 +51,7 @@ namespace traversability_mapping
         layers_ = {"N", "sx", "sy", "sz", "sx2", "sy2", "sz2", "sxy", "sxz", "syz",
                    "hazard", "elevation", "slope_haz", "step_haz", "roughness_haz",
                    "normal_x", "normal_y", "normal_z"};
-        nav_layers_ = {"normal_x", "normal_y", "normal_z", "slope_haz",
+        navLayers_ = {"normal_x", "normal_y", "normal_z", "slope_haz",
                        "step_haz", "elevation", "roughness_haz", "hazard"};
 
         const double half = parameterInstance.getValue<double>("half_size_traversability");
@@ -166,7 +166,7 @@ namespace traversability_mapping
         if (sign < 0 && std::lround(gridMap_.atPosition("N", p)) <= 0)
         {
             blankCell(p);
-            dirty_for_nav_.insert(cellId);
+            dirtyNavCells_.insert(cellId);
         }
     }
 
@@ -196,13 +196,13 @@ namespace traversability_mapping
     std::unordered_set<std::uint64_t> LocalMap::dilate(const std::unordered_set<std::uint64_t> &touched) const
     {
         std::unordered_set<std::uint64_t> out;
-        out.reserve(touched.size() * (2 * delta_ind_ + 1) * (2 * delta_ind_ + 1));
+        out.reserve(touched.size() * (2 * deltaInd_ + 1) * (2 * deltaInd_ + 1));
         for (auto id : touched)
         {
             int ci, cj;
             Lattice::unkey(id, ci, cj);
-            for (int di = -delta_ind_; di <= delta_ind_; ++di)
-                for (int dj = -delta_ind_; dj <= delta_ind_; ++dj)
+            for (int di = -deltaInd_; di <= deltaInd_; ++di)
+                for (int dj = -deltaInd_; dj <= deltaInd_; ++dj)
                     out.insert(Lattice::key(ci + di, cj + dj));
         }
         return out;
@@ -223,8 +223,8 @@ namespace traversability_mapping
         CellMoment query{qd, Eigen::Vector3d(qp.x(), qp.y(), 0.0)};
         std::vector<CellMoment> occupied;
         int total = 0;
-        for (int i = ci - delta_ind_; i <= ci + delta_ind_; ++i)
-            for (int j = cj - delta_ind_; j <= cj + delta_ind_; ++j)
+        for (int i = ci - deltaInd_; i <= ci + deltaInd_; ++i)
+            for (int j = cj - deltaInd_; j <= cj + deltaInd_; ++j)
             {
                 ++total;
                 NodeMetaData d;
@@ -235,8 +235,8 @@ namespace traversability_mapping
                 }
             }
 
-        const auto haz = computeGoodness(query, occupied, total, ground_clearance_,
-                                         max_slope_, min_vicinity_points_, min_occupied_fraction_);
+        const auto haz = computeGoodness(query, occupied, total, groundClearance_,
+                                         maxSlope_, minVicinityPoints_, minOccupiedFraction_);
 
         if (!std::isnan(haz[HAZ_ELEVATION]))
             gridMap_.atPosition("elevation", qp) = static_cast<float>(haz[HAZ_ELEVATION]);
@@ -266,17 +266,17 @@ namespace traversability_mapping
     {
         for (auto id : dirty)
             if (recomputeCell(id))
-                dirty_for_nav_.insert(id);
+                dirtyNavCells_.insert(id);
     }
 
-    // ---- per-keyframe op (mapMutex_ held by caller) -------------------------
+    // ---- per-keyframe op (masterGridMapMutex_ held by caller) -------------------------
 
-    bool LocalMap::processKeyframeLocked(const std::shared_ptr<KeyFrame> &kf)
+    bool LocalMap::recomputeKeyFrame(const std::shared_ptr<KeyFrame> &kf)
     {
         // Deleted between snapshot and now?
-        if (keyframes_.find(kf->id()) == keyframes_.end())
+        if (keyFramesMap_.find(kf->getKfID()) == keyFramesMap_.end())
         {
-            std::cout << "[LocalMap " << mapID_ << "] kf " << kf->id()
+            std::cout << "[LocalMap " << mapID_ << "] kf " << kf->getKfID()
                       << ": not in working set (deleted?); skip." << std::endl;
             return false;
         }
@@ -285,7 +285,7 @@ namespace traversability_mapping
         // no effect when is_kf_optimization_enabled is false.
         if (!kf->hasCloud())
         {
-            std::cout << "[LocalMap " << mapID_ << "] kf " << kf->id()
+            std::cout << "[LocalMap " << mapID_ << "] kf " << kf->getKfID()
                       << ": SKIP reprocess -- no retained cloud "
                          "(is_kf_optimization_enabled=false); pose update NOT applied."
                       << std::endl;
@@ -324,10 +324,10 @@ namespace traversability_mapping
         const auto dirty = dilate(touched);
         recomputeDirty(dirty);
 
-        std::cout << "[LocalMap " << mapID_ << "] kf " << kf->id()
+        std::cout << "[LocalMap " << mapID_ << "] kf " << kf->getKfID()
                   << (posed ? " [pose updated]" : " [first bin / no new pose]")
                   << ": -" << nOld << " cells, +" << nNew << " cells, recomputed "
-                  << dirty.size() << " cells, dirty_for_nav=" << dirty_for_nav_.size()
+                  << dirty.size() << " cells, dirty_for_nav=" << dirtyNavCells_.size()
                   << "." << std::endl;
 
         // 6. drop the cloud if optimization is disabled (keyframe becomes non-rebinnable).
@@ -339,25 +339,25 @@ namespace traversability_mapping
 
     // ---- keyframe lifecycle -------------------------------------------------
 
-    void LocalMap::addKeyFrame(const std::shared_ptr<KeyFrame> &kf)
+    void LocalMap::addAlreadyDeclaredKF(const std::shared_ptr<KeyFrame> &kf)
     {
         // Pure registration: does NOT mark the keyframe dirty. The caller marks it
         // dirty once it is ready to be (re)processed -- additions wait for the pose
         // via System::updateKeyFrame; re-parent marks it dirty itself. This avoids
         // ever binning at the placeholder identity pose.
-        std::lock_guard<std::mutex> lock(mapMutex_);
+        std::lock_guard<std::mutex> lock(masterGridMapMutex_);
         kf->setMap(mapID_);
-        keyframes_[kf->id()] = kf;
-        window_.push_front(kf);
-        while (window_.size() > windowCap_)
-            window_.pop_back();
+        keyFramesMap_[kf->getKfID()] = kf;
+        mLocalKeyFrames_.push_front(kf);
+        while (mLocalKeyFrames_.size() > windowCap_)
+            mLocalKeyFrames_.pop_back();
     }
 
     std::shared_ptr<KeyFrame> LocalMap::detachKeyFrame(std::uint64_t id)
     {
-        std::lock_guard<std::mutex> lock(mapMutex_);
-        auto it = keyframes_.find(id);
-        if (it == keyframes_.end())
+        std::lock_guard<std::mutex> lock(masterGridMapMutex_);
+        auto it = keyFramesMap_.find(id);
+        if (it == keyFramesMap_.end())
             return nullptr;
         auto kf = it->second;
 
@@ -370,10 +370,10 @@ namespace traversability_mapping
         recomputeDirty(dilate(touched));
         kf->partials().clear();
 
-        keyframes_.erase(it);
-        for (auto wit = window_.begin(); wit != window_.end();)
+        keyFramesMap_.erase(it);
+        for (auto wit = mLocalKeyFrames_.begin(); wit != mLocalKeyFrames_.end();)
         {
-            if ((*wit)->id() == id) wit = window_.erase(wit);
+            if ((*wit)->getKfID() == id) wit = mLocalKeyFrames_.erase(wit);
             else ++wit;
         }
         return kf;
@@ -381,15 +381,15 @@ namespace traversability_mapping
 
     void LocalMap::clearEntireMap()
     {
-        std::lock_guard<std::mutex> lock(mapMutex_);
+        std::lock_guard<std::mutex> lock(masterGridMapMutex_);
         // Tell nav every currently-occupied cell is cleared.
         for (auto k : allOccupiedKeys())
-            dirty_for_nav_.insert(k);
+            dirtyNavCells_.insert(k);
         // Blank every cell of every layer.
         for (const auto &l : layers_)
             gridMap_[l].setConstant(kNaN);
         // Clear each keyframe's contribution record and mark it for rebuild.
-        for (auto &kv : keyframes_)
+        for (auto &kv : keyFramesMap_)
         {
             kv.second->partials().clear();
             kv.second->markDirty();
@@ -422,10 +422,10 @@ namespace traversability_mapping
         d.resolution = res_;
         d.origin_x = lattice_.x0;
         d.origin_y = lattice_.y0;
-        d.layers = nav_layers_;
+        d.layers = navLayers_;
         d.is_full_snapshot = full;
         d.cell_keys.reserve(keys.size());
-        d.values.reserve(keys.size() * nav_layers_.size());
+        d.values.reserve(keys.size() * navLayers_.size());
         for (auto id : keys)
         {
             int ci, cj;
@@ -434,7 +434,7 @@ namespace traversability_mapping
             if (!gridMap_.isInside(p))
                 continue;
             d.cell_keys.push_back(id);
-            for (const auto &l : nav_layers_)
+            for (const auto &l : navLayers_)
                 d.values.push_back(gridMap_.atPosition(l, p));
         }
         return d;
@@ -442,16 +442,16 @@ namespace traversability_mapping
 
     NavDelta LocalMap::drainNavDelta()
     {
-        std::lock_guard<std::mutex> lock(mapMutex_);
-        const std::vector<std::uint64_t> keys(dirty_for_nav_.begin(), dirty_for_nav_.end());
+        std::lock_guard<std::mutex> lock(masterGridMapMutex_);
+        const std::vector<std::uint64_t> keys(dirtyNavCells_.begin(), dirtyNavCells_.end());
         NavDelta d = fillNav(keys, /*full=*/false);
-        dirty_for_nav_.clear();
+        dirtyNavCells_.clear();
         return d;
     }
 
     NavDelta LocalMap::fullNavSnapshot()
     {
-        std::lock_guard<std::mutex> lock(mapMutex_);
+        std::lock_guard<std::mutex> lock(masterGridMapMutex_);
         return fillNav(allOccupiedKeys(), /*full=*/true);
     }
 
@@ -461,16 +461,16 @@ namespace traversability_mapping
         auto stitched = std::make_shared<pcl::PointCloud<pcl::PointXYZ>>();
         std::vector<std::shared_ptr<KeyFrame>> snapshot;
         {
-            std::lock_guard<std::mutex> lock(mapMutex_);
-            snapshot.reserve(keyframes_.size());
-            for (auto &kv : keyframes_)
+            std::lock_guard<std::mutex> lock(masterGridMapMutex_);
+            snapshot.reserve(keyFramesMap_.size());
+            for (auto &kv : keyFramesMap_)
                 snapshot.push_back(kv.second);
         }
         for (auto &kf : snapshot)
         {
             if (!kf->hasCloud())
                 continue;
-            const Eigen::Affine3f Tmb = kf->pose();
+            const Eigen::Affine3f Tmb = kf->getPose();
             for (const auto &pb : kf->cloudBase())
             {
                 const Eigen::Vector3f pm = Tmb * pb;
@@ -498,8 +498,8 @@ namespace traversability_mapping
         {
             std::vector<std::shared_ptr<KeyFrame>> snapshot;
             {
-                std::lock_guard<std::mutex> lock(mapMutex_);
-                snapshot.assign(window_.begin(), window_.end());
+                std::lock_guard<std::mutex> lock(masterGridMapMutex_);
+                snapshot.assign(mLocalKeyFrames_.begin(), mLocalKeyFrames_.end());
             }
             for (auto &kf : snapshot)
             {
@@ -509,8 +509,8 @@ namespace traversability_mapping
                 {
                     bool changed = false;
                     {
-                        std::lock_guard<std::mutex> lock(mapMutex_);
-                        changed = processKeyframeLocked(kf);
+                        std::lock_guard<std::mutex> lock(masterGridMapMutex_);
+                        changed = recomputeKeyFrame(kf);
                     }
                     // Fire OUTSIDE the lock so the adapter can read the grid / drain
                     // nav deltas (which take the same mutex) without deadlocking.
@@ -530,9 +530,9 @@ namespace traversability_mapping
         {
             std::vector<std::shared_ptr<KeyFrame>> snapshot;
             {
-                std::lock_guard<std::mutex> lock(mapMutex_);
-                snapshot.reserve(keyframes_.size());
-                for (auto &kv : keyframes_)
+                std::lock_guard<std::mutex> lock(masterGridMapMutex_);
+                snapshot.reserve(keyFramesMap_.size());
+                for (auto &kv : keyFramesMap_)
                     snapshot.push_back(kv.second);
             }
             for (auto &kf : snapshot)
@@ -543,8 +543,8 @@ namespace traversability_mapping
                 {
                     bool changed = false;
                     {
-                        std::lock_guard<std::mutex> lock(mapMutex_);
-                        changed = processKeyframeLocked(kf);
+                        std::lock_guard<std::mutex> lock(masterGridMapMutex_);
+                        changed = recomputeKeyFrame(kf);
                     }
                     if (changed && onUpdate_)
                         onUpdate_();

@@ -24,11 +24,6 @@
 
 namespace traversability_mapping
 {
-    // t is the transform from in_frame to out_frame. (Where is the in frame in the out reference frame?)
-    void doTransformPCL(
-        const pcl::PointCloud<pcl::PointXYZ> &p_in, pcl::PointCloud<pcl::PointXYZ> &p_out,
-        const Eigen::Affine3f &t);
-
     inline double probabilityToLogOdds(double p) {
         // Clamp away from {0, 1} so log-odds stays finite
         // extreme observation pins the cell at +/- inf forever.

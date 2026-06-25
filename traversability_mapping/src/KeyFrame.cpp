@@ -16,14 +16,14 @@
 
 namespace traversability_mapping
 {
-    KeyFrame::KeyFrame(std::uint64_t id, double timestamp, const Eigen::Affine3f &Tm_base,
-                       std::vector<Eigen::Vector3f> &&cloud_base, std::uint64_t parentMapID)
-        : id_(id), timestamp_(timestamp), parentMapID_(parentMapID),
-          pose_(Tm_base), cloud_base_(std::move(cloud_base)) {}
+    KeyFrame::KeyFrame(std::uint64_t kfID, double timestamp, const Eigen::Affine3f &Tm_base,
+                       std::vector<Eigen::Vector3f> &&cloudBase, std::uint64_t parentMapID)
+        : kfID_(kfID), timestamp_(timestamp), parentMapID_(parentMapID),
+          pose_(Tm_base), cloudBase_(std::move(cloudBase)) {}
 
-    KeyFrame::KeyFrame(std::uint64_t id, const Eigen::Affine3f &Tm_base,
-                       std::vector<Eigen::Vector3f> &&cloud_base)
-        : KeyFrame(id, 0.0, Tm_base, std::move(cloud_base), 0) {}
+    KeyFrame::KeyFrame(std::uint64_t kfID, const Eigen::Affine3f &Tm_base,
+                       std::vector<Eigen::Vector3f> &&cloudBase)
+        : KeyFrame(kfID, 0.0, Tm_base, std::move(cloudBase), 0) {}
 
     void KeyFrame::setPose(const Eigen::Affine3f &p)
     {
@@ -32,14 +32,14 @@ namespace traversability_mapping
 
     void KeyFrame::setPendingPose(const Eigen::Affine3f &p)
     {
-        std::lock_guard<std::mutex> lock(slotMutex_);
+        std::lock_guard<std::mutex> lock(poseSlotMutex_);
         pendingPose_ = p;
         hasPending_ = true;
     }
 
     bool KeyFrame::takePendingPose(Eigen::Affine3f &out)
     {
-        std::lock_guard<std::mutex> lock(slotMutex_);
+        std::lock_guard<std::mutex> lock(poseSlotMutex_);
         if (!hasPending_)
             return false;
         out = pendingPose_;
@@ -55,7 +55,7 @@ namespace traversability_mapping
         // Single-threaded: OpenMP is deferred (see PRD); parallelism comes only
         // from the LocalMap worker-thread structure.
         partials_.clear();
-        for (const auto &p_base : cloud_base_)
+        for (const auto &p_base : cloudBase_)
         {
             const Eigen::Vector3f p_map = pose_ * p_base;
             int ci, cj;

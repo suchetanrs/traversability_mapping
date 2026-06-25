@@ -51,19 +51,19 @@ namespace traversability_mapping
         /// in the robot base frame; it is moved in and retained for re-binning
         /// under PGO. `timestamp` is the acquisition time (seconds); `parentMapID`
         /// is the map this keyframe currently belongs to.
-        KeyFrame(std::uint64_t id, double timestamp, const Eigen::Affine3f &Tm_base,
-                 std::vector<Eigen::Vector3f> &&cloud_base, std::uint64_t parentMapID = 0);
+        KeyFrame(std::uint64_t kfID, double timestamp, const Eigen::Affine3f &Tm_base,
+                 std::vector<Eigen::Vector3f> &&cloudBase, std::uint64_t parentMapID = 0);
 
         /// Convenience overload (timestamp = 0, parentMapID = 0). Retained so the
         /// transitional monolithic node keeps compiling; prefer the primary ctor.
-        KeyFrame(std::uint64_t id, const Eigen::Affine3f &Tm_base,
-                 std::vector<Eigen::Vector3f> &&cloud_base);
+        KeyFrame(std::uint64_t kfID, const Eigen::Affine3f &Tm_base,
+                 std::vector<Eigen::Vector3f> &&cloudBase);
 
-        std::uint64_t id() const { return id_; }
-        double timestamp() const { return timestamp_; }
-        std::uint64_t parentMapID() const { return parentMapID_; }
+        const std::uint64_t &getKfID() const { return kfID_; }
+        const double &getTimestamp() const { return timestamp_; }
+        std::uint64_t getParentMapID() const { return parentMapID_; }
 
-        const Eigen::Affine3f &pose() const { return pose_; }
+        const Eigen::Affine3f &getPose() const { return pose_; }
         /// Cheap, non-blocking. Does NOT re-bin; call rebin() explicitly after.
         void setPose(const Eigen::Affine3f &p);
 
@@ -110,25 +110,26 @@ namespace traversability_mapping
 
         /// The retained pruned cloud in the robot base frame (empty once dropped).
         /// Used by LocalMap::getStitchedPointCloud to rebuild map-frame geometry.
-        const std::vector<Eigen::Vector3f> &cloudBase() const { return cloud_base_; }
+        const std::vector<Eigen::Vector3f> &cloudBase() const { return cloudBase_; }
 
         /// Whether the pruned base-frame cloud is still retained (false once it has
         /// been dropped under !is_kf_optimization_enabled — keyframe then cannot be
         /// re-binned).
-        bool hasCloud() const { return !cloud_base_.empty(); }
+        bool hasCloud() const { return !cloudBase_.empty(); }
         /// Drop the retained cloud to reclaim memory; the keyframe can no longer be
         /// re-binned afterwards.
-        void dropCloud() { cloud_base_.clear(); cloud_base_.shrink_to_fit(); }
+        void dropCloud() { cloudBase_.clear(); cloudBase_.shrink_to_fit(); }
 
     private:
-        std::uint64_t id_;
+        // set only once in the constructor; thread-safety not needed (read-only).
+        std::uint64_t kfID_;
         double timestamp_ = 0.0;
         std::uint64_t parentMapID_ = 0;
         Eigen::Affine3f pose_;                                       ///< map <- base_footprint
-        std::vector<Eigen::Vector3f> cloud_base_;                    ///< pruned cloud, base frame
+        std::vector<Eigen::Vector3f> cloudBase_;                     ///< pruned cloud, base frame
         std::unordered_map<std::uint64_t, NodeMetaData> partials_;   ///< cellId -> cell-local moments
 
-        std::mutex slotMutex_;                                       ///< guards the pending-pose slot
+        std::mutex poseSlotMutex_;                                   ///< guards the pending-pose slot
         Eigen::Affine3f pendingPose_;                                ///< newest unconsumed PGO pose
         bool hasPending_ = false;
 

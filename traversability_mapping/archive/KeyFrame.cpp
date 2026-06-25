@@ -325,7 +325,7 @@ namespace traversability_mapping
             std::cerr << "POINTCLOUD LIDAR IS NULL" << std::endl;
             return;
         }
-        traversability_mapping::doTransformPCL(*pointCloudLidar_, pointCloudCorrected_, Tmv);
+        pcl::transformPointCloud(*pointCloudLidar_, pointCloudCorrected_, Tmv);
 
         // clear stray values
         // clearStrayValuesInGrid();

@@ -31,7 +31,6 @@ find_package(ament_index_cpp REQUIRED)
 # Create library target
 set(SOURCE_FILES
     src/Parameters.cpp
-    src/Helpers.cpp
     src/Moments.cpp
     src/TraversabilityMetrics.cpp
     src/KeyFrame.cpp

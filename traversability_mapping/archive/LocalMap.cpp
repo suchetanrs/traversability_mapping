@@ -199,7 +199,7 @@ namespace traversability_mapping
                     
                     // do the actual transform
                     pcl::PointCloud<pcl::PointXYZ> transformed;
-                    traversability_mapping::doTransformPCL(*cloudLidar, transformed, lidarInMap);
+                    pcl::transformPointCloud(*cloudLidar, transformed, lidarInMap);
                     
                     // append into our stitched cloud
                     *stitched += transformed;
