@@ -42,6 +42,7 @@
 
 #include "conversions.hpp"
 #include "common.hpp"
+#include "parameter_bridge.hpp"
 
 namespace tmap = traversability_mapping;
 
@@ -60,8 +61,12 @@ public:
         pointcloud_topic_ = declare_parameter<std::string>("pointcloud_topic_name", "lidar/points");
         const std::string parameter_file_path = declare_parameter<std::string>("parameter_file_path", "");
 
-        // Load the core params, then build the (ROS-free) System.
+        // Load the core params, then expose them as ROS params (introspective
+        // bridge; no parameter is re-listed here) so they are visible to
+        // `ros2 param get/set`. Must precede System construction, which caches
+        // several of these values.
         tmap::ParameterHandler::getInstance(parameter_file_path);
+        param_cb_handle_ = tmap_ros::bridgeCoreParameters(this);
         system_ = std::make_shared<tmap::System>();
         system_->setMapFrame(map_frame_);
 
@@ -90,7 +95,7 @@ public:
             std::bind(&GlobalTraversabilityNode::updatesCallback, this, std::placeholders::_1));
 
         // Optional raw-cloud buffering path (SLAM that announces keyframes by ts).
-        if (tmap::ParameterHandler::getInstance().getValue<bool>("use_pointcloud_buffer"))
+        if (tmap::ParameterHandler::getInstance().getValue<bool>("system/use_pointcloud_buffer"))
         {
             cloud_sub_ = create_subscription<sensor_msgs::msg::PointCloud2>(
                 pointcloud_topic_, rclcpp::SensorDataQoS(),
@@ -111,7 +116,7 @@ public:
             std::bind(&GlobalTraversabilityNode::globalCloudService, this,
                       std::placeholders::_1, std::placeholders::_2));
 
-        const double rate = tmap::ParameterHandler::getInstance().getValue<double>("publish_rate_hz");
+        const double rate = tmap::ParameterHandler::getInstance().getValue<double>("node/publish_rate_hz");
         publish_timer_ = create_wall_timer(
             std::chrono::duration<double>(1.0 / std::max(0.1, rate)),
             std::bind(&GlobalTraversabilityNode::publish, this));
@@ -270,6 +275,7 @@ private:
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr global_cloud_pub_;
     rclcpp::Service<traversability_msgs::srv::GetGlobalPointcloud>::SharedPtr cloud_srv_;
     rclcpp::TimerBase::SharedPtr publish_timer_;
+    rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr param_cb_handle_;
 };
 
 int main(int argc, char **argv)

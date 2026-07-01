@@ -10,45 +10,72 @@
  * License along with this library.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
+
 #ifndef TRAVERSABILITY_HELPERS_HPP_
 #define TRAVERSABILITY_HELPERS_HPP_
 
 #include <chrono>
+#include <cstdint>
+#include <string>
+#include <vector>
+#include <unordered_set>
+
 #include <Eigen/Geometry>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl/common/transforms.h>
+#include <grid_map_core/GridMap.hpp>
+
+#include "traversability_mapping/Moments.hpp"
 
 // NOTE: the ROS occupancy-grid conversion (gridMapToOccupancyGrid) lives in the ROS
 // adapter, not here, so the core library carries zero ROS headers.
 
 namespace traversability_mapping
 {
-    inline double probabilityToLogOdds(double p) {
-        // Clamp away from {0, 1} so log-odds stays finite
-        // extreme observation pins the cell at +/- inf forever.
-        constexpr double eps = 1e-2;
-        p = std::min(std::max(p, eps), 1.0 - eps);
-        return std::log(p / (1.0 - p));
-    }
+    // --- generic grid <-> lattice utilities ---------------------------------
+    // Free functions shared by the map machinery. They are stateless: every
+    // dependency (the grid, the lattice, the layer list, the resolution) is passed
+    // in, so they can be reused and unit-tested without a LocalMap instance.
 
-    inline double logOddsToProbability(double l) {
-        return 1.0 / (1.0 + std::exp(-l));
-    }
+    /// grid_map position of cell (ci,cj)'s centre on `lattice`.
+    grid_map::Position cellPos(const Lattice &lattice, int ci, int cj);
 
-    // Function to update the occupancy of a cell
-    inline double updateCellLogOdds(float& log_odds, double new_observation) {
-        // If the cell is uninitialized (NaN), initialize with neutral log-odds
-        if (std::isnan(log_odds)) {
-            log_odds = 0.0;  // Neutral belief (50%)
-        }
+    /// Build a fresh, all-NaN grid_map covering +/-(halfX,halfY) about the lattice
+    /// origin. ODD cell count per axis so cell centres land exactly on the lattice;
+    /// the geometry position stays the lattice origin so absolute cell ids survive
+    /// any resize.
+    grid_map::GridMap makeGridMap(const std::vector<std::string> &layers,
+                                  const std::string &frameId, const Lattice &lattice,
+                                  double res, double halfX, double halfY);
 
-        double new_log_odds = probabilityToLogOdds(new_observation);
+    /// Grow `grid` IN PLACE so it covers the given map-frame bounds, enlarging in
+    /// steps of `extend` metres and copying every non-NaN cell across. No-op when the
+    /// bounds already fit. `layers`/`lattice`/`res` describe `grid`.
+    void growGridToInclude(grid_map::GridMap &grid, const std::vector<std::string> &layers,
+                           const Lattice &lattice, double res, double extend,
+                           double minx, double maxx, double miny, double maxy);
 
-        log_odds += new_log_odds;
+    /// Add `v` to one layer at `p`, treating a NaN cell as 0 (lazy initialisation).
+    void addToLayer(grid_map::GridMap &grid, const std::string &layer,
+                    const grid_map::Position &p, double v);
 
-        return logOddsToProbability(log_odds);
-    }
+    /// Set every `layers` cell at `p` to NaN.
+    void blankCell(grid_map::GridMap &grid, const std::vector<std::string> &layers,
+                   const grid_map::Position &p);
+
+    /// Read the fused moment stored at cell (ci,cj) into `out`; false if the cell is
+    /// outside the grid or unobserved (N<1).
+    bool readCellMoment(const grid_map::GridMap &grid, const Lattice &lattice,
+                        int ci, int cj, NodeMetaData &out);
+
+    /// Absolute lattice ids of every occupied (N>=1) cell currently in `grid`.
+    std::vector<std::uint64_t> allOccupiedKeys(const grid_map::GridMap &grid,
+                                               const Lattice &lattice);
+
+    /// Dilate a set of cell keys by +/-`delta` cells on each axis (square window).
+    std::unordered_set<std::uint64_t> dilate(const std::unordered_set<std::uint64_t> &touched,
+                                             int delta);
 
     class Profiler
     {

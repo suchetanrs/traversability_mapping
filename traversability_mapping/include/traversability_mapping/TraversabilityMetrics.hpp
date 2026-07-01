@@ -10,6 +10,7 @@
  * License along with this library.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
+
 #ifndef TRAVERSABILITY_TRAVERSABILITYMETRICS_HPP_
 #define TRAVERSABILITY_TRAVERSABILITYMETRICS_HPP_
 
@@ -40,7 +41,7 @@ namespace traversability_mapping
     };
 
     /// PCA over ALL points in the vicinity:
-    ///   slope     = arccos(|n_z|) / max_pitch
+    ///   slope     = arccos(|n_z|) / max_slope
     ///   roughness = sqrt(lambda_min) / ground_clearance
     ///   step      = (max-min of cell centroid) / ground_clearance
     ///   elevation = query cell centroid z
@@ -55,7 +56,7 @@ namespace traversability_mapping
         const std::vector<CellMoment> &occupied,
         int vicinity_cell_count,
         double ground_clearance,
-        double max_pitch,
+        double max_slope,
         unsigned int min_vicinity_points,
         double min_occupied_fraction);
 

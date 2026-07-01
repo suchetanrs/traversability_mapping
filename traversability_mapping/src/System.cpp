@@ -20,17 +20,17 @@ namespace traversability_mapping
 {
     System::System()
     {
-        const double cx = parameterInstance.getValue<double>("grid_center_x");
-        const double cy = parameterInstance.getValue<double>("grid_center_y");
-        const double res = parameterInstance.getValue<double>("resolution_local_map");
+        const double cx = parameterInstance.getValue<double>("system/grid_center_x");
+        const double cy = parameterInstance.getValue<double>("system/grid_center_y");
+        const double res = parameterInstance.getValue<double>("system/resolution_local_map");
         lattice_ = Lattice(cx, cy, res);
 
-        robot_height_ = parameterInstance.getValue<double>("robot_height");
-        max_range_base_frame_ = parameterInstance.getValue<double>("max_range_base_frame");
-        min_range_base_frame_ = parameterInstance.getValue<double>("min_range_base_frame");
+        robot_height_ = parameterInstance.getValue<double>("system/robot_height");
+        max_range_base_frame_ = parameterInstance.getValue<double>("system/max_range_base_frame");
+        min_range_base_frame_ = parameterInstance.getValue<double>("system/min_range_base_frame");
 
-        usePointCloudBuffer_ = parameterInstance.getValue<bool>("use_pointcloud_buffer");
-        useROSBuffer_ = parameterInstance.getValue<bool>("use_ros_buffer");
+        usePointCloudBuffer_ = parameterInstance.getValue<bool>("system/use_pointcloud_buffer");
+        useROSBuffer_ = parameterInstance.getValue<bool>("system/use_ros_buffer");
         if (usePointCloudBuffer_)
         {
             pointCloudBuffer_ = std::make_shared<PointCloudBuffer>();

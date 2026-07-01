@@ -10,6 +10,7 @@
  * License along with this library.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
+
 #ifndef TRAVERSABILITY_PARAMETERS_HPP_
 #define TRAVERSABILITY_PARAMETERS_HPP_
 
@@ -17,6 +18,8 @@
 #include <memory>
 #include <unordered_map>
 #include <string>
+#include <vector>
+#include <typeinfo>
 #include <mutex>
 #include <stdexcept>
 #include <yaml-cpp/yaml.h>
@@ -42,6 +45,7 @@ class ParameterHandler
     template <typename T>
     T getValue(const std::string& parameterKey) const
     {
+        std::lock_guard<std::mutex> lock(mapMutex_);
         auto it = parameter_map_.find(parameterKey);
         if (it != parameter_map_.end())
         {
@@ -56,14 +60,21 @@ class ParameterHandler
 
     template <typename T>
     void setValue(const std::string& parameterKey, const T& value) {
+        std::lock_guard<std::mutex> lock(mapMutex_);
         parameter_map_[parameterKey] = value;
     }
+
+    /// Introspection hooks. The adapter
+    /// dispatches on typeOf() and reuses getValue<T>/setValue<T>.
+    std::vector<std::string> keys() const;
+    const std::type_info& typeOf(const std::string& parameterKey) const;
 
   private:
     ParameterHandler(const ParameterHandler&) = delete;
     ParameterHandler& operator=(const ParameterHandler&) = delete;
     static std::unique_ptr<ParameterHandler> parameterHandlerPtr_;
     static std::mutex instanceMutex_;
+    mutable std::mutex mapMutex_;
     std::unordered_map<std::string, boost::any> parameter_map_;
 };
 } // namespace traversability_mapping

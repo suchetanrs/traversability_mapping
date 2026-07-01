@@ -10,6 +10,7 @@
  * License along with this library.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
+
 #ifndef TRAVERSABILITY_MOMENTS_HPP_
 #define TRAVERSABILITY_MOMENTS_HPP_
 
@@ -21,8 +22,7 @@
 //   * CellMoment   : a cell's moments together with its map-frame centre.
 //
 // The traversability metrics computed FROM these structures live in
-// TraversabilityMetrics.hpp. The maths is documented in
-// obsidian_vault .../Traversability/traversability_moments_verbatim.md
+// TraversabilityMetrics.hpp.
 
 #include <Eigen/Core>
 #include <Eigen/Dense>
@@ -54,7 +54,6 @@ namespace traversability_mapping
         bool empty() const { return N == 0; }
 
         /// Accumulate one point given in this node's local (cell-centred) frame.
-        /// Hot path (called per point), kept inline.
         inline void insert(double x, double y, double z)
         {
             ++N;

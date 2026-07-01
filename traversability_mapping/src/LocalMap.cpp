@@ -37,16 +37,16 @@ namespace traversability_mapping
         : mapID_(mapID), lattice_(lattice), frameId_(std::move(mapFrame)), res_(lattice.res),
           onUpdate_(std::move(onUpdate))
     {
-        groundClearance_ = parameterInstance.getValue<double>("ground_clearance");
-        maxSlope_ = parameterInstance.getValue<double>("max_slope");
-        minOccupiedFraction_ = parameterInstance.getValue<double>("min_occupied_fraction");
-        minVicinityPoints_ = static_cast<unsigned int>(parameterInstance.getValue<int>("min_vicinity_points"));
-        const double security_distance = parameterInstance.getValue<double>("security_distance");
+        groundClearance_ = parameterInstance.getValue<double>("localMap/ground_clearance");
+        maxSlope_ = parameterInstance.getValue<double>("localMap/max_slope");
+        minOccupiedFraction_ = parameterInstance.getValue<double>("localMap/min_occupied_fraction");
+        minVicinityPoints_ = static_cast<unsigned int>(parameterInstance.getValue<int>("localMap/min_vicinity_points"));
+        const double security_distance = parameterInstance.getValue<double>("localMap/security_distance");
         // Vicinity radius in cells (symmetric window of side 2*deltaInd_+1).
         deltaInd_ = std::max(1, static_cast<int>(std::ceil((security_distance / 2.0) / res_)));
-        windowCap_ = static_cast<std::size_t>(std::max(1, parameterInstance.getValue<int>("num_local_keyframes")));
-        globalSleepMs_ = parameterInstance.getValue<int>("global_adjustment_sleep");
-        kfOptimizationEnabled_ = parameterInstance.getValue<bool>("is_kf_optimization_enabled");
+        windowCap_ = static_cast<std::size_t>(std::max(1, parameterInstance.getValue<int>("localMap/num_local_keyframes")));
+        globalSleepMs_ = parameterInstance.getValue<int>("localMap/global_adjustment_sleep");
+        kfOptimizationEnabled_ = parameterInstance.getValue<bool>("localMap/is_kf_optimization_enabled");
 
         layers_ = {"N", "sx", "sy", "sz", "sx2", "sy2", "sz2", "sxy", "sxz", "syz",
                    "hazard", "elevation", "slope_haz", "step_haz", "roughness_haz",
@@ -54,7 +54,7 @@ namespace traversability_mapping
         navLayers_ = {"normal_x", "normal_y", "normal_z", "slope_haz",
                        "step_haz", "elevation", "roughness_haz", "hazard"};
 
-        const double half = parameterInstance.getValue<double>("half_size_traversability");
+        const double half = parameterInstance.getValue<double>("localMap/half_size_traversability");
         gridMap_ = freshMap(half, half);
 
         localThread_ = std::thread(&LocalMap::RunLocalKeyFrames, this);
@@ -98,7 +98,7 @@ namespace traversability_mapping
         if (needX <= curHalfX && needY <= curHalfY)
             return;
 
-        const double extend = parameterInstance.getValue<double>("extend_length_every_resize_by");
+        const double extend = parameterInstance.getValue<double>("localMap/extend_length_every_resize_by");
         double newHalfX = curHalfX, newHalfY = curHalfY;
         while (newHalfX < needX) newHalfX += extend;
         while (newHalfY < needY) newHalfY += extend;

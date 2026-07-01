@@ -1,38 +1,39 @@
-# --- Global grid / fixed lattice ---
+# Parameters are prefixed by DOMAIN (what they configure), not by which class reads
+# them: grid/ (global grid geometry), traversability/ (per-cell hazard metric),
+# mapping/ (keyframe retention + worker scheduling), ingestion/ (cloud filtering +
+# buffering), node/ (the ROS adapter).
+
+# --- Global grid geometry ---
 # The global grid is fixed-frame and grows symmetrically about (grid_center_x,
 # grid_center_y). The lattice (origin + resolution) is set once at startup so
 # absolute cell ids and cell centres are stable across every resize.
-resolution_local_map: 0.05
-grid_center_x: 0.0
-grid_center_y: 0.0
-half_size_traversability: 7.5      # initial half-extent of the global grid (m); grows as needed
-extend_length_every_resize_by: 30.0 # how much (m) to grow by when a keyframe nears the edge
+grid/resolution_local_map: 0.05
+grid/grid_center_x: 0.0
+grid/grid_center_y: 0.0
+grid/half_size_traversability: 7.5      # initial half-extent of the global grid (m); grows as needed
+grid/extend_length_every_resize_by: 30.0 # how much (m) to grow by when a keyframe nears the edge
 
-# --- Traversability ---
-security_distance: 0.40   # max(robot_length, robot_width); sets the plane-fit vicinity radius
-ground_clearance: 0.15
-max_slope: 0.4            # rad; slope hazard normaliser
-robot_height: 3.5         # points more than this above the base are dropped (ceilings/overhangs)
-max_range_base_frame: 300.0  # points further than this from the base are dropped (m)
-min_range_base_frame: 1.0   # points closer than this to the base are dropped (m, ego-filter)
+# --- Traversability (per-cell hazard metric) ---
+traversability/security_distance: 0.40   # max(robot_length, robot_width); sets the plane-fit vicinity radius
+traversability/ground_clearance: 0.15
+traversability/max_slope: 0.4            # rad; slope hazard normaliser
+traversability/min_vicinity_points: 15   # min points in the vicinity to attempt a plane fit
+traversability/min_occupied_fraction: 0.5 # >= this fraction of vicinity cells must be observed
 
-# --- Plane-fit gates ---
-min_vicinity_points: 15      # min points in the vicinity to attempt a plane fit
-min_occupied_fraction: 0.5   # >= this fraction of vicinity cells must be observed
+# --- Mapping (keyframe retention + worker scheduling) ---
+# is_kf_optimization_enabled MUST be true for PGO / loop-closure: keyframes retain
+# their pruned base-frame cloud so a corrected pose can re-bin them. false = drop the
+# cloud after the first bin (saves memory) but then pose updates are silently skipped.
+mapping/is_kf_optimization_enabled: true
+mapping/num_local_keyframes: 10          # last-N keyframes serviced by the fast local worker
+mapping/global_adjustment_sleep: 0       # ms between per-keyframe passes in the slow global worker
 
-# --- Publishing ---
-publish_rate_hz: 1.0         # whole-map publish cadence, decoupled from ingestion
+# --- Ingestion (cloud filtering + buffering) ---
+ingestion/robot_height: 3.5              # points more than this above the base are dropped (ceilings/overhangs)
+ingestion/max_range_base_frame: 300.0    # points further than this from the base are dropped (m)
+ingestion/min_range_base_frame: 1.0      # points closer than this to the base are dropped (m, ego-filter)
+ingestion/use_pointcloud_buffer: false   # buffer clouds and fetch by timestamp (SLAM-announces-by-ts path)
+ingestion/use_ros_buffer: false          # when buffering, use the sensor_msgs buffer instead of the PCL one
 
-# --- Mapping ---
-# MUST be true for PGO / loop-closure: keyframes retain their pruned base-frame
-# cloud so a corrected pose can re-bin them. false = drop the cloud after the first
-# bin (saves memory) but then pose updates are silently skipped (no PGO).
-is_kf_optimization_enabled: true
-
-# --- Worker threads (per LocalMap) ---
-num_local_keyframes: 10      # last-N keyframes serviced by the fast local worker
-global_adjustment_sleep: 0   # ms between per-keyframe passes in the slow global worker
-
-# --- Cloud ingestion (System) ---
-use_pointcloud_buffer: false # buffer clouds and fetch by timestamp (SLAM-announces-by-ts path)
-use_ros_buffer: false        # when buffering, use the sensor_msgs buffer instead of the PCL one
+# --- Publishing (node) ---
+node/publish_rate_hz: 1.0                # whole-map publish cadence, decoupled from ingestion

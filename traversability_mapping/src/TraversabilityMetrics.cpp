@@ -10,6 +10,7 @@
  * License along with this library.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
+
 #include "traversability_mapping/TraversabilityMetrics.hpp"
 
 #include <Eigen/Eigenvalues>
@@ -24,7 +25,7 @@ namespace traversability_mapping
         const std::vector<CellMoment> &occupied,
         int vicinity_cell_count,
         double ground_clearance,
-        double max_pitch,
+        double max_slope,
         unsigned int min_vicinity_points,
         double min_occupied_fraction)
     {
@@ -96,7 +97,7 @@ namespace traversability_mapping
 
         // Slope: tilt of the surface normal from map up.
         const double slope = std::acos(std::min(1.0, std::abs(n.z())));
-        haz[HAZ_SLOPE] = std::min(slope / max_pitch, 1.0);
+        haz[HAZ_SLOPE] = std::min(slope / max_slope, 1.0);
 
         // Roughness: point-to-plane residual std (rotation-invariant).
         const double roughness = std::sqrt(std::max(0.0, lambda_min));

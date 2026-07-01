@@ -13,8 +13,7 @@
 #ifndef KEYFRAME_HPP_
 #define KEYFRAME_HPP_
 
-// Lean, ROS-free keyframe record for the moment-fused global map.
-//
+
 // A keyframe owns:
 //   * its latest (post-PGO) pose (map <- base_footprint),
 //   * its pruned raw cloud in the ROBOT BASE frame (pose-invariant, rigidly
@@ -36,7 +35,6 @@
 #include <cstdint>
 #include <unordered_map>
 #include <vector>
-#include <atomic>
 #include <mutex>
 #include <Eigen/Geometry>
 
@@ -63,45 +61,30 @@ namespace traversability_mapping
         const double &getTimestamp() const { return timestamp_; }
         std::uint64_t getParentMapID() const { return parentMapID_; }
 
-        const Eigen::Affine3f &getPose() const { return pose_; }
-        /// Cheap, non-blocking. Does NOT re-bin; call rebin() explicitly after.
-        void setPose(const Eigen::Affine3f &p);
-
         /// Re-parent this keyframe to a different map. Only updates the recorded
         /// parent id; moving the partials between map grids is the caller's job
         /// (System / LocalMap).
         void setMap(std::uint64_t parentMapID) { parentMapID_ = parentMapID; }
 
-        // --- latest-wins pending-pose slot (PGO reception) ----------------------
-        // The reception path (System::updateKeyFrame) writes the newest corrected
-        // pose here in O(1); a worker later swaps it out and commits via setPose().
-        // A newer correction overwrites an unconsumed one (latest-wins), which
-        // collapses bursts and bounds memory.
+        /// Store the newest pose (map <- base_footprint) AND flag the keyframe as
+        /// needing a rebin + recompute. Cheap, non-blocking. Thread-safe against
+        /// getPendingPose: a pose that arrives while one is being consumed simply
+        /// waits for the (short) lock, so latestPose_ and hasPending_ never tear.
+        void setPose(const Eigen::Affine3f &p);
 
-        /// Store the newest corrected pose (overwrites any unconsumed one).
-        void setPendingPose(const Eigen::Affine3f &p);
+        /// If a pose is pending, copy it into `out`, clear the pending flag, and
+        /// return true; otherwise return false. Non-blocking, thread-safe against
+        /// setPose. A true result is the signal to rebin() + recompute with `out`.
+        bool getPendingPose(Eigen::Affine3f &out);
 
-        /// If a pending pose is present, move it into `out`, clear the slot, and
-        /// return true; otherwise return false. Thread-safe against setPendingPose.
-        bool takePendingPose(Eigen::Affine3f &out);
-
-        // --- dirty / claim primitive (work dispatch) ----------------------------
-        // Single source of truth for "this keyframe needs (re)processing". A worker
-        // claims via claim(): the first caller to flip dirty true->false wins and
-        // owns the work, so the two LocalMap workers never double-process a frame.
-
-        /// Mark the keyframe as needing (re)processing.
-        void markDirty() { dirty_.store(true, std::memory_order_release); }
-        /// Atomically take ownership of pending work: returns true exactly once per
-        /// markDirty() across concurrent callers.
-        bool claim() { bool expected = true; return dirty_.compare_exchange_strong(expected, false); }
-        bool isDirty() const { return dirty_.load(std::memory_order_acquire); }
+        /// The latest known pose (map <- base_footprint). Non-blocking copy.
+        Eigen::Affine3f getPose() const;
 
         /// (Re)compute this keyframe's contribution: transform the stored
-        /// base-frame cloud by the current pose, bin into cell-local moments on
-        /// `lattice` (origin at each cell's centre, z about 0), and REPLACE the
-        /// partials. Clears any previous partials first.
-        void rebin(const Lattice &lattice);
+        /// base-frame cloud by `pose`, bin into cell-local moments on `lattice`
+        /// (origin at each cell's centre, z about 0), and REPLACE the partials.
+        /// Clears any previous partials first.
+        void rebin(const Lattice &lattice, const Eigen::Affine3f &pose);
 
         std::unordered_map<std::uint64_t, NodeMetaData> &partials() { return partials_; }
         const std::unordered_map<std::uint64_t, NodeMetaData> &partials() const { return partials_; }
@@ -125,15 +108,15 @@ namespace traversability_mapping
         std::uint64_t kfID_;
         double timestamp_ = 0.0;
         std::uint64_t parentMapID_ = 0;
-        Eigen::Affine3f pose_;                                       ///< map <- base_footprint
         std::vector<Eigen::Vector3f> cloudBase_;                     ///< pruned cloud, base frame
         std::unordered_map<std::uint64_t, NodeMetaData> partials_;   ///< cellId -> cell-local moments
 
-        std::mutex poseSlotMutex_;                                   ///< guards the pending-pose slot
-        Eigen::Affine3f pendingPose_;                                ///< newest unconsumed PGO pose
-        bool hasPending_ = false;
-
-        std::atomic<bool> dirty_{false};                             ///< needs (re)processing
+        // latestPose_ and hasPending_ are written together in setPose and consumed
+        // together in getPendingPose, both under poseMutex_. "Has a pending pose"
+        // IS the "needs rebin + recompute" signal -- there is no separate dirty flag.
+        mutable std::mutex poseMutex_;
+        Eigen::Affine3f latestPose_;                                 ///< map <- base_footprint
+        bool hasPending_ = false;                                    ///< latestPose_ awaits a rebin
     };
 }  // namespace traversability_mapping
 

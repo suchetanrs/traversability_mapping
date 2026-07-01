@@ -33,6 +33,7 @@ set(SOURCE_FILES
     src/Parameters.cpp
     src/Moments.cpp
     src/TraversabilityMetrics.cpp
+    src/Helpers.cpp
     src/KeyFrame.cpp
     src/LocalMap.cpp
     src/System.cpp
@@ -142,6 +143,32 @@ if(BUILD_TESTING)
         ${EIGEN3_INCLUDE_DIR}
     )
     target_link_libraries(test_moments traversabilitySystem)
+
+    # ParameterHandler unit tests (ROS-free: yaml-cpp + boost come via the lib).
+    ament_add_gtest(test_parameters test/test_parameters.cpp)
+    target_include_directories(test_parameters PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${Boost_INCLUDE_DIRS}
+        ${YAML_CPP_INCLUDE_DIRS}
+    )
+    target_link_libraries(test_parameters traversabilitySystem)
+
+    # KeyFrame unit tests (ROS-free / Eigen-only: pose state machine + rebinning).
+    ament_add_gtest(test_keyframe test/test_keyframe.cpp)
+    target_include_directories(test_keyframe PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${EIGEN3_INCLUDE_DIR}
+    )
+    target_link_libraries(test_keyframe traversabilitySystem)
+
+    # Helpers unit tests (generic grid/lattice utilities; needs grid_map_core, which
+    # traversabilitySystem links transitively).
+    ament_add_gtest(test_helpers test/test_helpers.cpp)
+    target_include_directories(test_helpers PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${EIGEN3_INCLUDE_DIR}
+    )
+    target_link_libraries(test_helpers traversabilitySystem)
 endif()
 
 ament_export_include_directories(include)
