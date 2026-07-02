@@ -203,8 +203,8 @@ private:
 
     void odomCallback(const nav_msgs::msg::Odometry::ConstSharedPtr &odom_msg,
                       const sensor_msgs::msg::PointCloud2::ConstSharedPtr &pcl_msg) {
-        RCLCPP_INFO(this->get_logger(), "Sync time difference (odom - pcl): %.6f seconds",
-                    (rclcpp::Time(odom_msg->header.stamp) - rclcpp::Time(pcl_msg->header.stamp)).seconds());
+        // RCLCPP_INFO(this->get_logger(), "Sync time difference (odom - pcl): %.6f seconds",
+        //             (rclcpp::Time(odom_msg->header.stamp) - rclcpp::Time(pcl_msg->header.stamp)).seconds());
         geometry_msgs::msg::Pose pose;
         pose.position = odom_msg->pose.pose.position;
         pose.orientation = odom_msg->pose.pose.orientation;

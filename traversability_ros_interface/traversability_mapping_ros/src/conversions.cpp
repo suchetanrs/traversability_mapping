@@ -25,17 +25,32 @@ namespace tmap_ros
         return out;
     }
 
-    void packSparse(const traversability_mapping::NavDelta &d, const rclcpp::Time &stamp,
-                    traversability_msgs::msg::TraversabilitySparseUpdate &msg)
+    void fillSparseUpdate(const grid_map::GridMap &grid,
+                          const traversability_mapping::Lattice &lattice,
+                          const std::vector<std::string> &layers,
+                          const std::vector<std::uint64_t> &cell_keys, bool is_full,
+                          traversability_msgs::msg::TraversabilitySparseUpdate &msg)
     {
-        msg.header.frame_id = d.frame_id;
-        msg.header.stamp = stamp;
-        msg.resolution = d.resolution;
-        msg.origin_x = d.origin_x;
-        msg.origin_y = d.origin_y;
-        msg.layers = d.layers;
-        msg.is_full_snapshot = d.is_full_snapshot;
-        msg.cell_keys = d.cell_keys;
-        msg.values = d.values;
+        msg.resolution = lattice.res;
+        msg.origin_x = lattice.x0;
+        msg.origin_y = lattice.y0;
+        msg.layers = layers;
+        msg.is_full_snapshot = is_full;
+        msg.cell_keys.clear();
+        msg.values.clear();
+        msg.cell_keys.reserve(cell_keys.size());
+        msg.values.reserve(cell_keys.size() * layers.size());
+        for (auto id : cell_keys)
+        {
+            int ci, cj;
+            traversability_mapping::Lattice::unkey(id, ci, cj);
+            const Eigen::Vector2d c = lattice.centerOf(ci, cj);
+            const grid_map::Position p(c.x(), c.y());
+            if (!grid.isInside(p))
+                continue;
+            msg.cell_keys.push_back(id);
+            for (const auto &l : layers)
+                msg.values.push_back(grid.atPosition(l, p));
+        }
     }
 }  // namespace tmap_ros

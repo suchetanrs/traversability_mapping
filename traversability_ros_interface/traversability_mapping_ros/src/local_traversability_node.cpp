@@ -16,8 +16,10 @@
  *                subscriber is present (debug); full snapshot on (re)connect.
  */
 #include <chrono>
+#include <cstdint>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
@@ -95,7 +97,7 @@ public:
             std::bind(&GlobalTraversabilityNode::updatesCallback, this, std::placeholders::_1));
 
         // Optional raw-cloud buffering path (SLAM that announces keyframes by ts).
-        if (tmap::ParameterHandler::getInstance().getValue<bool>("system/use_pointcloud_buffer"))
+        if (tmap::ParameterHandler::getInstance().getValue<bool>("ingestion/use_pointcloud_buffer"))
         {
             cloud_sub_ = create_subscription<sensor_msgs::msg::PointCloud2>(
                 pointcloud_topic_, rclcpp::SensorDataQoS(),
@@ -140,6 +142,7 @@ private:
         for (const auto &kf : msg->keyframes)
         {
             auto cloud = tmap_ros::toPCL(kf.kf_pointcloud);
+            std::cout << "\033[32mROS NODE: Adding KF: " << kf.kf_id << "\033[0m" << std::endl;
             system_->addNewKeyFrameWithPCL(kf.kf_timestamp_in_nanosec, kf.kf_id, kf.map_id, cloud);
             // Supplies the pose AND triggers the first bin (additions register without
             // binning at the placeholder pose).
@@ -184,28 +187,40 @@ private:
         auto lm = system_->getLocalMap();
         if (!lm)
             return;
-        // No consumer: drain (to keep the dirty set bounded) and arm a full snapshot
-        // so the next subscriber starts consistent.
+        // No consumer: drain (to keep the changed-cell set bounded) and arm a full
+        // snapshot so the next subscriber starts consistent.
         if (sparse_pub_->get_subscription_count() == 0)
         {
-            lm->drainNavDelta();
+            {
+                std::lock_guard<std::mutex> lock(lm->getGridMapMutex());
+                lm->takeChangedCells();
+            }
             need_full_snapshot_ = true;
             return;
         }
-        tmap::NavDelta d;
-        if (need_full_snapshot_)
-        {
-            d = lm->fullNavSnapshot();
-            need_full_snapshot_ = false;
-        }
-        else
-        {
-            d = lm->drainNavDelta();
-            if (d.cell_keys.empty())
-                return;
-        }
+
+        // Take the cell keys AND read their layer values under one grid lock so the
+        // two stay consistent. The core map only hands out cell ids + the grid + the
+        // lattice; this node owns navLayers_ and decides what to publish.
+        const bool is_full = need_full_snapshot_;
         traversability_msgs::msg::TraversabilitySparseUpdate out;
-        tmap_ros::packSparse(d, now(), out);
+        bool ready = false;
+        {
+            std::lock_guard<std::mutex> lock(lm->getGridMapMutex());
+            const std::vector<std::uint64_t> keys =
+                is_full ? lm->occupiedCellKeys() : lm->takeChangedCells();
+            if (is_full || !keys.empty())
+            {
+                tmap_ros::fillSparseUpdate(lm->getGridMap(), lm->getLattice(), navLayers_,
+                                           keys, is_full, out);
+                ready = true;
+            }
+        }
+        if (!ready)
+            return;
+        need_full_snapshot_ = false;
+        out.header.frame_id = map_frame_;
+        out.header.stamp = now();
         sparse_pub_->publish(out);
     }
 
@@ -219,7 +234,7 @@ private:
         std::unique_ptr<grid_map_msgs::msg::GridMap> gm;
         {
             std::lock_guard<std::mutex> lock(lm->getGridMapMutex());
-            gm = grid_map::GridMapRosConverter::toMessage(lm->getGridMap(), lm->navLayers());
+            gm = grid_map::GridMapRosConverter::toMessage(lm->getGridMap(), navLayers_);
         }
         gm->header.frame_id = map_frame_;
         gm->header.stamp = now();
@@ -260,6 +275,12 @@ private:
     // ---- members ------------------------------------------------------------
     std::string additions_topic_, updates_topic_, pointcloud_topic_;
     std::string slam_frame_, robot_base_frame_, lidar_frame_, map_frame_;
+
+    // The grid layers this adapter publishes (sparse update + debug grid_map). The
+    // core LocalMap is layer-agnostic; this subset is owned here on the ROS side.
+    const std::vector<std::string> navLayers_ = {
+        "normal_x", "normal_y", "normal_z", "slope_haz",
+        "step_haz", "elevation", "roughness_haz", "hazard"};
 
     std::shared_ptr<tmap::System> system_;
     bool need_full_snapshot_ = true;

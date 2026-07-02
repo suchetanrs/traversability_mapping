@@ -29,6 +29,7 @@
       pose_type: "odom"
       odom_topic: "ground_truth_pose"
       pcl_topic: "lidar/points"
-      keyframe_publish_rate_hz: 2.5 # Hz.
-      per_keyframe_translation_error_m: 1.0
-      per_keyframe_yaw_error_deg: 2.0
+      keyframe_publish_rate_hz: 10.5 # Hz.
+      per_keyframe_translation_error_m: 0.0
+      per_keyframe_yaw_error_deg: 0.0
+      keyframe_min_displacement_m: 0.0
