@@ -10,6 +10,7 @@
  * License along with this library.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
+
 #include "traversability_mapping/PointCloudBuffer.hpp"
 
 using namespace std::chrono_literals;

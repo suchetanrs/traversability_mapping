@@ -10,6 +10,7 @@
  * License along with this library.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
+
 #ifndef POINTCLOUDBUFFERROS_HPP_
 #define POINTCLOUDBUFFERROS_HPP_
 
@@ -27,21 +28,30 @@ using namespace std::chrono_literals;
 
 namespace traversability_mapping
 {
-    // sensor_msgs variant of PointCloudBuffer. Compiled only when ROS message types
-    // are available (WITH_ROS2_SENSOR_MSGS); the pure-PCL PointCloudBuffer is the
-    // always-available fallback for the no-ROS build.
+    /**
+     * @brief Timestamp-keyed ring buffer holding raw sensor_msgs clouds.
+     *
+     * The sensor_msgs variant of PointCloudBuffer, compiled only when ROS message
+     * types are available (WITH_ROS2_SENSOR_MSGS); the pure-PCL PointCloudBuffer is
+     * the always-available fallback.
+     */
     class PointCloudBufferROS
     {
     public:
+        /// @brief Construct an empty buffer.
         PointCloudBufferROS();
 #ifdef WITH_ROS2_SENSOR_MSGS
 
+        /// @brief Store a cloud under its acquisition time.
+        /// @param pointCloud the cloud. @param timestamp acquisition time (s).
         void addPointCloud(sensor_msgs::msg::PointCloud2::SharedPtr pointCloud, double timestamp);
 
-        // Function to find the closest point cloud to the queried timestamp
+        /// @brief Fetch the buffered cloud closest in time to @p query_time.
+        /// @param query_time query time (s). @return the closest cloud (nullptr if empty).
         std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> getClosestPointCloud(const double &query_time);
 
-        // Function to delete all points before the queried timestamp in the buffer
+        /// @brief Drop every buffered cloud older than @p query_time.
+        /// @param query_time cutoff time (s).
         void deletePointsBefore(const double &query_time);
 
     private:

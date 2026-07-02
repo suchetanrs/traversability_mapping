@@ -28,58 +28,69 @@
 
 #include "traversability_mapping/Moments.hpp"
 
-// NOTE: the ROS occupancy-grid conversion (gridMapToOccupancyGrid) lives in the ROS
-// adapter, not here, so the core library carries zero ROS headers.
+/**
+ * @file Helpers.hpp
+ * @brief Stateless grid <-> lattice utilities shared by the map machinery.
+ *
+ * Every dependency is passed in, so these free functions are reusable and unit-testable
+ * without a LocalMap.
+ * @note The ROS occupancy-grid conversion lives in the ROS adapter, so the core carries
+ *       zero ROS headers.
+ */
 
 namespace traversability_mapping
 {
-    // --- generic grid <-> lattice utilities ---------------------------------
-    // Free functions shared by the map machinery. They are stateless: every
-    // dependency (the grid, the lattice, the layer list, the resolution) is passed
-    // in, so they can be reused and unit-tested without a LocalMap instance.
-
-    /// grid_map position of cell (ci,cj)'s centre on `lattice`.
+    /// @brief grid_map position of a cell's centre.
+    /// @param lattice the cell lattice. @param ci,cj cell indices. @return centre position.
     grid_map::Position cellPos(const Lattice &lattice, int ci, int cj);
 
-    /// Build a fresh, all-NaN grid_map covering +/-(halfX,halfY) about the lattice
-    /// origin. ODD cell count per axis so cell centres land exactly on the lattice;
-    /// the geometry position stays the lattice origin so absolute cell ids survive
-    /// any resize.
+    /// @brief Build a fresh all-NaN grid covering +/-(halfX,halfY) about the lattice origin.
+    /// @param layers layer names. @param frameId grid frame id. @param lattice the lattice.
+    /// @param res cell size (m). @param halfX,halfY half-extents (m).
+    /// @return the new grid (odd cell count per axis so centres land on the lattice).
     grid_map::GridMap makeGridMap(const std::vector<std::string> &layers,
                                   const std::string &frameId, const Lattice &lattice,
                                   double res, double halfX, double halfY);
 
-    /// Grow `grid` IN PLACE so it covers the given map-frame bounds, enlarging in
-    /// steps of `extend` metres and copying every non-NaN cell across. No-op when the
-    /// bounds already fit. `layers`/`lattice`/`res` describe `grid`.
+    /// @brief Grow @p grid in place to cover the given map-frame bounds, copying cells across.
+    /// @param grid grid to enlarge (no-op if the bounds already fit).
+    /// @param layers,lattice,res describe @p grid. @param extend growth step (m).
+    /// @param minx,maxx,miny,maxy map-frame bounds to include.
     void growGridToInclude(grid_map::GridMap &grid, const std::vector<std::string> &layers,
                            const Lattice &lattice, double res, double extend,
                            double minx, double maxx, double miny, double maxy);
 
-    /// Add `v` to one layer at `p`, treating a NaN cell as 0 (lazy initialisation).
+    /// @brief Add @p v to one layer at @p p, treating a NaN cell as 0.
+    /// @param grid target grid. @param layer layer name. @param p cell position. @param v value to add.
     void addToLayer(grid_map::GridMap &grid, const std::string &layer,
                     const grid_map::Position &p, double v);
 
-    /// Set every `layers` cell at `p` to NaN.
+    /// @brief Set every @p layers cell at @p p to NaN.
+    /// @param grid target grid. @param layers layers to blank. @param p cell position.
     void blankCell(grid_map::GridMap &grid, const std::vector<std::string> &layers,
                    const grid_map::Position &p);
 
-    /// Read the fused moment stored at cell (ci,cj) into `out`; false if the cell is
-    /// outside the grid or unobserved (N<1).
+    /// @brief Read the fused moment stored at cell (ci,cj).
+    /// @param grid,lattice the map. @param ci,cj cell indices. @param out [out] the moment.
+    /// @return false if the cell is outside the grid or unobserved (N<1).
     bool readCellMoment(const grid_map::GridMap &grid, const Lattice &lattice,
                         int ci, int cj, NodeMetaData &out);
 
-    /// Absolute lattice ids of every occupied (N>=1) cell currently in `grid`.
+    /// @brief Absolute ids of every occupied (N>=1) cell in @p grid.
+    /// @param grid,lattice the map. @return the occupied cell ids.
     std::vector<std::uint64_t> allOccupiedKeys(const grid_map::GridMap &grid,
                                                const Lattice &lattice);
 
-    /// Dilate a set of cell keys by +/-`delta` cells on each axis (square window).
+    /// @brief Dilate a set of cell keys by +/-@p delta cells on each axis (square window).
+    /// @param touched input keys. @param delta radius in cells. @return the dilated set.
     std::unordered_set<std::uint64_t> dilate(const std::unordered_set<std::uint64_t> &touched,
                                              int delta);
 
+    /// @brief Scoped timer that logs the wall-clock lifetime of its enclosing scope.
     class Profiler
     {
     public:
+        /// @param functionName label printed with the measured duration.
         Profiler(const std::string & functionName) : functionName(functionName)
         {
             start = std::chrono::high_resolution_clock::now();
@@ -98,6 +109,7 @@ namespace traversability_mapping
         std::chrono::time_point<std::chrono::high_resolution_clock> start;
     };
 
+    /// @brief Profile the current function: drop this macro at the top of its body.
     #define PROFILE_FUNCTION Profiler profiler_instance(__func__);
 }
 #endif // TRAVERSABILITY_HELPERS_HPP_

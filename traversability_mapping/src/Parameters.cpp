@@ -86,5 +86,4 @@ const std::type_info& ParameterHandler::typeOf(const std::string& parameterKey) 
         throw std::runtime_error("Parameter " + parameterKey + " is not found in the map");
     return it->second.type();
 }
-
 } // namespace traversability_mapping

@@ -29,11 +29,23 @@
 
 namespace traversability_mapping
 {
+/**
+ * @brief Thread-safe, YAML-backed key/value parameter store used as a process singleton.
+ *
+ * Values are held type-erased in a boost::any map, so the ROS-free core carries no ROS
+ * parameter dependency; an adapter can mirror these to ROS params via the introspection
+ * hooks (keys() / typeOf()) and getValue<T>() / setValue<T>().
+ */
 class ParameterHandler
 {
   public:
+    /// @brief Construct from a YAML file; an empty path loads the package default.
+    /// @param yaml_file_path path to the YAML params file ("" = package default).
     ParameterHandler(std::string yaml_file_path = "");
 
+    /// @brief Lazily-constructed process singleton.
+    /// @param yaml_file_path source path; only the FIRST call's value takes effect.
+    /// @return the singleton instance.
     static ParameterHandler& getInstance(std::string yaml_file_path = "")
     {
         std::lock_guard<std::mutex> lock(instanceMutex_);
@@ -42,6 +54,11 @@ class ParameterHandler
         return *parameterHandlerPtr_;
     }
 
+    /// @brief Typed read of a parameter.
+    /// @tparam T stored value type (must match what was loaded / set).
+    /// @param parameterKey key to read. @return the stored value.
+    /// @throws std::runtime_error if the key is absent.
+    /// @throws boost::bad_any_cast if @p T does not match the stored type.
     template <typename T>
     T getValue(const std::string& parameterKey) const
     {
@@ -49,24 +66,24 @@ class ParameterHandler
         auto it = parameter_map_.find(parameterKey);
         if (it != parameter_map_.end())
         {
-            // std::cout << "\e[0;106m" << "Got request for: " << parameterKey << "\e[m" << std::endl;
-            // std::cout << "\e[0;106m" << "Returning value " << boost::any_cast<T>(it->second) << " for parameter " << parameterKey
-            //           << "\e[m" << std::endl;
             return boost::any_cast<T>(it->second);
         }
-        // TODO : Handle this runtime error.
         throw std::runtime_error("Parameter " + parameterKey + " is not found in the map");
     }
 
+    /// @brief Insert or overwrite a parameter.
+    /// @tparam T value type. @param parameterKey key. @param value value to store.
     template <typename T>
     void setValue(const std::string& parameterKey, const T& value) {
         std::lock_guard<std::mutex> lock(mapMutex_);
         parameter_map_[parameterKey] = value;
     }
 
-    /// Introspection hooks. The adapter
-    /// dispatches on typeOf() and reuses getValue<T>/setValue<T>.
+    /// @brief Introspection hook for the ROS bridge. @return every currently-stored key.
     std::vector<std::string> keys() const;
+    /// @brief Stored type of a parameter; the bridge dispatches on this.
+    /// @param parameterKey key to query. @return the stored type.
+    /// @throws std::runtime_error if the key is absent.
     const std::type_info& typeOf(const std::string& parameterKey) const;
 
   private:
@@ -79,6 +96,7 @@ class ParameterHandler
 };
 } // namespace traversability_mapping
 
+/// @brief Shorthand for the ParameterHandler singleton instance.
 #define parameterInstance (::traversability_mapping::ParameterHandler::getInstance())
 
 #endif

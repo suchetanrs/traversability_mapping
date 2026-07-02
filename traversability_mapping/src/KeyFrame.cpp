@@ -10,6 +10,7 @@
  * License along with this library.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
+
 #include "traversability_mapping/KeyFrame.hpp"
 
 #include <vector>
@@ -50,12 +51,6 @@ namespace traversability_mapping
 
     void KeyFrame::rebin(const Lattice &lattice, const Eigen::Affine3f &pose)
     {
-        // Bin the stored base-frame cloud, transformed by `pose`, into cell-local
-        // moments and REPLACE the partials. `pose` is passed by value/snapshot (not
-        // read from a shared member) so a concurrent setPose cannot tear it mid-loop.
-        // Moments are raw sums, so the partition can be recomputed from scratch every
-        // call (not frozen). Single-threaded: OpenMP is deferred (see PRD);
-        // parallelism comes only from the LocalMap worker-thread structure.
         partials_.clear();
         for (const auto &p_base : cloudBase_)
         {

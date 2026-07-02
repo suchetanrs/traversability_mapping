@@ -10,33 +10,9 @@
  * License along with this library.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
+
 #ifndef TRAVERSABILITY_LOCALMAP_HPP_
 #define TRAVERSABILITY_LOCALMAP_HPP_
-
-// Per-submap moment-fused map. Owns ONE fixed-frame, growing grid_map whose layers
-// hold the fused moments + derived hazard/nav layers, the keyframes routed to it,
-// and TWO worker threads that turn keyframe contributions into traversability:
-//
-//   * RunLocalKeyFrames - drains the local work queue (keyframes enqueued by
-//                          setKeyFramePose), fast.
-//   * RunTraversability  - a backstop that sweeps ALL keyframes, slower; a keyframe
-//                          with no pending pose is skipped (getPendingPose() returns
-//                          false), so it catches anything not drained via the queue.
-//
-// Both run the same per-keyframe op (subtract old partials -> rebin at the pending
-// pose -> add -> recompute hazards over the dilated touched cells). Locking uses TWO
-// independent mutexes: masterGridMapMutex_ (the heavy lock, held for the whole
-// recompute) guards the grid + keyframe registry; poseQueueMutex_ (a light lock) guards
-// only the pose work queue. setKeyFramePose takes ONLY the queue lock, so a pose update
-// never blocks behind an in-progress recompute. getPendingPose() hands the pending pose
-// to exactly one worker and clears the flag, so a double-touch by both workers is
-// idempotent.
-//
-// ROS-free and output-format agnostic: LocalMap owns the whole grid_map and the set
-// of cell ids changed since the last drain, and exposes the grid + its mutex + the
-// lattice + the changed-cell set. It has NO notion of "nav layers" or any publish
-// format -- the ROS adapter decides which layers to publish for the changed cells.
-// The keyframe never touches the grid; LocalMap performs all grid arithmetic.
 
 #include <cstdint>
 #include <string>
@@ -59,16 +35,30 @@
 
 namespace traversability_mapping
 {
+    /**
+     * @brief Per-submap moment-fused map: one growing grid_map, its keyframes, and two
+     *        worker threads that turn keyframe contributions into traversability.
+     *
+     * Workers: RunLocalKeyFrames drains the pose work queue (fast); RunTraversability is
+     * a backstop that sweeps all keyframes. Both run the same op: subtract old partials
+     * -> rebin -> add -> recompute hazards over the dilated touched cells.
+     *
+     * Three independent locks, nested in this order: masterGridMapMutex_ (grid +
+     * changed-cell set) -> keyFramesMapMutex_ (keyframe registry) -> poseQueueMutex_
+     * (pose work queue). setKeyFramePose takes only the queue lock, so pose updates never
+     * block a recompute.
+     *
+     * ROS-free and output-format agnostic: it exposes the grid, its mutex, the lattice,
+     * and the changed-cell set; the adapter decides which layers to publish.
+     */
     class LocalMap
     {
     public:
-        /// `lattice` is the shared absolute lattice (same across all maps so a
-        /// keyframe's partials transfer on re-parent). `mapFrame` is the grid frame
-        /// id (cosmetic in the core; the adapter sets the published header frame).
-        /// `onUpdate`, if set, is invoked by a worker AFTER it finishes a keyframe
-        /// op and AFTER releasing the grid lock (so the callback may read the grid /
-        /// drain the changed-cell set without deadlocking). Used by the adapter to
-        /// publish on every recompute. Must be set at construction (read by the workers).
+        /// @brief Construct a map and start its two worker threads.
+        /// @param mapID this map's id.
+        /// @param lattice shared absolute lattice (same across maps so partials transfer on re-parent).
+        /// @param mapFrame grid frame id (cosmetic in the core).
+        /// @param onUpdate invoked by a worker after each grid-changing op, outside the grid lock.
         LocalMap(std::uint64_t mapID, const Lattice &lattice, std::string mapFrame = "map",
                  std::function<void()> onUpdate = {});
         ~LocalMap();
@@ -76,97 +66,104 @@ namespace traversability_mapping
         LocalMap(const LocalMap &) = delete;
         LocalMap &operator=(const LocalMap &) = delete;
 
+        /// @brief This map's id.
         std::uint64_t mapID() const { return mapID_; }
 
-        // --- keyframe lifecycle ------------------------------------------------
+        /// @name Keyframe lifecycle
+        /// @{
 
-        /// Register a keyframe in this map's working set. Does NOT flag it pending or
-        /// enqueue it; the caller sets a pose (setKeyFramePose) once it is ready to be
-        /// binned. Used for both fresh additions and re-parented KFs, and when multiple
-        /// maps are fused together.
+        /// @brief Register a keyframe in the working set (does NOT flag it pending).
+        /// @param kf keyframe to register; a pose is supplied later via setKeyFramePose.
         void addAlreadyDeclaredKF(const std::shared_ptr<KeyFrame> &kf);
 
-        /// Set a keyframe's latest pose AND push it onto the local work queue so a
-        /// worker rebins it. This is the single entry point for pose updates: routing
-        /// them through the map (rather than KeyFrame::setPose directly) is what lets
-        /// the local worker be a real work queue whose depth == the rebin backlog.
-        /// Takes ONLY poseQueueMutex_ (never the grid lock), so it never blocks behind
-        /// a recompute. The caller passes the keyframe directly (it already holds the
-        /// shared_ptr), so no grid-locked keyFramesMap_ lookup is needed. Cheap,
-        /// non-blocking; no-op if `kf` is null.
+        /// @brief Set a keyframe's latest pose and enqueue it for rebin (queue lock only).
+        /// @param kf keyframe to update (no-op if null); passed directly to avoid a registry lookup.
+        /// @param pose new pose (map <- base_footprint).
         void setKeyFramePose(const std::shared_ptr<KeyFrame> &kf, const Eigen::Affine3f &pose);
 
-        /// Subtract a keyframe's contribution from the grid (recomputing the cells
-        /// it vacated), remove it from the working set/window, and return it (or
-        /// nullptr). Used by delete and by re-parent-out.
+        /// @brief Subtract a keyframe's contribution and remove it from the working set.
+        /// @param id keyframe id. @return the detached keyframe, or nullptr if unknown.
         std::shared_ptr<KeyFrame> detachKeyFrame(std::uint64_t id);
 
-        /// detachKeyFrame + discard (the caller releases the last reference).
+        /// @brief detachKeyFrame + discard (the caller releases the last reference).
+        /// @param id keyframe id.
         void deleteKeyFrame(std::uint64_t id) { (void)detachKeyFrame(id); }
 
-        /// Clear the whole grid and rebuild from retained clouds: blank every layer,
-        /// record every occupied cell as changed, clear every keyframe's partials,
-        /// and flag them pending so the workers re-add them. Keyframes whose cloud was
-        /// dropped (optimization off) cannot be rebuilt.
+        /// @brief Blank the grid and rebuild from retained clouds (loop-closure response).
+        ///        Keyframes whose cloud was dropped cannot be rebuilt.
         void clearEntireMap();
 
+        /// @brief Read-only view of the keyframe registry.
         const std::unordered_map<std::uint64_t, std::shared_ptr<KeyFrame>> &getKeyFramesMap() const
         {
             return keyFramesMap_;
         }
+        /// @}
 
-        // --- outputs -----------------------------------------------------------
-        //
-        // LocalMap hands out the raw grid + the set of changed cell ids; it does NOT
-        // know which layers a consumer publishes. To build any sparse/full update the
-        // adapter holds getGridMapMutex(), takes the cell keys (takeChangedCells /
-        // occupiedCellKeys), then reads whatever layers it wants from getGridMap() at
-        // each key's position via getLattice(). Doing it under one held lock keeps the
-        // key set and the values it reads consistent.
+        /// @name Outputs
+        /// The adapter holds getGridMapMutex(), takes the cell keys (takeChangedCells /
+        /// occupiedCellKeys), then reads layers from getGridMap() at each key via
+        /// getLattice() — all under one held lock so keys and values stay consistent.
+        /// @{
 
-        /// Live grid + its mutex. The caller must hold getGridMapMutex() while
-        /// touching getGridMap() or calling takeChangedCells / occupiedCellKeys.
+        /// @brief The live grid (hold getGridMapMutex() while accessing it).
         const grid_map::GridMap &getGridMap() const { return gridMap_; }
+        /// @brief The mutex guarding the grid and the changed-cell set.
         std::mutex &getGridMapMutex() { return masterGridMapMutex_; }
 
-        /// The absolute lattice (maps cell ids <-> map-frame positions). Immutable
-        /// after construction.
+        /// @brief The absolute lattice (cell ids <-> map-frame positions), immutable after construction.
         const Lattice &getLattice() const { return lattice_; }
 
-        /// Cell ids changed since the last call; clears the set. CALLER MUST HOLD
-        /// getGridMapMutex() (so the keys stay consistent with the grid it reads).
+        /// @brief Cell ids changed since the last call; clears the set.
+        /// @return the changed cell ids. @note caller must hold getGridMapMutex().
         std::vector<std::uint64_t> takeChangedCells();
 
-        /// Cell ids of every occupied (N>=1) cell, for a full snapshot. CALLER MUST
-        /// HOLD getGridMapMutex().
+        /// @brief Cell ids of every occupied (N>=1) cell, for a full snapshot.
+        /// @return the occupied cell ids. @note caller must hold getGridMapMutex().
         std::vector<std::uint64_t> occupiedCellKeys() const;
 
-        /// Voxel-downsampled stitch of every retained keyframe cloud in the map
-        /// frame (legacy getStitchedPointCloud).
+        /// @brief Voxel-downsampled stitch of every retained keyframe cloud, in the map frame.
+        /// @param voxel_size_x,voxel_size_y,voxel_size_z voxel leaf size (<=0 disables downsampling).
+        /// @return the stitched cloud.
         std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> getStitchedPointCloud(
             float voxel_size_x, float voxel_size_y, float voxel_size_z);
+        /// @}
 
     private:
-        // ---- grid growth (delegates to growGridToInclude in Helpers.hpp) ----
+        /// @brief Grow the grid to cover every cell in @p partials.
+        /// @param partials cells that must fit in the grid.
         void growToIncludeCells(const std::unordered_map<std::uint64_t, NodeMetaData> &partials);
 
-        // ---- moment -> grid ----
+        /// @brief Add (sign>0) or subtract (sign<0) one keyframe's cell moment.
+        /// @param cellId target cell. @param m the moment. @param sign +1 to add, -1 to subtract.
         void addPartialToGrid(std::uint64_t cellId, const NodeMetaData &m, double sign);
 
-        // ---- recompute ----
+        /// @name Recompute (caller must hold masterGridMapMutex_)
+        /// @{
+        /// @brief Recompute one cell's hazards from its vicinity.
+        /// @param id cell id. @return true if the cell was (re)written.
         bool recomputeCell(std::uint64_t id);
+        /// @brief Recompute every cell in @p dirty, recording those that changed.
+        /// @param dirty cell ids to recompute.
         void recomputeDirty(const std::unordered_set<std::uint64_t> &dirty);
+        /// @}
 
-        // ---- per-keyframe op (caller must NOT hold masterGridMapMutex_) ----
-        // Returns true iff it actually (re)wrote the grid (false on a skip), so the
-        // worker only fires onUpdate_ when something changed.
+        /// @brief Per-keyframe op: subtract old, rebin at @p pose, add, recompute hazards.
+        ///        Manages its own locking (caller must NOT hold masterGridMapMutex_).
+        /// @param kf keyframe to (re)process. @param pose pose to bin at.
+        /// @return true iff it (re)wrote the grid (false on a skip).
         bool recomputeKeyFrame(const std::shared_ptr<KeyFrame> &kf, const Eigen::Affine3f &pose);
 
-        // ---- worker threads ----
+        /// @name Worker threads
+        /// @{
+        /// @brief Fast worker: drain the pose work queue.
         void RunLocalKeyFrames();
+        /// @brief Slow backstop worker: sweep all keyframes for a pending pose.
         void RunTraversability();
+        /// @}
 
-        // ---- identity / config ----
+        /// @name Identity / config
+        /// @{
         std::uint64_t mapID_;
         Lattice lattice_;
         std::string frameId_;
@@ -176,34 +173,41 @@ namespace traversability_mapping
         int deltaInd_;
         int globalSleepMs_;
         bool kfOptimizationEnabled_;
-        std::function<void()> onUpdate_;        // fired after each grid-changing keyframe op
+        std::function<void()> onUpdate_;        ///< fired after each grid-changing keyframe op
+        std::vector<std::string> layers_;       ///< all internal layers (moments + derived)
+        /// @}
 
-        std::vector<std::string> layers_;       // all internal layers (moments + derived)
-
-        // ---- grid + registry state, guarded by masterGridMapMutex_ ----
-        // recomputeKeyFrame releases it around the keyframe-local rebin, so a long rebin
-        // no longer blocks grid readers. Pose updates never take it at all.
-        std::mutex masterGridMapMutex_;          // guards gridMap_, changedCells_
+        /// @name Grid state, guarded by masterGridMapMutex_
+        /// Taken only in short bursts around grid touches (a recompute releases it around
+        /// the keyframe-local rebin); pose updates never take it.
+        /// @{
+        std::mutex masterGridMapMutex_;
         grid_map::GridMap gridMap_;
-        std::unordered_set<std::uint64_t> changedCells_;  // cell ids changed since last drain
+        std::unordered_set<std::uint64_t> changedCells_;  ///< cell ids changed since last drain
+        /// @}
 
-        // keyFramesMap_ has its OWN light lock so a keyframe add/detach never waits on
-        // the grid lock (held across the whole recompute). Lock order where both are
-        // held: masterGridMapMutex_ -> keyFramesMapMutex_.
+        /// @name Keyframe registry, guarded by keyFramesMapMutex_
+        /// Separate lock so an add/detach never waits on the grid lock.
+        /// @{
         std::mutex keyFramesMapMutex_;
         std::unordered_map<std::uint64_t, std::shared_ptr<KeyFrame>> keyFramesMap_;
+        /// @}
 
-        // ---- pose work queue, guarded by its OWN light lock ----
-        // Held only for O(1) enqueue/dequeue, never during a recompute. The queue
-        // holds shared_ptrs so the worker needs no keyFramesMap_ lookup to drain it.
-        std::mutex poseQueueMutex_;              // guards localQueue_, localQueued_
-        std::deque<std::shared_ptr<KeyFrame>> localQueue_;   // keyframes awaiting rebin; depth == backlog
-        std::unordered_set<std::uint64_t> localQueued_;      // membership set (kf ids): dedup enqueues
+        /// @name Pose work queue, guarded by poseQueueMutex_
+        /// Held only for O(1) enqueue/dequeue; holds shared_ptrs so the worker needs no
+        /// registry lookup to drain it.
+        /// @{
+        std::mutex poseQueueMutex_;
+        std::deque<std::shared_ptr<KeyFrame>> localQueue_;   ///< keyframes awaiting rebin; depth == backlog
+        std::unordered_set<std::uint64_t> localQueued_;      ///< membership set (kf ids): dedup enqueues
+        /// @}
 
-        // ---- threads ----
+        /// @name Threads
+        /// @{
         std::atomic<bool> running_{true};
         std::thread localThread_;
         std::thread globalThread_;
+        /// @}
     };
 }  // namespace traversability_mapping
 

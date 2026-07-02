@@ -10,6 +10,7 @@
  * License along with this library.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
+
 #include "traversability_mapping/Helpers.hpp"
 
 #include <grid_map_core/iterators/GridMapIterator.hpp>

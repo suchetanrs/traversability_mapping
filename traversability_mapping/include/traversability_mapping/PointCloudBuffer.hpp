@@ -10,6 +10,7 @@
  * License along with this library.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
+
 #ifndef POINTCLOUDBUFFER_HPP_
 #define POINTCLOUDBUFFER_HPP_
 
@@ -26,20 +27,29 @@ using namespace std::chrono_literals;
 
 namespace traversability_mapping
 {
-    // Pure-PCL ring buffer of clouds keyed by timestamp. Lets a SLAM front-end that
-    // announces keyframes by timestamp (separate from the cloud stream) recover the
-    // cloud closest to a keyframe's time. Always compiled (no ROS dependency).
+    /**
+     * @brief Pure-PCL ring buffer of clouds keyed by timestamp.
+     *
+     * Lets a SLAM front-end that announces keyframes by timestamp (separate from the
+     * cloud stream) recover the cloud closest to a keyframe's time. Always compiled
+     * (no ROS dependency).
+     */
     class PointCloudBuffer
     {
     public:
+        /// @brief Construct an empty buffer.
         PointCloudBuffer();
 
+        /// @brief Store a cloud under its acquisition time.
+        /// @param pointCloud the cloud. @param timestamp acquisition time (s).
         void addPointCloud(std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> pointCloud, double timestamp);
 
-        // Function to find the closest point cloud to the queried timestamp
+        /// @brief Fetch the buffered cloud closest in time to @p query_time.
+        /// @param query_time query time (s). @return the closest cloud (nullptr if empty).
         std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> getClosestPointCloud(const double &query_time);
 
-        // Function to delete all points before the queried timestamp in the buffer
+        /// @brief Drop every buffered cloud older than @p query_time.
+        /// @param query_time cutoff time (s).
         void deletePointsBefore(const double &query_time);
 
     private:

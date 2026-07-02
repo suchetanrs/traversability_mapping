@@ -120,4 +120,5 @@ namespace traversability_mapping
         haz[HAZ_BORDER] = 0.0;
         return haz;
     }
+
 }  // namespace traversability_mapping

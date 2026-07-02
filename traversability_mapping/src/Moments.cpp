@@ -70,4 +70,5 @@ namespace traversability_mapping
     {
         transform(Eigen::Matrix3d::Identity(), d);
     }
+
 }  // namespace traversability_mapping
