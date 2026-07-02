@@ -11,7 +11,7 @@
       robot_base_frame: base_footprint
       lidar_frame: lidar_link
 
-  local_traversability_node:
+  global_traversability_node:
     ros__parameters:
       additions_topic_name: "traversability_keyframe_additions"
       updates_topic_name: "traversability_keyframe_updates"

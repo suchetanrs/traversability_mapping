@@ -86,9 +86,9 @@ include_directories(
 # target_link_libraries(multi_map_merge ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem traversability_mapping_common)
 
 # Add executable (thin adapter node + ROS<->plain-data conversions)
-add_executable(local_traversability src/local_traversability_node.cpp src/conversions.cpp)
-ament_target_dependencies(local_traversability ${dependencies})
-target_link_libraries(local_traversability ${PCL_LIBRARIES} ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem traversability_mapping_common)
+add_executable(global_traversability src/global_traversability_node.cpp src/conversions.cpp)
+ament_target_dependencies(global_traversability ${dependencies})
+target_link_libraries(global_traversability ${PCL_LIBRARIES} ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem traversability_mapping_common)
 
 # # Add executable
 # add_executable(threshold_occupancy src/threshold_occupancy.cpp)
@@ -108,7 +108,7 @@ target_link_libraries(local_traversability ${PCL_LIBRARIES} ${Sophus_LIBRARIES} 
 # Install executable 
 install(TARGETS
     # traversability_node multi_map_merge threshold_occupancy virtual_boundary_maker one_shot_traversability
-    local_traversability
+    global_traversability
     DESTINATION lib/${PROJECT_NAME}
 )
 

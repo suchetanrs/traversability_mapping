@@ -51,7 +51,7 @@ namespace tmap = traversability_mapping;
 class GlobalTraversabilityNode : public rclcpp::Node
 {
 public:
-    GlobalTraversabilityNode() : Node("local_traversability_node")
+    GlobalTraversabilityNode() : Node("global_traversability_node")
     {
         // --- ROS params (names match traversability_gt_ros_params.yaml) ---
         additions_topic_ = declare_parameter<std::string>("additions_topic_name", "traversability_keyframe_additions");

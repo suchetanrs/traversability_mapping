@@ -48,7 +48,7 @@ def generate_launch_description():
 
         traversability_mapping_ros = Node(
             package='traversability_mapping_ros',
-            executable='local_traversability',
+            executable='global_traversability',
             namespace=namespace,
             output='screen',
             parameters=[params_file, {"parameter_file_path": traversability_params_file}])
