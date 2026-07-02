@@ -20,17 +20,17 @@ namespace traversability_mapping
 {
     System::System()
     {
-        const double cx = parameterInstance.getValue<double>("system/grid_center_x");
-        const double cy = parameterInstance.getValue<double>("system/grid_center_y");
-        const double res = parameterInstance.getValue<double>("system/resolution_local_map");
+        const double cx = parameterInstance.getValue<double>("grid/grid_center_x");
+        const double cy = parameterInstance.getValue<double>("grid/grid_center_y");
+        const double res = parameterInstance.getValue<double>("grid/resolution_local_map");
         lattice_ = Lattice(cx, cy, res);
 
-        robot_height_ = parameterInstance.getValue<double>("system/robot_height");
-        max_range_base_frame_ = parameterInstance.getValue<double>("system/max_range_base_frame");
-        min_range_base_frame_ = parameterInstance.getValue<double>("system/min_range_base_frame");
+        robot_height_ = parameterInstance.getValue<double>("ingestion/robot_height");
+        max_range_base_frame_ = parameterInstance.getValue<double>("ingestion/max_range_base_frame");
+        min_range_base_frame_ = parameterInstance.getValue<double>("ingestion/min_range_base_frame");
 
-        usePointCloudBuffer_ = parameterInstance.getValue<bool>("system/use_pointcloud_buffer");
-        useROSBuffer_ = parameterInstance.getValue<bool>("system/use_ros_buffer");
+        usePointCloudBuffer_ = parameterInstance.getValue<bool>("ingestion/use_pointcloud_buffer");
+        useROSBuffer_ = parameterInstance.getValue<bool>("ingestion/use_ros_buffer");
         if (usePointCloudBuffer_)
         {
             pointCloudBuffer_ = std::make_shared<PointCloudBuffer>();
@@ -119,8 +119,6 @@ namespace traversability_mapping
             std::cerr << "[System] keyframe " << kfID << " pruned to empty; not stored." << std::endl;
             return;
         }
-        // Identity placeholder pose: the keyframe is NOT marked dirty here, so no
-        // worker bins it until updateKeyFrame supplies the real pose.
         const std::size_t npts = cloud_base.size();
         auto kf = std::make_shared<KeyFrame>(kfID, timestamp, Eigen::Affine3f::Identity(),
                                              std::move(cloud_base), mapID);
@@ -164,22 +162,32 @@ namespace traversability_mapping
     void System::updateKeyFrame(std::uint64_t kfID, const Eigen::Affine3f &pose_map_base,
                                 std::uint64_t /*numConnections*/)
     {
+        std::shared_ptr<LocalMap> map;
         std::shared_ptr<KeyFrame> kf;
         {
             std::lock_guard<std::recursive_mutex> lock(localMapMutex_);
-            auto it = keyFramesMap_.find(kfID);
-            if (it == keyFramesMap_.end())
+            auto rit = allKeyFramesSet_.find(kfID);
+            if (rit == allKeyFramesSet_.end())
             {
                 std::cerr << "[System] update for unknown keyframe " << kfID << "; ignored." << std::endl;
                 return;
             }
-            kf = it->second;
+            auto mapIt = localMapsSet_.find(rit->second);
+            if (mapIt == localMapsSet_.end())
+            {
+                std::cerr << "[System] update for kf " << kfID << ": owning map "
+                          << rit->second << " missing; ignored." << std::endl;
+                return;
+            }
+            map = mapIt->second;
+            auto kfIt = keyFramesMap_.find(kfID);
+            if (kfIt != keyFramesMap_.end())
+                kf = kfIt->second;
         }
-        // O(1), never blocks: store the latest pose and flag the keyframe. The owning
-        // map's workers pick it up on their next sweep.
-        kf->setPendingPose(pose_map_base);
-        kf->markDirty();
-        std::cout << "[System] UPDATE kf " << kfID << ": pose queued + marked dirty." << std::endl;
+        // O(1), never blocks: route the pose through the owning map so it stores the
+        // latest pose AND enqueues the keyframe for rebin on the local work queue.
+        map->setKeyFramePose(kf, pose_map_base);
+        std::cout << "[System] UPDATE kf " << kfID << ": pose queued for rebin." << std::endl;
     }
 
     void System::updateKeyFrame(std::uint64_t kfID, const Sophus::SE3f &pose_map_base,
@@ -234,7 +242,9 @@ namespace traversability_mapping
             return;
         kf->setMap(mapID);
         localMapsSet_[mapID]->addAlreadyDeclaredKF(kf);   // register in the new map (not yet binned)
-        kf->markDirty();                 // trigger rebin + add in the new map
+        // Re-set the current pose THROUGH the new map: raises pending + enqueues it so
+        // the new map's local worker rebins and adds it.
+        localMapsSet_[mapID]->setKeyFramePose(kf, kf->getPose());
         rit->second = mapID;
     }
 

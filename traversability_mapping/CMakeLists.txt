@@ -169,6 +169,17 @@ if(BUILD_TESTING)
         ${EIGEN3_INCLUDE_DIR}
     )
     target_link_libraries(test_helpers traversabilitySystem)
+
+    # LocalMap unit tests (grid arithmetic + worker orchestration; needs grid_map_core
+    # + PCL + Eigen, all transitive through traversabilitySystem).
+    ament_add_gtest(test_localmap test/test_localmap.cpp)
+    target_include_directories(test_localmap PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${EIGEN3_INCLUDE_DIR}
+        ${Boost_INCLUDE_DIRS}
+        ${YAML_CPP_INCLUDE_DIRS}
+    )
+    target_link_libraries(test_localmap traversabilitySystem)
 endif()
 
 ament_export_include_directories(include)

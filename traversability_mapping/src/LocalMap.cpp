@@ -10,12 +10,13 @@
  * License along with this library.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
+
 #include "traversability_mapping/LocalMap.hpp"
 
 #include "traversability_mapping/TraversabilityMetrics.hpp"
 #include "traversability_mapping/Parameters.hpp"
+#include "traversability_mapping/Helpers.hpp"
 
-#include <grid_map_core/iterators/GridMapIterator.hpp>
 #include <pcl/filters/voxel_grid.h>
 
 #include <algorithm>
@@ -37,28 +38,25 @@ namespace traversability_mapping
         : mapID_(mapID), lattice_(lattice), frameId_(std::move(mapFrame)), res_(lattice.res),
           onUpdate_(std::move(onUpdate))
     {
-        groundClearance_ = parameterInstance.getValue<double>("localMap/ground_clearance");
-        maxSlope_ = parameterInstance.getValue<double>("localMap/max_slope");
-        minOccupiedFraction_ = parameterInstance.getValue<double>("localMap/min_occupied_fraction");
-        minVicinityPoints_ = static_cast<unsigned int>(parameterInstance.getValue<int>("localMap/min_vicinity_points"));
-        const double security_distance = parameterInstance.getValue<double>("localMap/security_distance");
+        groundClearance_ = parameterInstance.getValue<double>("traversability/ground_clearance");
+        maxSlope_ = parameterInstance.getValue<double>("traversability/max_slope");
+        minOccupiedFraction_ = parameterInstance.getValue<double>("traversability/min_occupied_fraction");
+        minVicinityPoints_ = static_cast<unsigned int>(parameterInstance.getValue<int>("traversability/min_vicinity_points"));
+        const double security_distance = parameterInstance.getValue<double>("traversability/security_distance");
         // Vicinity radius in cells (symmetric window of side 2*deltaInd_+1).
         deltaInd_ = std::max(1, static_cast<int>(std::ceil((security_distance / 2.0) / res_)));
-        windowCap_ = static_cast<std::size_t>(std::max(1, parameterInstance.getValue<int>("localMap/num_local_keyframes")));
-        globalSleepMs_ = parameterInstance.getValue<int>("localMap/global_adjustment_sleep");
-        kfOptimizationEnabled_ = parameterInstance.getValue<bool>("localMap/is_kf_optimization_enabled");
+        globalSleepMs_ = parameterInstance.getValue<int>("mapping/global_adjustment_sleep");
+        kfOptimizationEnabled_ = parameterInstance.getValue<bool>("mapping/is_kf_optimization_enabled");
 
         layers_ = {"N", "sx", "sy", "sz", "sx2", "sy2", "sz2", "sxy", "sxz", "syz",
                    "hazard", "elevation", "slope_haz", "step_haz", "roughness_haz",
                    "normal_x", "normal_y", "normal_z"};
-        navLayers_ = {"normal_x", "normal_y", "normal_z", "slope_haz",
-                       "step_haz", "elevation", "roughness_haz", "hazard"};
 
-        const double half = parameterInstance.getValue<double>("localMap/half_size_traversability");
-        gridMap_ = freshMap(half, half);
+        const double half = parameterInstance.getValue<double>("grid/half_size_traversability");
+        gridMap_ = makeGridMap(layers_, frameId_, lattice_, res_, half, half);
 
         localThread_ = std::thread(&LocalMap::RunLocalKeyFrames, this);
-        globalThread_ = std::thread(&LocalMap::RunTraversability, this);
+        // globalThread_ = std::thread(&LocalMap::RunTraversability, this);
     }
 
     LocalMap::~LocalMap()
@@ -70,55 +68,7 @@ namespace traversability_mapping
             globalThread_.join();
     }
 
-    // ---- grid construction / growth ----------------------------------------
-
-    grid_map::GridMap LocalMap::freshMap(double halfX, double halfY) const
-    {
-        // ODD cell count per axis so cell centres land exactly on the lattice;
-        // position stays the lattice origin forever so partials keyed by absolute
-        // id remain valid across resizes.
-        const int kx = static_cast<int>(std::ceil(halfX / res_));
-        const int ky = static_cast<int>(std::ceil(halfY / res_));
-        grid_map::GridMap m(layers_);
-        m.setFrameId(frameId_);
-        m.setGeometry(grid_map::Length((2 * kx + 1) * res_, (2 * ky + 1) * res_), res_,
-                      grid_map::Position(lattice_.x0, lattice_.y0));
-        for (const auto &l : layers_)
-            m[l].setConstant(kNaN);
-        return m;
-    }
-
-    void LocalMap::growToInclude(double minx, double maxx, double miny, double maxy)
-    {
-        const double margin = res_;
-        const double curHalfX = gridMap_.getLength().x() / 2.0;
-        const double curHalfY = gridMap_.getLength().y() / 2.0;
-        const double needX = std::max(std::abs(maxx - lattice_.x0), std::abs(minx - lattice_.x0)) + margin;
-        const double needY = std::max(std::abs(maxy - lattice_.y0), std::abs(miny - lattice_.y0)) + margin;
-        if (needX <= curHalfX && needY <= curHalfY)
-            return;
-
-        const double extend = parameterInstance.getValue<double>("localMap/extend_length_every_resize_by");
-        double newHalfX = curHalfX, newHalfY = curHalfY;
-        while (newHalfX < needX) newHalfX += extend;
-        while (newHalfY < needY) newHalfY += extend;
-
-        grid_map::GridMap old = gridMap_;
-        gridMap_ = freshMap(newHalfX, newHalfY);
-        for (grid_map::GridMapIterator it(old); !it.isPastEnd(); ++it)
-        {
-            grid_map::Position p;
-            old.getPosition(*it, p);
-            if (!gridMap_.isInside(p))
-                continue;
-            for (const auto &l : layers_)
-            {
-                const float v = old.at(l, *it);
-                if (!std::isnan(v))
-                    gridMap_.atPosition(l, p) = v;
-            }
-        }
-    }
+    // ---- grid growth --------------------------------------------------------
 
     void LocalMap::growToIncludeCells(const std::unordered_map<std::uint64_t, NodeMetaData> &partials)
     {
@@ -133,91 +83,43 @@ namespace traversability_mapping
             minx = std::min(minx, c.x()); maxx = std::max(maxx, c.x());
             miny = std::min(miny, c.y()); maxy = std::max(maxy, c.y());
         }
-        growToInclude(minx, maxx, miny, maxy);
+        const double extend = parameterInstance.getValue<double>("grid/extend_length_every_resize_by");
+        growGridToInclude(gridMap_, layers_, lattice_, res_, extend, minx, maxx, miny, maxy);
     }
 
-    // ---- moment <-> grid helpers -------------------------------------------
-
-    grid_map::Position LocalMap::cellPos(int ci, int cj) const
-    {
-        const Eigen::Vector2d c = lattice_.centerOf(ci, cj);
-        return grid_map::Position(c.x(), c.y());
-    }
-
-    void LocalMap::addToLayer(const std::string &l, const grid_map::Position &p, double v)
-    {
-        float &cell = gridMap_.atPosition(l, p);
-        if (std::isnan(cell)) cell = 0.f;
-        cell += static_cast<float>(v);
-    }
+    // ---- moment -> grid -----------------------------------------------------
 
     void LocalMap::addPartialToGrid(std::uint64_t cellId, const NodeMetaData &m, double sign)
     {
         int ci, cj;
         Lattice::unkey(cellId, ci, cj);
-        const grid_map::Position p = cellPos(ci, cj);
+        const grid_map::Position p = cellPos(lattice_, ci, cj);
         if (!gridMap_.isInside(p))
             return;
-        addToLayer("N", p, sign * m.N);
-        addToLayer("sx", p, sign * m.sx);   addToLayer("sy", p, sign * m.sy);   addToLayer("sz", p, sign * m.sz);
-        addToLayer("sx2", p, sign * m.sx2); addToLayer("sy2", p, sign * m.sy2); addToLayer("sz2", p, sign * m.sz2);
-        addToLayer("sxy", p, sign * m.sxy); addToLayer("sxz", p, sign * m.sxz); addToLayer("syz", p, sign * m.syz);
-        // A subtraction that empties the cell blanks it and tells nav it is cleared.
+        addToLayer(gridMap_, "N", p, sign * m.N);
+        addToLayer(gridMap_, "sx", p, sign * m.sx);   addToLayer(gridMap_, "sy", p, sign * m.sy);   addToLayer(gridMap_, "sz", p, sign * m.sz);
+        addToLayer(gridMap_, "sx2", p, sign * m.sx2); addToLayer(gridMap_, "sy2", p, sign * m.sy2); addToLayer(gridMap_, "sz2", p, sign * m.sz2);
+        addToLayer(gridMap_, "sxy", p, sign * m.sxy); addToLayer(gridMap_, "sxz", p, sign * m.sxz); addToLayer(gridMap_, "syz", p, sign * m.syz);
+        // A subtraction that empties the cell blanks it and records it as changed.
         if (sign < 0 && std::lround(gridMap_.atPosition("N", p)) <= 0)
         {
-            blankCell(p);
-            dirtyNavCells_.insert(cellId);
+            blankCell(gridMap_, layers_, p);
+            changedCells_.insert(cellId);
         }
-    }
-
-    void LocalMap::blankCell(const grid_map::Position &p)
-    {
-        for (const auto &l : layers_)
-            gridMap_.atPosition(l, p) = kNaN;
-    }
-
-    bool LocalMap::readCellMoment(int ci, int cj, NodeMetaData &out) const
-    {
-        const grid_map::Position p = cellPos(ci, cj);
-        if (!gridMap_.isInside(p))
-            return false;
-        const float n = gridMap_.atPosition("N", p);
-        if (std::isnan(n) || n < 1.f)
-            return false;
-        out.N = static_cast<unsigned int>(std::lround(n));
-        out.sx = gridMap_.atPosition("sx", p);   out.sy = gridMap_.atPosition("sy", p);   out.sz = gridMap_.atPosition("sz", p);
-        out.sx2 = gridMap_.atPosition("sx2", p); out.sy2 = gridMap_.atPosition("sy2", p); out.sz2 = gridMap_.atPosition("sz2", p);
-        out.sxy = gridMap_.atPosition("sxy", p); out.sxz = gridMap_.atPosition("sxz", p); out.syz = gridMap_.atPosition("syz", p);
-        return true;
     }
 
     // ---- recompute ----------------------------------------------------------
-
-    std::unordered_set<std::uint64_t> LocalMap::dilate(const std::unordered_set<std::uint64_t> &touched) const
-    {
-        std::unordered_set<std::uint64_t> out;
-        out.reserve(touched.size() * (2 * deltaInd_ + 1) * (2 * deltaInd_ + 1));
-        for (auto id : touched)
-        {
-            int ci, cj;
-            Lattice::unkey(id, ci, cj);
-            for (int di = -deltaInd_; di <= deltaInd_; ++di)
-                for (int dj = -deltaInd_; dj <= deltaInd_; ++dj)
-                    out.insert(Lattice::key(ci + di, cj + dj));
-        }
-        return out;
-    }
 
     bool LocalMap::recomputeCell(std::uint64_t id)
     {
         int ci, cj;
         Lattice::unkey(id, ci, cj);
-        const grid_map::Position qp = cellPos(ci, cj);
+        const grid_map::Position qp = cellPos(lattice_, ci, cj);
         if (!gridMap_.isInside(qp))
             return false;
 
         NodeMetaData qd;
-        if (!readCellMoment(ci, cj, qd))
+        if (!readCellMoment(gridMap_, lattice_, ci, cj, qd))
             return false;  // query cell unobserved -> nothing to write
 
         CellMoment query{qd, Eigen::Vector3d(qp.x(), qp.y(), 0.0)};
@@ -228,7 +130,7 @@ namespace traversability_mapping
             {
                 ++total;
                 NodeMetaData d;
-                if (readCellMoment(i, j, d))
+                if (readCellMoment(gridMap_, lattice_, i, j, d))
                 {
                     const Eigen::Vector2d c2 = lattice_.centerOf(i, j);
                     occupied.push_back({d, Eigen::Vector3d(c2.x(), c2.y(), 0.0)});
@@ -266,19 +168,22 @@ namespace traversability_mapping
     {
         for (auto id : dirty)
             if (recomputeCell(id))
-                dirtyNavCells_.insert(id);
+                changedCells_.insert(id);
     }
 
-    // ---- per-keyframe op (masterGridMapMutex_ held by caller) -------------------------
+    // ---- per-keyframe
 
-    bool LocalMap::recomputeKeyFrame(const std::shared_ptr<KeyFrame> &kf)
+    bool LocalMap::recomputeKeyFrame(const std::shared_ptr<KeyFrame> &kf, const Eigen::Affine3f &pose)
     {
         // Deleted between snapshot and now?
-        if (keyFramesMap_.find(kf->getKfID()) == keyFramesMap_.end())
         {
-            std::cout << "[LocalMap " << mapID_ << "] kf " << kf->getKfID()
-                      << ": not in working set (deleted?); skip." << std::endl;
-            return false;
+            std::lock_guard<std::mutex> lock(keyFramesMapMutex_);
+            if (keyFramesMap_.find(kf->getKfID()) == keyFramesMap_.end())
+            {
+                std::cout << "[LocalMap " << mapID_ << "] kf " << kf->getKfID()
+                          << ": not in working set (deleted?); skip." << std::endl;
+                return false;
+            }
         }
         // Cloud dropped (optimization off, already binned once): cannot reprocess;
         // leave the existing contribution intact. THIS is why a PGO pose update has
@@ -296,41 +201,40 @@ namespace traversability_mapping
 
         // 1. subtract the OLD contribution (computed at the old pose).
         const std::size_t nOld = kf->partials().size();
-        for (auto &kv : kf->partials())
         {
-            addPartialToGrid(kv.first, kv.second, -1.0);
-            touched.insert(kv.first);
+            std::lock_guard<std::mutex> lock(masterGridMapMutex_);
+            for (auto &kv : kf->partials())
+            {
+                addPartialToGrid(kv.first, kv.second, -1.0);
+                touched.insert(kv.first);
+            }
         }
 
-        // 2. commit any pending PGO pose BEFORE re-binning.
-        Eigen::Affine3f newPose;
-        const bool posed = kf->takePendingPose(newPose);
-        if (posed)
-            kf->setPose(newPose);
+        // 2. re-bin the stored base-frame cloud at the pending pose (partition NOT frozen).
+        kf->rebin(lattice_, pose);
 
-        // 3. re-bin the stored base-frame cloud at the current pose (partition NOT frozen).
-        kf->rebin(lattice_);
-
-        // 4. grow to fit, then add the fresh contribution.
-        growToIncludeCells(kf->partials());
-        const std::size_t nNew = kf->partials().size();
-        for (auto &kv : kf->partials())
+        // 3. grow to fit, then add the fresh contribution.
         {
-            addPartialToGrid(kv.first, kv.second, +1.0);
-            touched.insert(kv.first);
+            std::lock_guard<std::mutex> lock(masterGridMapMutex_);
+            growToIncludeCells(kf->partials());
+            const std::size_t nNew = kf->partials().size();
+            for (auto &kv : kf->partials())
+            {
+                addPartialToGrid(kv.first, kv.second, +1.0);
+                touched.insert(kv.first);
+            }
+
+            // 4. recompute hazards over the dilated union of cells left and newly occupied.
+            const auto dirty = dilate(touched, deltaInd_);
+            recomputeDirty(dirty);
+
+            std::cout << "[LocalMap " << mapID_ << "] kf " << kf->getKfID()
+                      << ": -" << nOld << " cells, +" << nNew << " cells, recomputed "
+                      << dirty.size() << " cells, changed=" << changedCells_.size()
+                      << "." << std::endl;
         }
 
-        // 5. recompute hazards over the dilated union of cells left and newly occupied.
-        const auto dirty = dilate(touched);
-        recomputeDirty(dirty);
-
-        std::cout << "[LocalMap " << mapID_ << "] kf " << kf->getKfID()
-                  << (posed ? " [pose updated]" : " [first bin / no new pose]")
-                  << ": -" << nOld << " cells, +" << nNew << " cells, recomputed "
-                  << dirty.size() << " cells, dirty_for_nav=" << dirtyNavCells_.size()
-                  << "." << std::endl;
-
-        // 6. drop the cloud if optimization is disabled (keyframe becomes non-rebinnable).
+        // 5. drop the cloud if optimization is disabled (keyframe becomes non-rebinnable).
         if (!kfOptimizationEnabled_)
             kf->dropCloud();
 
@@ -341,21 +245,32 @@ namespace traversability_mapping
 
     void LocalMap::addAlreadyDeclaredKF(const std::shared_ptr<KeyFrame> &kf)
     {
-        // Pure registration: does NOT mark the keyframe dirty. The caller marks it
-        // dirty once it is ready to be (re)processed -- additions wait for the pose
-        // via System::updateKeyFrame; re-parent marks it dirty itself. This avoids
-        // ever binning at the placeholder identity pose.
-        std::lock_guard<std::mutex> lock(masterGridMapMutex_);
+        // Pure registration: does NOT flag the keyframe pending or enqueue it. The
+        // caller sets a pose via setKeyFramePose once it is ready to be (re)processed;
+        // that is what puts it on the local work queue. This avoids ever binning at
+        // the placeholder identity pose.
+        std::lock_guard<std::mutex> lock(keyFramesMapMutex_);
         kf->setMap(mapID_);
         keyFramesMap_[kf->getKfID()] = kf;
-        mLocalKeyFrames_.push_front(kf);
-        while (mLocalKeyFrames_.size() > windowCap_)
-            mLocalKeyFrames_.pop_back();
+    }
+
+    void LocalMap::setKeyFramePose(const std::shared_ptr<KeyFrame> &kf, const Eigen::Affine3f &pose)
+    {
+        if (!kf)
+            return;
+        kf->setPose(pose);                // store latest pose + raise pending (kf's own mutex)
+        // ONLY the queue lock -- never the grid lock -- so this never waits on a recompute.
+        std::lock_guard<std::mutex> lock(poseQueueMutex_);
+        if (localQueued_.insert(kf->getKfID()).second)
+            localQueue_.push_back(kf);      // enqueue once (dedup on the membership set)
+        std::cout << "[LocalMap " << mapID_ << "] local queue depth: "
+                    << localQueue_.size() << "." << std::endl;
     }
 
     std::shared_ptr<KeyFrame> LocalMap::detachKeyFrame(std::uint64_t id)
     {
-        std::lock_guard<std::mutex> lock(masterGridMapMutex_);
+        std::lock_guard<std::mutex> lock(masterGridMapMutex_);           // grid (subtract)
+        std::lock_guard<std::mutex> kfLock(keyFramesMapMutex_);          // registry (find/erase)
         auto it = keyFramesMap_.find(id);
         if (it == keyFramesMap_.end())
             return nullptr;
@@ -367,101 +282,70 @@ namespace traversability_mapping
             addPartialToGrid(kv.first, kv.second, -1.0);
             touched.insert(kv.first);
         }
-        recomputeDirty(dilate(touched));
+        recomputeDirty(dilate(touched, deltaInd_));
         kf->partials().clear();
 
         keyFramesMap_.erase(it);
-        for (auto wit = mLocalKeyFrames_.begin(); wit != mLocalKeyFrames_.end();)
+        // Clear the dedup marker so a future re-add of this id can re-enqueue; any stale
+        // shared_ptr left in localQueue_ self-cleans when the worker pops it (the id is
+        // no longer in keyFramesMap_, so recomputeKeyFrame's guard skips it).
         {
-            if ((*wit)->getKfID() == id) wit = mLocalKeyFrames_.erase(wit);
-            else ++wit;
+            std::lock_guard<std::mutex> qlock(poseQueueMutex_);
+            localQueued_.erase(id);
         }
         return kf;
     }
 
     void LocalMap::clearEntireMap()
     {
+        throw std::runtime_error("This function was not supposed to be executed! getStitchedPointCloud()");
         std::lock_guard<std::mutex> lock(masterGridMapMutex_);
-        // Tell nav every currently-occupied cell is cleared.
-        for (auto k : allOccupiedKeys())
-            dirtyNavCells_.insert(k);
+        // Record every currently-occupied cell as changed (it is about to be blanked).
+        for (auto k : allOccupiedKeys(gridMap_, lattice_))
+            changedCells_.insert(k);
         // Blank every cell of every layer.
         for (const auto &l : layers_)
             gridMap_[l].setConstant(kNaN);
-        // Clear each keyframe's contribution record and mark it for rebuild.
+        // Clear each keyframe's contribution record, flag it for rebuild at its current
+        // pose (re-setting the same pose raises the pending flag), and enqueue it so the
+        // local worker re-adds it (keyframes with a dropped cloud simply skip on rebin).
+        // Lock order: grid (held) -> keyFramesMap -> queue.
+        std::lock_guard<std::mutex> kfLock(keyFramesMapMutex_);
+        std::lock_guard<std::mutex> qlock(poseQueueMutex_);
         for (auto &kv : keyFramesMap_)
         {
             kv.second->partials().clear();
-            kv.second->markDirty();
+            kv.second->setPose(kv.second->getPose());
+            if (localQueued_.insert(kv.first).second)
+                localQueue_.push_back(kv.second);
         }
     }
 
-    // ---- nav output ---------------------------------------------------------
+    // ---- changed-cell output (layer-agnostic) -------------------------------
 
-    std::vector<std::uint64_t> LocalMap::allOccupiedKeys() const
+    std::vector<std::uint64_t> LocalMap::takeChangedCells()
     {
-        std::vector<std::uint64_t> keys;
-        for (grid_map::GridMapIterator it(gridMap_); !it.isPastEnd(); ++it)
-        {
-            const float n = gridMap_.at("N", *it);
-            if (std::isnan(n) || n < 1.f)
-                continue;
-            grid_map::Position p;
-            gridMap_.getPosition(*it, p);
-            int ci, cj;
-            lattice_.cellOf(p.x(), p.y(), ci, cj);
-            keys.push_back(Lattice::key(ci, cj));
-        }
+        // Caller holds masterGridMapMutex_ (so these keys stay consistent with the
+        // grid it then reads).
+        std::vector<std::uint64_t> keys(changedCells_.begin(), changedCells_.end());
+        changedCells_.clear();
         return keys;
     }
 
-    NavDelta LocalMap::fillNav(const std::vector<std::uint64_t> &keys, bool full) const
+    std::vector<std::uint64_t> LocalMap::occupiedCellKeys() const
     {
-        NavDelta d;
-        d.frame_id = frameId_;
-        d.resolution = res_;
-        d.origin_x = lattice_.x0;
-        d.origin_y = lattice_.y0;
-        d.layers = navLayers_;
-        d.is_full_snapshot = full;
-        d.cell_keys.reserve(keys.size());
-        d.values.reserve(keys.size() * navLayers_.size());
-        for (auto id : keys)
-        {
-            int ci, cj;
-            Lattice::unkey(id, ci, cj);
-            const grid_map::Position p = cellPos(ci, cj);
-            if (!gridMap_.isInside(p))
-                continue;
-            d.cell_keys.push_back(id);
-            for (const auto &l : navLayers_)
-                d.values.push_back(gridMap_.atPosition(l, p));
-        }
-        return d;
-    }
-
-    NavDelta LocalMap::drainNavDelta()
-    {
-        std::lock_guard<std::mutex> lock(masterGridMapMutex_);
-        const std::vector<std::uint64_t> keys(dirtyNavCells_.begin(), dirtyNavCells_.end());
-        NavDelta d = fillNav(keys, /*full=*/false);
-        dirtyNavCells_.clear();
-        return d;
-    }
-
-    NavDelta LocalMap::fullNavSnapshot()
-    {
-        std::lock_guard<std::mutex> lock(masterGridMapMutex_);
-        return fillNav(allOccupiedKeys(), /*full=*/true);
+        // Caller holds masterGridMapMutex_.
+        return allOccupiedKeys(gridMap_, lattice_);
     }
 
     std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> LocalMap::getStitchedPointCloud(
         float voxel_size_x, float voxel_size_y, float voxel_size_z)
     {
+        throw std::runtime_error("This function was not supposed to be executed! getStitchedPointCloud()");
         auto stitched = std::make_shared<pcl::PointCloud<pcl::PointXYZ>>();
         std::vector<std::shared_ptr<KeyFrame>> snapshot;
         {
-            std::lock_guard<std::mutex> lock(masterGridMapMutex_);
+            std::lock_guard<std::mutex> lock(keyFramesMapMutex_);
             snapshot.reserve(keyFramesMap_.size());
             for (auto &kv : keyFramesMap_)
                 snapshot.push_back(kv.second);
@@ -493,30 +377,34 @@ namespace traversability_mapping
 
     void LocalMap::RunLocalKeyFrames()
     {
-        // Fast worker: service dirty keyframes in the last-N window at a high rate.
+        // Fast worker: drain the local work queue at a high rate. The queue is fed by
+        // setKeyFramePose, so its depth is exactly how far behind rebinning is.
         while (running_.load())
         {
-            std::vector<std::shared_ptr<KeyFrame>> snapshot;
+            // Pop keyframes until the queue empties. Removal is unconditional: even if
+            // the pose was already consumed (e.g. by the global backstop), the stale
+            // entry leaves the queue here.
+            while (running_.load())
             {
-                std::lock_guard<std::mutex> lock(masterGridMapMutex_);
-                snapshot.assign(mLocalKeyFrames_.begin(), mLocalKeyFrames_.end());
-            }
-            for (auto &kf : snapshot)
-            {
-                if (!running_.load())
-                    return;
-                if (kf->claim())
+                std::shared_ptr<KeyFrame> kf;
                 {
-                    bool changed = false;
-                    {
-                        std::lock_guard<std::mutex> lock(masterGridMapMutex_);
-                        changed = recomputeKeyFrame(kf);
-                    }
-                    // Fire OUTSIDE the lock so the adapter can read the grid / drain
-                    // nav deltas (which take the same mutex) without deadlocking.
-                    if (changed && onUpdate_)
-                        onUpdate_();
+                    // Queue lock only: pop is O(1) and never waits on a recompute.
+                    std::lock_guard<std::mutex> lock(poseQueueMutex_);
+                    if (localQueue_.empty())
+                        break;
+                    kf = localQueue_.front();     // queue holds the shared_ptr directly
+                    localQueue_.pop_front();
+                    localQueued_.erase(kf->getKfID());
                 }
+                Eigen::Affine3f pose;
+                if (!kf->getPendingPose(pose))
+                    continue;                     // already handled (e.g. global backstop)
+                // recomputeKeyFrame owns the grid lock (do NOT wrap it here); its guard
+                // skips a keyframe detached since it was enqueued, so a stale shared_ptr
+                // in the queue is harmless.
+                const bool changed = recomputeKeyFrame(kf, pose);
+                if (changed && onUpdate_)
+                    onUpdate_();
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
@@ -524,13 +412,14 @@ namespace traversability_mapping
 
     void LocalMap::RunTraversability()
     {
-        // Slow worker: sweep ALL keyframes; a keyframe with nothing pending fails
-        // claim() and is skipped, so the sweep is cheap, not redundant re-binning.
+        // Slow worker: sweep ALL keyframes; a keyframe with no pending pose returns
+        // false from getPendingPose() and is skipped, so the sweep is cheap, not
+        // redundant re-binning.
         while (running_.load())
         {
             std::vector<std::shared_ptr<KeyFrame>> snapshot;
             {
-                std::lock_guard<std::mutex> lock(masterGridMapMutex_);
+                std::lock_guard<std::mutex> lock(keyFramesMapMutex_);
                 snapshot.reserve(keyFramesMap_.size());
                 for (auto &kv : keyFramesMap_)
                     snapshot.push_back(kv.second);
@@ -539,13 +428,11 @@ namespace traversability_mapping
             {
                 if (!running_.load())
                     return;
-                if (kf->claim())
+                Eigen::Affine3f pose;
+                if (kf->getPendingPose(pose))
                 {
-                    bool changed = false;
-                    {
-                        std::lock_guard<std::mutex> lock(masterGridMapMutex_);
-                        changed = recomputeKeyFrame(kf);
-                    }
+                    // recomputeKeyFrame owns the grid lock; do NOT wrap it here.
+                    const bool changed = recomputeKeyFrame(kf, pose);
                     if (changed && onUpdate_)
                         onUpdate_();
                 }

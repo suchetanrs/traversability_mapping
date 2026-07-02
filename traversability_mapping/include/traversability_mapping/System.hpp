@@ -23,8 +23,8 @@
 // (Tmb = map <- base_footprint), matching KeyFrame.msg::kf_pose. The cloud handed
 // to addNewKeyFrame* is in the LIDAR/sensor frame and is pruned to the base frame
 // here (ego/ceiling/range gates + the Tbv extrinsic). Additions register a keyframe
-// without binning; the pose arrives via updateKeyFrame, which is what makes the
-// keyframe dirty and triggers the first bin (so nothing is ever binned at the
+// without binning; the pose arrives via updateKeyFrame, which sets the keyframe's
+// pending pose and triggers the first bin (so nothing is ever binned at the
 // placeholder identity pose).
 
 #include <cstdint>
