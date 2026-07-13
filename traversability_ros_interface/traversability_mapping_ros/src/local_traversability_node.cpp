@@ -3,8 +3,9 @@
  *
  * Thin ROS adapter for the LOCAL moment-fused traversability map.
  *
- * Same core (System / LocalMap / KeyFrame), driven differently: every lidar scan is
- * a keyframe, added at its synced pose and evicted after a rolling window of N scans.
+ * Same core (System / LocalMap / KeyFrame), driven differently: a lidar scan becomes a
+ * keyframe once the robot has moved keyframe_min_displacement_m since the last one, added
+ * at its synced pose and evicted after a rolling window of N keyframes.
  * The map stays a small robot-centered disc; the underlying grid buffer grows with the
  * trajectory (accepted) but is never published whole -- publish crops a fixed W x H
  * submap around the latest pose. NO PGO: each scan is binned once (clouds dropped via
@@ -12,9 +13,11 @@
  * moments exactly. The core is unchanged from the global node -- all local behavior
  * (sync, window eviction, submap crop) lives here.
  *
- *   sync   -> per scan: (cloud, pose) paired by ApproximateTime; sensor_msgs->PCL,
- *             System::addNewKeyFrameWithPCL, then System::updateKeyFrame(pose) to set
- *             the pose and trigger the (only) bin, then System::deleteKeyFrame(id - N).
+ *   sync   -> per scan: (cloud, pose) paired by ApproximateTime; scans within
+ *             keyframe_min_displacement_m of the last keyframe are dropped. Otherwise
+ *             sensor_msgs->PCL, System::addNewKeyFrameWithPCL, then
+ *             System::updateKeyFrame(pose) to set the pose and trigger the (only) bin,
+ *             then System::deleteKeyFrame(id - N).
  *   timer  -> cropped grid_map + occupancy around the robot (debug, subscriber-gated)
  *             and the sparse delta (deployment). Fixed nav cadence, decoupled from scans.
  */
@@ -68,8 +71,13 @@ public:
         // synced poses live in (odom is recommended -- a jumping SLAM 'map' frame would
         // smear the never-rebinned window). Stamped on every published message.
         map_frame_ = declare_parameter<std::string>("map_frame", "odom");
-        // Rolling window: keep the last N scans; scan id-N is evicted when scan id lands.
+        // Rolling window: keep the last N keyframes; keyframe id-N is evicted when id lands.
         window_size_ = static_cast<std::uint64_t>(declare_parameter<int>("window_size", 15));
+        // A scan taken less than this from the last keyframe's position is dropped: it would
+        // re-bin near-duplicate points into the same cells for no new information, and it
+        // would push still-useful keyframes out of the window while standing still.
+        // Translation only; rotation is deliberately ignored for now.
+        keyframe_min_displacement_m_ = declare_parameter<double>("keyframe_min_displacement_m", 0.05);
         // Robot-centered crop published to consumers (m). Independent of the growing buffer.
         crop_size_x_ = declare_parameter<double>("crop_size_x", 15.0);
         crop_size_y_ = declare_parameter<double>("crop_size_y", 15.0);
@@ -116,8 +124,10 @@ public:
             std::chrono::duration<double>(1.0 / std::max(0.1, rate)),
             std::bind(&LocalTraversabilityNode::publish, this));
 
-        RCLCPP_INFO(get_logger(), "Local traversability adapter ready (window=%lu scans).",
-                    static_cast<unsigned long>(window_size_));
+        RCLCPP_INFO(get_logger(),
+                    "Local traversability adapter ready (window=%lu keyframes, "
+                    "min displacement=%.3f m).",
+                    static_cast<unsigned long>(window_size_), keyframe_min_displacement_m_);
     }
 
     ~LocalTraversabilityNode() override
@@ -129,11 +139,28 @@ public:
 private:
     // ---- callbacks ----------------------------------------------------------
 
-    // One synced (cloud, pose) pair -> one keyframe. Add + bin at the pose, cache the
-    // robot xy for the crop, then evict the scan that just fell out of the window.
+    // One synced (cloud, pose) pair -> at most one keyframe. Scans that have not moved far
+    // enough since the last keyframe are dropped. Otherwise add + bin at the pose, then
+    // evict the keyframe that just fell out of the window.
     void scanCallback(const sensor_msgs::msg::PointCloud2::ConstSharedPtr &cloud_msg,
                       const nav_msgs::msg::Odometry::ConstSharedPtr &odom_msg)
     {
+        const auto &p = odom_msg->pose.pose.position;
+        const Eigen::Vector3d pos(p.x, p.y, p.z);
+
+        // The crop follows the robot on every scan, including dropped ones.
+        robot_x_ = p.x;
+        robot_y_ = p.y;
+        have_pose_ = true;
+
+        // Displacement gate. The first scan always lands; after that a scan only becomes a
+        // keyframe once the robot has moved far enough. ids stay contiguous because
+        // next_id_ advances only here -- the window eviction below relies on that.
+        if (have_last_kf_pose_ && (pos - last_kf_pos_).norm() < keyframe_min_displacement_m_)
+            return;
+        last_kf_pos_ = pos;
+        have_last_kf_pose_ = true;
+
         const std::uint64_t id = next_id_++;
         const auto ts = static_cast<unsigned long long>(
             rclcpp::Time(cloud_msg->header.stamp).nanoseconds());
@@ -142,10 +169,6 @@ private:
         system_->addNewKeyFrameWithPCL(ts, id, 0, cloud);
         // Supplies the pose AND triggers the (only) bin.
         system_->updateKeyFrame(id, tmap_ros::poseToAffine(odom_msg->pose.pose));
-
-        robot_x_ = odom_msg->pose.pose.position.x;
-        robot_y_ = odom_msg->pose.pose.position.y;
-        have_pose_ = true;
 
         // Rolling window: once N+1 are in flight, drop the oldest (subtracts its retained
         // moments exactly, even though its cloud was dropped after the first bin).
@@ -253,6 +276,7 @@ private:
     std::string slam_frame_, robot_base_frame_, lidar_frame_, map_frame_;
     std::uint64_t window_size_ = 15;
     double crop_size_x_ = 15.0, crop_size_y_ = 15.0;
+    double keyframe_min_displacement_m_ = 0.05;
 
     // The grid layers this adapter publishes (sparse update + debug grid_map). The core
     // LocalMap is layer-agnostic; this subset is owned here on the ROS side.
@@ -265,6 +289,8 @@ private:
     bool need_full_snapshot_ = true;
     bool have_pose_ = false;
     double robot_x_ = 0.0, robot_y_ = 0.0;
+    bool have_last_kf_pose_ = false;
+    Eigen::Vector3d last_kf_pos_ = Eigen::Vector3d::Zero();  ///< position of the last accepted keyframe
 
     using SyncPolicy = message_filters::sync_policies::ApproximateTime<
         sensor_msgs::msg::PointCloud2, nav_msgs::msg::Odometry>;

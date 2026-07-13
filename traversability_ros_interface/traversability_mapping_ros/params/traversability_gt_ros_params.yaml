@@ -27,8 +27,9 @@
       slam_frame: base_footprint             # == robot_base_frame so Tbs = I (only base<-lidar is needed)
       robot_base_frame: base_footprint
       lidar_frame: lidar_link
-      map_frame: odom                         # fixed accumulation + published frame (must match odom_topic frame)
-      window_size: 15000                         # rolling window: last-N scans kept
+      map_frame: map                         # fixed accumulation + published frame (must match odom_topic frame)
+      window_size: 30                         # rolling window: last-N keyframes kept
+      keyframe_min_displacement_m: 0.05       # scans closer than this to the last keyframe are dropped
       crop_size_x: 5.0                        # robot-centered published submap (m)
       crop_size_y: 5.0
 

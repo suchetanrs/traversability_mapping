@@ -5,7 +5,7 @@
 # --- Local grid geometry ---
 # Grid is fixed-frame and grows as the robot roams (accepted); consumers only ever see a
 # robot-centered crop (node crop_size_*). Keep half_size >= lidar range so a scan fits.
-grid/resolution_local_map: 0.121
+grid/resolution_local_map: 0.05
 grid/grid_center_x: 0.0
 grid/grid_center_y: 0.0
 grid/half_size_traversability: 10.0      # initial half-extent (m); >= max_range_base_frame
@@ -29,7 +29,7 @@ mapping/global_adjustment_sleep: 0
 # --- Ingestion (cloud filtering + buffering) ---
 # LOCAL: cap the lidar range to the local grid extent so scans never overshoot the map.
 ingestion/robot_height: 3.5
-ingestion/max_range_base_frame: 10.0     # <= grid/half_size_traversability
+ingestion/max_range_base_frame: 6.0     # <= grid/half_size_traversability
 ingestion/min_range_base_frame: 1.0
 ingestion/use_pointcloud_buffer: false
 ingestion/use_ros_buffer: false
