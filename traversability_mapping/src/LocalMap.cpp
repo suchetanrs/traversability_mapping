@@ -89,19 +89,18 @@ namespace traversability_mapping
 
     // ---- moment -> grid -----------------------------------------------------
 
-    void LocalMap::addPartialToGrid(std::uint64_t cellId, const NodeMetaData &m, double sign)
+    void LocalMap::addPartialToGrid(std::uint64_t cellId, const NodeMetaData &m, double sign,
+                                    const MomentLayers &layers)
     {
         int ci, cj;
         Lattice::unkey(cellId, ci, cj);
         const grid_map::Position p = cellPos(lattice_, ci, cj);
-        if (!gridMap_.isInside(p))
+        grid_map::Index idx;
+        if (!gridMap_.getIndex(p, idx))
             return;
-        addToLayer(gridMap_, "N", p, sign * m.N);
-        addToLayer(gridMap_, "sx", p, sign * m.sx);   addToLayer(gridMap_, "sy", p, sign * m.sy);   addToLayer(gridMap_, "sz", p, sign * m.sz);
-        addToLayer(gridMap_, "sx2", p, sign * m.sx2); addToLayer(gridMap_, "sy2", p, sign * m.sy2); addToLayer(gridMap_, "sz2", p, sign * m.sz2);
-        addToLayer(gridMap_, "sxy", p, sign * m.sxy); addToLayer(gridMap_, "sxz", p, sign * m.sxz); addToLayer(gridMap_, "syz", p, sign * m.syz);
+        layers.add(idx, m, sign);
         // A subtraction that empties the cell blanks it and records it as changed.
-        if (sign < 0 && std::lround(gridMap_.atPosition("N", p)) <= 0)
+        if (sign < 0 && std::lround((*layers.N)(idx(0), idx(1))) <= 0)
         {
             blankCell(gridMap_, layers_, p);
             changedCells_.insert(cellId);
@@ -110,7 +109,7 @@ namespace traversability_mapping
 
     // ---- recompute ----------------------------------------------------------
 
-    bool LocalMap::recomputeCell(std::uint64_t id)
+    bool LocalMap::recomputeCell(std::uint64_t id, const MomentLayers &layers)
     {
         int ci, cj;
         Lattice::unkey(id, ci, cj);
@@ -119,18 +118,19 @@ namespace traversability_mapping
             return false;
 
         NodeMetaData qd;
-        if (!readCellMoment(gridMap_, lattice_, ci, cj, qd))
+        if (!readCellMoment(gridMap_, layers, lattice_, ci, cj, qd))
             return false;  // query cell unobserved -> nothing to write
 
         CellMoment query{qd, Eigen::Vector3d(qp.x(), qp.y(), 0.0)};
         std::vector<CellMoment> occupied;
+        occupied.reserve((2 * deltaInd_ + 1) * (2 * deltaInd_ + 1));
         int total = 0;
         for (int i = ci - deltaInd_; i <= ci + deltaInd_; ++i)
             for (int j = cj - deltaInd_; j <= cj + deltaInd_; ++j)
             {
                 ++total;
                 NodeMetaData d;
-                if (readCellMoment(gridMap_, lattice_, i, j, d))
+                if (readCellMoment(gridMap_, layers, lattice_, i, j, d))
                 {
                     const Eigen::Vector2d c2 = lattice_.centerOf(i, j);
                     occupied.push_back({d, Eigen::Vector3d(c2.x(), c2.y(), 0.0)});
@@ -166,8 +166,9 @@ namespace traversability_mapping
 
     void LocalMap::recomputeDirty(const std::unordered_set<std::uint64_t> &dirty)
     {
+        const MomentLayers layers(gridMap_);
         for (auto id : dirty)
-            if (recomputeCell(id))
+            if (recomputeCell(id, layers))
                 changedCells_.insert(id);
     }
 
@@ -203,9 +204,10 @@ namespace traversability_mapping
         const std::size_t nOld = kf->partials().size();
         {
             std::lock_guard<std::mutex> lock(masterGridMapMutex_);
+            const MomentLayers layers(gridMap_);
             for (auto &kv : kf->partials())
             {
-                addPartialToGrid(kv.first, kv.second, -1.0);
+                addPartialToGrid(kv.first, kv.second, -1.0, layers);
                 touched.insert(kv.first);
             }
         }
@@ -217,10 +219,13 @@ namespace traversability_mapping
         {
             std::lock_guard<std::mutex> lock(masterGridMapMutex_);
             growToIncludeCells(kf->partials());
+            // Resolve the layers only now: growing replaces gridMap_, which would leave
+            // handles taken before it dangling.
+            const MomentLayers layers(gridMap_);
             const std::size_t nNew = kf->partials().size();
             for (auto &kv : kf->partials())
             {
-                addPartialToGrid(kv.first, kv.second, +1.0);
+                addPartialToGrid(kv.first, kv.second, +1.0, layers);
                 touched.insert(kv.first);
             }
 
@@ -277,10 +282,13 @@ namespace traversability_mapping
         auto kf = it->second;
 
         std::unordered_set<std::uint64_t> touched;
-        for (auto &kv : kf->partials())
         {
-            addPartialToGrid(kv.first, kv.second, -1.0);
-            touched.insert(kv.first);
+            const MomentLayers layers(gridMap_);
+            for (auto &kv : kf->partials())
+            {
+                addPartialToGrid(kv.first, kv.second, -1.0, layers);
+                touched.insert(kv.first);
+            }
         }
         recomputeDirty(dilate(touched, deltaInd_));
         kf->partials().clear();

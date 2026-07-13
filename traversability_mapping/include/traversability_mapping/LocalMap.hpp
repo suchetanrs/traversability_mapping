@@ -31,6 +31,7 @@
 #include <pcl/point_types.h>
 
 #include "traversability_mapping/Moments.hpp"
+#include "traversability_mapping/Helpers.hpp"
 #include "traversability_mapping/KeyFrame.hpp"
 
 namespace traversability_mapping
@@ -136,13 +137,16 @@ namespace traversability_mapping
 
         /// @brief Add (sign>0) or subtract (sign<0) one keyframe's cell moment.
         /// @param cellId target cell. @param m the moment. @param sign +1 to add, -1 to subtract.
-        void addPartialToGrid(std::uint64_t cellId, const NodeMetaData &m, double sign);
+        /// @param layers pre-resolved moment layers of gridMap_ (rebuild after any grow).
+        void addPartialToGrid(std::uint64_t cellId, const NodeMetaData &m, double sign,
+                              const MomentLayers &layers);
 
         /// @name Recompute (caller must hold masterGridMapMutex_)
         /// @{
         /// @brief Recompute one cell's hazards from its vicinity.
-        /// @param id cell id. @return true if the cell was (re)written.
-        bool recomputeCell(std::uint64_t id);
+        /// @param id cell id. @param layers pre-resolved moment layers of gridMap_.
+        /// @return true if the cell was (re)written.
+        bool recomputeCell(std::uint64_t id, const MomentLayers &layers);
         /// @brief Recompute every cell in @p dirty, recording those that changed.
         /// @param dirty cell ids to recompute.
         void recomputeDirty(const std::unordered_set<std::uint64_t> &dirty);

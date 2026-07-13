@@ -76,6 +76,44 @@ namespace traversability_mapping
     bool readCellMoment(const grid_map::GridMap &grid, const Lattice &lattice,
                         int ci, int cj, NodeMetaData &out);
 
+    /**
+     * @brief Handles to a grid's ten moment layers, resolved once.
+     *
+     * grid_map's at(layerName, position) hashes the layer name and re-derives the buffer
+     * index on every scalar access, and the moment layers are always touched ten at a
+     * time. Resolving the layer matrices up front and indexing them directly turns that
+     * into one bounds-checked position->index lookup per cell.
+     *
+     * @warning Holds raw pointers into @p grid: rebuild after anything that replaces the
+     *          grid (growGridToInclude).
+     */
+    struct MomentLayers
+    {
+        /// @param grid grid whose moment layers to resolve.
+        explicit MomentLayers(grid_map::GridMap &grid);
+
+        /// @brief Read the moment at a buffer index.
+        /// @param idx buffer index. @param out [out] the moment.
+        /// @return false if the cell is unobserved (N<1).
+        bool read(const grid_map::Index &idx, NodeMetaData &out) const;
+
+        /// @brief Accumulate sign * @p m at a buffer index, treating a NaN cell as 0.
+        /// @param idx buffer index. @param m the moment. @param sign +1 to add, -1 to subtract.
+        void add(const grid_map::Index &idx, const NodeMetaData &m, double sign) const;
+
+        grid_map::Matrix *N;
+        grid_map::Matrix *sx, *sy, *sz;
+        grid_map::Matrix *sx2, *sy2, *sz2;
+        grid_map::Matrix *sxy, *sxz, *syz;
+    };
+
+    /// @brief readCellMoment against pre-resolved layers (the recompute hot path).
+    /// @param grid,lattice the map. @param layers layers of @p grid. @param ci,cj cell indices.
+    /// @param out [out] the moment.
+    /// @return false if the cell is outside the grid or unobserved (N<1).
+    bool readCellMoment(const grid_map::GridMap &grid, const MomentLayers &layers,
+                        const Lattice &lattice, int ci, int cj, NodeMetaData &out);
+
     /// @brief Absolute ids of every occupied (N>=1) cell in @p grid.
     /// @param grid,lattice the map. @return the occupied cell ids.
     std::vector<std::uint64_t> allOccupiedKeys(const grid_map::GridMap &grid,

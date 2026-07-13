@@ -30,7 +30,7 @@ mapping/global_adjustment_sleep: 0       # ms between per-keyframe passes in the
 
 # --- Ingestion (cloud filtering + buffering) ---
 ingestion/robot_height: 3.5              # points more than this above the base are dropped (ceilings/overhangs)
-ingestion/max_range_base_frame: 300.0    # points further than this from the base are dropped (m)
+ingestion/max_range_base_frame: 6.0    # points further than this from the base are dropped (m)
 ingestion/min_range_base_frame: 1.0      # points closer than this to the base are dropped (m, ego-filter)
 ingestion/use_pointcloud_buffer: false   # buffer clouds and fetch by timestamp (SLAM-announces-by-ts path)
 ingestion/use_ros_buffer: false          # when buffering, use the sensor_msgs buffer instead of the PCL one

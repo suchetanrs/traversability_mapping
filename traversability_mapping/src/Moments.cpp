@@ -68,7 +68,12 @@ namespace traversability_mapping
 
     void NodeMetaData::shift(const Eigen::Vector3d &d)
     {
-        transform(Eigen::Matrix3d::Identity(), d);
+        // transform() with an identity rotation, minus the two 3x3 products against it.
+        const Eigen::Vector3d s = S();
+        const double n = static_cast<double>(N);
+        const Eigen::Matrix3d q2 = Q() + s * d.transpose() + d * s.transpose()
+                                 + n * d * d.transpose();
+        setSQ(s + n * d, q2);
     }
 
 }  // namespace traversability_mapping

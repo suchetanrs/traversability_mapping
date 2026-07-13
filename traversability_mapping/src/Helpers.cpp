@@ -114,6 +114,51 @@ namespace traversability_mapping
         return true;
     }
 
+    MomentLayers::MomentLayers(grid_map::GridMap &grid)
+        : N(&grid["N"]),
+          sx(&grid["sx"]), sy(&grid["sy"]), sz(&grid["sz"]),
+          sx2(&grid["sx2"]), sy2(&grid["sy2"]), sz2(&grid["sz2"]),
+          sxy(&grid["sxy"]), sxz(&grid["sxz"]), syz(&grid["syz"])
+    {
+    }
+
+    bool MomentLayers::read(const grid_map::Index &idx, NodeMetaData &out) const
+    {
+        const int i = idx(0), j = idx(1);
+        const float n = (*N)(i, j);
+        if (std::isnan(n) || n < 1.f)
+            return false;
+        out.N = static_cast<unsigned int>(std::lround(n));
+        out.sx = (*sx)(i, j);   out.sy = (*sy)(i, j);   out.sz = (*sz)(i, j);
+        out.sx2 = (*sx2)(i, j); out.sy2 = (*sy2)(i, j); out.sz2 = (*sz2)(i, j);
+        out.sxy = (*sxy)(i, j); out.sxz = (*sxz)(i, j); out.syz = (*syz)(i, j);
+        return true;
+    }
+
+    void MomentLayers::add(const grid_map::Index &idx, const NodeMetaData &m, double sign) const
+    {
+        const int i = idx(0), j = idx(1);
+        const auto acc = [i, j](grid_map::Matrix &layer, double v)
+        {
+            float &cell = layer(i, j);
+            if (std::isnan(cell)) cell = 0.f;
+            cell += static_cast<float>(v);
+        };
+        acc(*N, sign * m.N);
+        acc(*sx, sign * m.sx);   acc(*sy, sign * m.sy);   acc(*sz, sign * m.sz);
+        acc(*sx2, sign * m.sx2); acc(*sy2, sign * m.sy2); acc(*sz2, sign * m.sz2);
+        acc(*sxy, sign * m.sxy); acc(*sxz, sign * m.sxz); acc(*syz, sign * m.syz);
+    }
+
+    bool readCellMoment(const grid_map::GridMap &grid, const MomentLayers &layers,
+                        const Lattice &lattice, int ci, int cj, NodeMetaData &out)
+    {
+        grid_map::Index idx;
+        if (!grid.getIndex(cellPos(lattice, ci, cj), idx))
+            return false;
+        return layers.read(idx, out);
+    }
+
     std::vector<std::uint64_t> allOccupiedKeys(const grid_map::GridMap &grid,
                                                const Lattice &lattice)
     {
