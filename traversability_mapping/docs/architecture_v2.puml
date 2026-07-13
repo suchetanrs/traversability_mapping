@@ -1,0 +1,245 @@
+@startuml traversability_mapping_core_v2
+title Traversability Mapping — ROS-independent core (v2, with threading)
+
+' ── rendering ────────────────────────────────────────────────
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam roundcorner 8
+skinparam classAttributeIconSize 0
+skinparam ArrowColor #4A6FA5
+skinparam packageStyle rectangle
+' straight right-angle connectors only (no curved/spline lines)
+skinparam linetype ortho
+' breathing room so lines route around boxes, not through text
+skinparam nodesep 70
+skinparam ranksep 90
+skinparam class {
+    BorderColor #4A6FA5
+    AttributeFontColor #333333
+}
+skinparam package {
+    FontStyle bold
+    BorderColor #7A7A7A
+    FontColor #333333
+}
+hide empty members
+
+' =============================================================
+' ORCHESTRATION
+' =============================================================
+package "Orchestration  (public API, ROS-free)" #EEF3FB {
+
+    class System <<facade / multi-map orchestrator>> #E8F0FF {
+        .. additions ..
+        +addNewKeyFrameWithPCL(ts, kfID, mapID, cloud)
+        +addNewKeyFrameTsDouble(ts, kfID, mapID)
+        .. pose updates (PGO) ..
+        +updateKeyFrame(kfID, pose_map_base)  «O(1), latest-wins»
+        .. lifecycle ..
+        +deleteKeyFrame(kfID)
+        +updateKFMap(kfID, mapID)   «re-parent»
+        +informLoopClosure()        «clear + rebuild»
+        +addNewLocalMap(mapID, onUpdate)
+        .. access ..
+        +getLocalMap(mapID) : LocalMap
+        +getGlobalPointCloud(vx, vy, vz)
+        -pruneToBase(cloud_lidar)   «lidar -> base, range-gated»
+        __ state __
+        -Lattice lattice_           «shared across maps»
+        -map<mapID, LocalMap> localMapsSet_
+        -map<kfID, KeyFrame> keyFramesMap_   «authoritative»
+        -map<kfID, mapID>    allKeyFramesSet_ «routing»
+        -Affine3f Tbv_  «base <- lidar»
+        -recursive_mutex localMapMutex_
+    }
+}
+
+' =============================================================
+' PER-SUBMAP RUNTIME  (the concurrent engine)
+' =============================================================
+package "Per-submap runtime  (one LocalMap = one grid + its threads)" #FBF0EE {
+
+    class LocalMap <<moment-fused submap>> #FDE7E2 {
+        .. keyframe lifecycle ..
+        +addAlreadyDeclaredKF(kf)
+        +setKeyFramePose(kf, pose)  «enqueue — queue lock only»
+        +detachKeyFrame(id) : KeyFrame
+        +clearEntireMap()
+        .. outputs (hold getGridMapMutex) ..
+        +getGridMap() : GridMap
+        +getGridMapMutex() : mutex&
+        +takeChangedCells() : cellIds  «drains delta»
+        +occupiedCellKeys() : cellIds
+        +getStitchedPointCloud(vx, vy, vz)
+        .. core op (self-locking) ..
+        -recomputeKeyFrame(kf, pose) «subtract -> rebin -> add -> recompute»
+        -recomputeDirty(dirty)  «PCA over dilated touched cells»
+        -growToIncludeCells(partials)
+        __ workers __
+        -RunLocalKeyFrames()  «FAST: drains localQueue_»
+        -RunTraversability()  «BACKSTOP: sweeps all KFs (disabled)»
+        __ state __
+        -GridMap gridMap_
+        -set<cellId> changedCells_
+        -map<kfID, KeyFrame> keyFramesMap_  «shared view»
+        -deque<KeyFrame> localQueue_        «depth == backlog»
+        -Lattice lattice_
+    }
+
+    ' ---- concurrency detail --------------------------------------
+    class "«threads»" as Threads <<runtime>> #FFFFFF {
+        localThread_  : RunLocalKeyFrames()   «started»
+        globalThread_ : RunTraversability()   «currently //commented»
+    }
+
+    class "«mutexes»" as Locks <<runtime>> #FFFFFF {
+        1. masterGridMapMutex_  : grid + changedCells_
+        2. keyFramesMapMutex_   : keyframe registry
+        3. poseQueueMutex_      : pose work queue
+    }
+
+    LocalMap *-- Threads
+    LocalMap *-- Locks
+
+    note bottom of Locks
+      <b>Lock ordering (never inverted): 1 -> 2 -> 3</b>
+      • setKeyFramePose() takes <b>only</b> #3
+        => PGO pose updates never block a recompute.
+      • recomputeKeyFrame() releases #1 around the
+        keyframe-local rebin, then re-takes it to add.
+    end note
+
+    note bottom of Threads
+      <b>Producer / consumer</b>
+      System (any thread) --enqueue--> localQueue_
+      localThread_ pops (unconditional), recomputes,
+      fires onUpdate_; sleeps 10 ms when the queue is empty.
+    end note
+}
+
+' =============================================================
+' DOMAIN  (pure data — no ROS / grid_map / PCL)
+' =============================================================
+package "Domain  (Eigen-only, unit-testable)" #ECFAF1 {
+
+    class KeyFrame <<pose + retained cloud + partials>> #DFF5E7 {
+        +setPose(p)  «non-blocking»
+        +getPendingPose(out) : bool   «"has pending" == "needs rebin"»
+        +rebin(lattice, pose)  «base cloud -> cell moments»
+        +partials() : map<cellId, NodeMetaData>
+        +hasCloud() : bool
+        +dropCloud()  «reclaim memory, disables rebin»
+        __
+        -uint64 kfID_ ; uint64 parentMapID_
+        -vector<Vec3f> cloudBase_   «pruned, base frame»
+        -Affine3f latestPose_ ; bool hasPending_
+        -mutex poseMutex_
+    }
+
+    class NodeMetaData <<raw additive moments>> #DFF5E7 {
+        +uint N
+        +S() : Vec3d          «sum p»
+        +Q() : Mat3d          «sum p p^T»
+        +fuseWith(o)    «+ contribution»
+        +removeWith(o)  «exact inverse — PGO back-out»
+        +covariance() : Mat3d
+        +barycenter() : Vec3d
+        +transform(R, t) ; shift(d)
+    }
+
+    class Lattice <<fixed absolute grid>> #DFF5E7 {
+        +double x0, y0, res
+        +cellOf(x, y, ci, cj)
+        +centerOf(ci, cj) : Vec2d
+        +{static} key(ci, cj) : cellId
+        +{static} unkey(k, ci, cj)
+    }
+
+    class CellMoment #DFF5E7 {
+        +NodeMetaData data
+        +Vec3d center  «map frame»
+    }
+}
+
+' =============================================================
+' STATELESS ALGORITHMS
+' =============================================================
+package "Stateless algorithms" #F4F0FA {
+
+    class TraversabilityMetrics <<free function>> #ECE4F7 {
+        +{static} computeGoodness(query, occupied,\n  vicinity_count, ground_clearance,\n  max_slope, min_pts, min_frac) : Hazard[9]
+    }
+
+    enum Hazard #ECE4F7 {
+        OVERALL ; BORDER
+        ELEVATION ; SLOPE ; STEP
+        ROUGHNESS
+        NORMAL_X ; NORMAL_Y ; NORMAL_Z
+    }
+
+    class Helpers <<free functions>> #ECE4F7 {
+        +makeGridMap(...) : GridMap
+        +growGridToInclude(...)
+        +readCellMoment(...) : bool
+        +allOccupiedKeys(...) : cellIds
+        +dilate(touched, delta) : cells
+        ~ Profiler / PROFILE_FUNCTION
+    }
+}
+
+' =============================================================
+' INFRASTRUCTURE
+' =============================================================
+package "Infrastructure" #F7F7F5 {
+
+    class PointCloudBuffer <<timestamp ring buffer>> #EFEFEC {
+        +addPointCloud(cloud, ts)
+        +getClosestPointCloud(t) : cloud
+        +deletePointsBefore(t)
+    }
+
+    class ParameterHandler <<YAML singleton>> #EFEFEC {
+        +{static} getInstance(path) : ParameterHandler
+        +getValue<T>(key) : T
+        +setValue<T>(key, v)
+        +keys() : string[]
+    }
+}
+
+' =============================================================
+' RELATIONSHIPS
+' =============================================================
+' composition (owned lifetime)
+System "1" *-- "0..N" LocalMap  : owns
+System "1" *-- "0..N" KeyFrame  : registry
+System "1" o-- "1"    PointCloudBuffer : buffers
+KeyFrame "1" *-- "0..N" NodeMetaData : partials
+CellMoment *-- NodeMetaData
+
+' aggregation (shared view — enables re-parenting between maps)
+LocalMap "1" o-- "0..N" KeyFrame : shared view
+
+' dependency (uses)
+KeyFrame  ..> Lattice : rebin onto
+LocalMap  ..> Lattice : bins onto
+LocalMap  ..> TraversabilityMetrics : per dirty cell
+LocalMap  ..> Helpers : grid utils
+TraversabilityMetrics ..> CellMoment : fits over
+TraversabilityMetrics ..> Hazard
+System    ..> ParameterHandler : config
+LocalMap  ..> ParameterHandler : config
+
+legend right
+  |= arrow |= meaning |
+  | <b>*--</b> | composition (owned lifetime) |
+  | <b>o--</b> | aggregation (shared, non-owning view) |
+  | <b>..></b> | dependency (uses) |
+  |= box color |= layer |
+  | <back:#E8F0FF>   </back> | orchestration |
+  | <back:#FDE7E2>   </back> | per-submap runtime (threaded) |
+  | <back:#DFF5E7>   </back> | domain (ROS-free) |
+  | <back:#ECE4F7>   </back> | stateless algorithms |
+  | <back:#EFEFEC>   </back> | infrastructure |
+endlegend
+
+@enduml

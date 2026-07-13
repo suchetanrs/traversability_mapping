@@ -25,6 +25,7 @@ find_package(Sophus REQUIRED)
 find_package(Eigen3 3.1.0 REQUIRED)
 find_package(traversability_mapping REQUIRED)
 find_package(traversability_mapping_common REQUIRED)
+find_package(message_filters REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(grid_map_core REQUIRED)
 find_package(grid_map_ros REQUIRED)
@@ -49,6 +50,7 @@ set(dependencies
     Eigen3
     traversability_mapping
     traversability_mapping_common
+    message_filters
     sensor_msgs
     grid_map_core
     grid_map_ros
@@ -90,6 +92,16 @@ add_executable(global_traversability src/global_traversability_node.cpp src/conv
 ament_target_dependencies(global_traversability ${dependencies})
 target_link_libraries(global_traversability ${PCL_LIBRARIES} ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem traversability_mapping_common)
 
+# Add executable (local, robot-centered rolling-window variant; same core + conversions)
+add_executable(local_traversability src/local_traversability_node.cpp src/conversions.cpp)
+ament_target_dependencies(local_traversability ${dependencies})
+target_link_libraries(local_traversability ${PCL_LIBRARIES} ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem traversability_mapping_common)
+
+# Add executable (one-shot: a single static PLY cloud -> one keyframe -> latched map)
+add_executable(one_shot_traversability src/one_shot_traversability_node.cpp)
+ament_target_dependencies(one_shot_traversability ${dependencies})
+target_link_libraries(one_shot_traversability ${PCL_LIBRARIES} ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem traversability_mapping_common)
+
 # # Add executable
 # add_executable(threshold_occupancy src/threshold_occupancy.cpp)
 # ament_target_dependencies(threshold_occupancy ${dependencies})
@@ -107,8 +119,10 @@ target_link_libraries(global_traversability ${PCL_LIBRARIES} ${Sophus_LIBRARIES}
 
 # Install executable 
 install(TARGETS
-    # traversability_node multi_map_merge threshold_occupancy virtual_boundary_maker one_shot_traversability
+    # traversability_node multi_map_merge threshold_occupancy virtual_boundary_maker
     global_traversability
+    local_traversability
+    one_shot_traversability
     DESTINATION lib/${PROJECT_NAME}
 )
 
