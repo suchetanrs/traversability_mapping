@@ -17,6 +17,7 @@
 #include <chrono>
 #include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
 #include <unordered_set>
 
@@ -123,6 +124,23 @@ namespace traversability_mapping
     /// @param touched input keys. @param delta radius in cells. @return the dilated set.
     std::unordered_set<std::uint64_t> dilate(const std::unordered_set<std::uint64_t> &touched,
                                              int delta);
+
+    /// @brief Cell offsets whose centres lie within @p radius of a cell centre (a disc).
+    ///
+    /// This is the robot footprint expressed in cells: the plane fit for a cell uses
+    /// exactly the cells the robot standing on it would cover. Always includes (0,0), and
+    /// a radius under one cell is clamped up to one so the fit is never handed a single cell.
+    /// @param radius footprint radius (m). @param res cell size (m).
+    /// @return the offsets, as (di,dj) pairs.
+    std::vector<std::pair<int, int>> discOffsets(double radius, double res);
+
+    /// @brief Dilate a set of cell keys by a structuring element (e.g. discOffsets()).
+    ///
+    /// With a symmetric element this yields exactly the cells whose neighbourhood contains
+    /// a touched cell — i.e. the cells whose value the touched cells can have changed.
+    /// @param touched input keys. @param offsets structuring element. @return the dilated set.
+    std::unordered_set<std::uint64_t> dilate(const std::unordered_set<std::uint64_t> &touched,
+                                             const std::vector<std::pair<int, int>> &offsets);
 
     /// @brief Scoped timer that logs the wall-clock lifetime of its enclosing scope.
     class Profiler

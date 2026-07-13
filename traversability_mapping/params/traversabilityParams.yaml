@@ -14,7 +14,10 @@ grid/half_size_traversability: 7.5      # initial half-extent of the global grid
 grid/extend_length_every_resize_by: 30.0 # how much (m) to grow by when a keyframe nears the edge
 
 # --- Traversability (per-cell hazard metric) ---
-traversability/security_distance: 0.40   # max(robot_length, robot_width); sets the plane-fit vicinity radius
+# The plane fit for a cell uses exactly the cells a robot centred on it would cover: the
+# disc of cells whose centres lie within robot_radius. Cost scales with the disc area, so
+# this squared: doubling it is ~4x the cells per fit and ~16x the recompute.
+traversability/robot_radius: 0.20        # robot footprint radius (m)
 traversability/ground_clearance: 0.15
 traversability/max_slope: 0.4            # rad; slope hazard normaliser
 traversability/min_vicinity_points: 15   # min points in the vicinity to attempt a plane fit

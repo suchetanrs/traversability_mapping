@@ -46,7 +46,7 @@ ParameterHandler::ParameterHandler(std::string yaml_file_path)
     parameter_map_["grid/extend_length_every_resize_by"] = loaded_node["grid/extend_length_every_resize_by"].as<double>();
 
     // --- Traversability (per-cell hazard metric) ---
-    parameter_map_["traversability/security_distance"] = loaded_node["traversability/security_distance"].as<double>();
+    parameter_map_["traversability/robot_radius"] = loaded_node["traversability/robot_radius"].as<double>();
     parameter_map_["traversability/ground_clearance"] = loaded_node["traversability/ground_clearance"].as<double>();
     parameter_map_["traversability/max_slope"] = loaded_node["traversability/max_slope"].as<double>();
     parameter_map_["traversability/min_vicinity_points"] = loaded_node["traversability/min_vicinity_points"].as<int>();

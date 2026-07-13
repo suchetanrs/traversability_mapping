@@ -192,4 +192,34 @@ namespace traversability_mapping
         }
         return out;
     }
+
+    std::vector<std::pair<int, int>> discOffsets(double radius, double res)
+    {
+        // Work in cells. A footprint smaller than one cell would leave the fit with a
+        // single cell and no plane, so clamp it to one cell (a 5-cell plus).
+        const double rc = std::max(1.0, radius / res);
+        const int r = static_cast<int>(std::ceil(rc));
+        const double rc2 = rc * rc;
+        std::vector<std::pair<int, int>> out;
+        for (int di = -r; di <= r; ++di)
+            for (int dj = -r; dj <= r; ++dj)
+                if (static_cast<double>(di * di + dj * dj) <= rc2)
+                    out.emplace_back(di, dj);
+        return out;
+    }
+
+    std::unordered_set<std::uint64_t> dilate(const std::unordered_set<std::uint64_t> &touched,
+                                             const std::vector<std::pair<int, int>> &offsets)
+    {
+        std::unordered_set<std::uint64_t> out;
+        out.reserve(touched.size() * offsets.size());
+        for (auto id : touched)
+        {
+            int ci, cj;
+            Lattice::unkey(id, ci, cj);
+            for (const auto &o : offsets)
+                out.insert(Lattice::key(ci + o.first, cj + o.second));
+        }
+        return out;
+    }
 }  // namespace traversability_mapping

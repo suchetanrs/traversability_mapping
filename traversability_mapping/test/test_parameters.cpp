@@ -32,7 +32,7 @@ ingestion/use_pointcloud_buffer: true
 ingestion/use_ros_buffer: false
 grid/half_size_traversability: 7.5
 grid/extend_length_every_resize_by: 30.0
-traversability/security_distance: 0.4
+traversability/robot_radius: 0.4
 traversability/ground_clearance: 0.15
 traversability/max_slope: 0.4
 traversability/min_vicinity_points: 15
@@ -59,7 +59,7 @@ node/publish_rate_hz: 1.0
         "ingestion/robot_height", "ingestion/max_range_base_frame", "ingestion/min_range_base_frame",
         "ingestion/use_pointcloud_buffer", "ingestion/use_ros_buffer",
         "grid/half_size_traversability", "grid/extend_length_every_resize_by",
-        "traversability/security_distance", "traversability/ground_clearance", "traversability/max_slope",
+        "traversability/robot_radius", "traversability/ground_clearance", "traversability/max_slope",
         "traversability/min_vicinity_points", "traversability/min_occupied_fraction",
         "mapping/is_kf_optimization_enabled", "mapping/num_local_keyframes",
         "mapping/global_adjustment_sleep", "node/publish_rate_hz"};

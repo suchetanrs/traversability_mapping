@@ -58,7 +58,7 @@ grid/grid_center_x: 0.0
 grid/grid_center_y: 0.0
 grid/half_size_traversability: 7.5
 grid/extend_length_every_resize_by: 30.0
-traversability/security_distance: 0.4
+traversability/robot_radius: 0.4
 traversability/ground_clearance: 0.15
 traversability/max_slope: 0.4
 traversability/min_vicinity_points: 15

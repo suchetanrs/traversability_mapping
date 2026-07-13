@@ -174,7 +174,8 @@ namespace traversability_mapping
         double res_;
         double groundClearance_, maxSlope_, minOccupiedFraction_;
         unsigned int minVicinityPoints_;
-        int deltaInd_;
+        double robotRadius_;                                 ///< footprint radius (m)
+        std::vector<std::pair<int, int>> discOffsets_;       ///< footprint as cell offsets; the fit vicinity
         int globalSleepMs_;
         bool kfOptimizationEnabled_;
         std::function<void()> onUpdate_;        ///< fired after each grid-changing keyframe op

@@ -11,11 +11,12 @@ grid/half_size_traversability: 40.0      # initial half-extent (m); the grid aut
 grid/extend_length_every_resize_by: 40.0
 
 # --- Traversability (per-cell hazard metric) ---
-# ONE-SHOT: deltaInd_ = max(1, ceil((security_distance/2)/resolution)) sets the vicinity
-# half-window (in cells). With resolution = 0.05, security_distance = 0.10 gives
-# (0.10/2)/0.05 = 1.0 -> deltaInd_ = 1 -> a 3x3 window (the query cell + its 8 neighbours),
-# and nothing wider. Keep security_distance <= 2*resolution to stay at 3x3.
-traversability/security_distance: 0.10
+# The plane fit for a cell uses the disc of cells the robot footprint covers. At
+# resolution = 0.05 a 0.20 m radius is 4 cells, i.e. 49 cells per fit. The previous value
+# here was deliberately shrunk to force a 3x3 (9-cell) window purely to keep the one-shot
+# pass cheap; that traded the real footprint for speed. Shrink it again if the pass is too
+# slow, but know that it no longer matches the robot.
+traversability/robot_radius: 0.20        # robot footprint radius (m)
 traversability/ground_clearance: 0.15
 traversability/max_slope: 0.4
 traversability/min_vicinity_points: 15

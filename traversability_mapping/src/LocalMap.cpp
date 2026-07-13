@@ -42,9 +42,10 @@ namespace traversability_mapping
         maxSlope_ = parameterInstance.getValue<double>("traversability/max_slope");
         minOccupiedFraction_ = parameterInstance.getValue<double>("traversability/min_occupied_fraction");
         minVicinityPoints_ = static_cast<unsigned int>(parameterInstance.getValue<int>("traversability/min_vicinity_points"));
-        const double security_distance = parameterInstance.getValue<double>("traversability/security_distance");
-        // Vicinity radius in cells (symmetric window of side 2*deltaInd_+1).
-        deltaInd_ = std::max(1, static_cast<int>(std::ceil((security_distance / 2.0) / res_)));
+        robotRadius_ = parameterInstance.getValue<double>("traversability/robot_radius");
+        // The vicinity IS the robot footprint: the cells a robot centred on the query cell
+        // would cover. Same disc drives the fit and the dirty-set dilation.
+        discOffsets_ = discOffsets(robotRadius_, res_);
         globalSleepMs_ = parameterInstance.getValue<int>("mapping/global_adjustment_sleep");
         kfOptimizationEnabled_ = parameterInstance.getValue<bool>("mapping/is_kf_optimization_enabled");
 
@@ -123,19 +124,20 @@ namespace traversability_mapping
 
         CellMoment query{qd, Eigen::Vector3d(qp.x(), qp.y(), 0.0)};
         std::vector<CellMoment> occupied;
-        occupied.reserve((2 * deltaInd_ + 1) * (2 * deltaInd_ + 1));
-        int total = 0;
-        for (int i = ci - deltaInd_; i <= ci + deltaInd_; ++i)
-            for (int j = cj - deltaInd_; j <= cj + deltaInd_; ++j)
+        occupied.reserve(discOffsets_.size());
+        for (const auto &o : discOffsets_)
+        {
+            const int i = ci + o.first;
+            const int j = cj + o.second;
+            NodeMetaData d;
+            if (readCellMoment(gridMap_, layers, lattice_, i, j, d))
             {
-                ++total;
-                NodeMetaData d;
-                if (readCellMoment(gridMap_, layers, lattice_, i, j, d))
-                {
-                    const Eigen::Vector2d c2 = lattice_.centerOf(i, j);
-                    occupied.push_back({d, Eigen::Vector3d(c2.x(), c2.y(), 0.0)});
-                }
+                const Eigen::Vector2d c2 = lattice_.centerOf(i, j);
+                occupied.push_back({d, Eigen::Vector3d(c2.x(), c2.y(), 0.0)});
             }
+        }
+        // Denominator of the occupied-fraction gate: cells under the footprint, not a square.
+        const int total = static_cast<int>(discOffsets_.size());
 
         const auto haz = computeGoodness(query, occupied, total, groundClearance_,
                                          maxSlope_, minVicinityPoints_, minOccupiedFraction_);
@@ -230,7 +232,7 @@ namespace traversability_mapping
             }
 
             // 4. recompute hazards over the dilated union of cells left and newly occupied.
-            const auto dirty = dilate(touched, deltaInd_);
+            const auto dirty = dilate(touched, discOffsets_);
             recomputeDirty(dirty);
 
             std::cout << "[LocalMap " << mapID_ << "] kf " << kf->getKfID()
@@ -290,7 +292,7 @@ namespace traversability_mapping
                 touched.insert(kv.first);
             }
         }
-        recomputeDirty(dilate(touched, deltaInd_));
+        recomputeDirty(dilate(touched, discOffsets_));
         kf->partials().clear();
 
         keyFramesMap_.erase(it);

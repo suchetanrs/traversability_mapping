@@ -12,7 +12,7 @@ grid/half_size_traversability: 10.0      # initial half-extent (m); >= max_range
 grid/extend_length_every_resize_by: 30.0
 
 # --- Traversability (per-cell hazard metric) --- (unchanged from global)
-traversability/security_distance: 0.40
+traversability/robot_radius: 0.20        # robot footprint radius (m); the plane-fit disc
 traversability/ground_clearance: 0.15
 traversability/max_slope: 0.4
 traversability/min_vicinity_points: 15
