@@ -72,6 +72,8 @@ namespace traversability_mapping
         /// @brief Add a keyframe with a directly supplied LIDAR-frame cloud.
         /// @param timestamp_ns acquisition time (ns). @param kfID keyframe id.
         /// @param mapID owning map. @param sensorPointCloud LIDAR-frame cloud.
+        /// @throws std::runtime_error if @p kfID exceeds INT64_MAX, which is what a
+        ///         negative id from a signed-id front-end converts to.
         void addNewKeyFrameWithPCL(unsigned long long timestamp_ns, std::uint64_t kfID,
                                    std::uint64_t mapID,
                                    std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> sensorPointCloud);

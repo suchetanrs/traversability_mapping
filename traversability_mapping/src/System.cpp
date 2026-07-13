@@ -14,6 +14,9 @@
 #include "traversability_mapping/Parameters.hpp"
 
 #include <iostream>
+#include <limits>
+#include <stdexcept>
+#include <string>
 #include <utility>
 
 namespace traversability_mapping
@@ -133,6 +136,12 @@ namespace traversability_mapping
                                        std::uint64_t mapID,
                                        std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> sensorPointCloud)
     {
+        if (kfID > static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max()))
+        {
+            throw std::runtime_error(
+                "The given KF ID was negative. Please make sure the keyFrame IDs are positive. KF ID: " +
+                std::to_string(static_cast<std::int64_t>(kfID)));
+        }
         if (!sensorPointCloud)
             return;
         addNewKeyFrameToMap(nanosecToSec(timestamp_ns), kfID, mapID, *sensorPointCloud);
