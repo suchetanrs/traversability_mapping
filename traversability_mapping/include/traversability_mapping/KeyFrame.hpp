@@ -54,8 +54,6 @@ namespace traversability_mapping
         const std::uint64_t &getKfID() const { return kfID_; }
         /// @brief Acquisition time (seconds).
         const double &getTimestamp() const { return timestamp_; }
-        /// @brief Id of the map this keyframe currently belongs to.
-        std::uint64_t getParentMapID() const { return parentMapID_; }
 
         /// @brief Record a new parent map id (moving partials between grids is the caller's job).
         /// @param parentMapID new owning map id.
@@ -82,9 +80,6 @@ namespace traversability_mapping
         std::unordered_map<std::uint64_t, NodeMetaData> &partials() { return partials_; }
         /// @brief Read-only per-cell moments.
         const std::unordered_map<std::uint64_t, NodeMetaData> &partials() const { return partials_; }
-
-        /// @brief True if the keyframe contributes to no cell.
-        bool empty() const { return partials_.empty(); }
 
         /// @brief Retained pruned cloud in the robot base frame (empty once dropped).
         const std::vector<Eigen::Vector3f> &cloudBase() const { return cloudBase_; }

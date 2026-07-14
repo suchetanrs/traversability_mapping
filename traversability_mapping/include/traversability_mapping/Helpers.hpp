@@ -61,21 +61,10 @@ namespace traversability_mapping
                            const Lattice &lattice, double res, double extend,
                            double minx, double maxx, double miny, double maxy);
 
-    /// @brief Add @p v to one layer at @p p, treating a NaN cell as 0.
-    /// @param grid target grid. @param layer layer name. @param p cell position. @param v value to add.
-    void addToLayer(grid_map::GridMap &grid, const std::string &layer,
-                    const grid_map::Position &p, double v);
-
     /// @brief Set every @p layers cell at @p p to NaN.
     /// @param grid target grid. @param layers layers to blank. @param p cell position.
     void blankCell(grid_map::GridMap &grid, const std::vector<std::string> &layers,
                    const grid_map::Position &p);
-
-    /// @brief Read the fused moment stored at cell (ci,cj).
-    /// @param grid,lattice the map. @param ci,cj cell indices. @param out [out] the moment.
-    /// @return false if the cell is outside the grid or unobserved (N<1).
-    bool readCellMoment(const grid_map::GridMap &grid, const Lattice &lattice,
-                        int ci, int cj, NodeMetaData &out);
 
     /**
      * @brief Handles to a grid's ten moment layers, resolved once.
@@ -108,7 +97,7 @@ namespace traversability_mapping
         grid_map::Matrix *sxy, *sxz, *syz;
     };
 
-    /// @brief readCellMoment against pre-resolved layers (the recompute hot path).
+    /// @brief Read the fused moment stored at cell (ci,cj), against pre-resolved layers.
     /// @param grid,lattice the map. @param layers layers of @p grid. @param ci,cj cell indices.
     /// @param out [out] the moment.
     /// @return false if the cell is outside the grid or unobserved (N<1).
@@ -119,11 +108,6 @@ namespace traversability_mapping
     /// @param grid,lattice the map. @return the occupied cell ids.
     std::vector<std::uint64_t> allOccupiedKeys(const grid_map::GridMap &grid,
                                                const Lattice &lattice);
-
-    /// @brief Dilate a set of cell keys by +/-@p delta cells on each axis (square window).
-    /// @param touched input keys. @param delta radius in cells. @return the dilated set.
-    std::unordered_set<std::uint64_t> dilate(const std::unordered_set<std::uint64_t> &touched,
-                                             int delta);
 
     /// @brief Cell offsets whose centres lie within @p radius of a cell centre (a disc).
     ///

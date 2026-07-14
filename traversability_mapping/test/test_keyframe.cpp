@@ -48,11 +48,10 @@ TEST(KeyFrame, PrimaryConstructorStoresFields)
 
     EXPECT_EQ(kf.getKfID(), 42u);
     EXPECT_DOUBLE_EQ(kf.getTimestamp(), 12.25);
-    EXPECT_EQ(kf.getParentMapID(), 3u);
     EXPECT_TRUE(kf.getPose().matrix().isApprox(pose.matrix()));
     EXPECT_TRUE(kf.hasCloud());
     EXPECT_EQ(kf.cloudBase().size(), 2u);
-    EXPECT_TRUE(kf.empty());          // nothing binned yet
+    EXPECT_TRUE(kf.partials().empty());   // nothing binned yet
 }
 
 TEST(KeyFrame, ConvenienceConstructorDefaultsTimestampAndMap)
@@ -61,16 +60,7 @@ TEST(KeyFrame, ConvenienceConstructorDefaultsTimestampAndMap)
     KeyFrame kf(9, pose, cloud({{0.f, 0.f, 0.f}}));
     EXPECT_EQ(kf.getKfID(), 9u);
     EXPECT_DOUBLE_EQ(kf.getTimestamp(), 0.0);
-    EXPECT_EQ(kf.getParentMapID(), 0u);
     EXPECT_TRUE(kf.getPose().matrix().isApprox(pose.matrix()));
-}
-
-TEST(KeyFrame, SetMapUpdatesParentID)
-{
-    KeyFrame kf = makeKF();
-    EXPECT_EQ(kf.getParentMapID(), 0u);
-    kf.setMap(5);
-    EXPECT_EQ(kf.getParentMapID(), 5u);
 }
 
 // --- Pose state machine ------------------------------------------------------
@@ -146,7 +136,6 @@ TEST(KeyFrame, RebinBinsCloudIntoCellLocalMoments)
     EXPECT_NEAR(bary.x(), 0.04, 1e-4);
     EXPECT_NEAR(bary.y(), -0.11, 1e-4);
     EXPECT_NEAR(bary.z(), 2.0, 1e-4);
-    EXPECT_FALSE(kf.empty());
 }
 
 TEST(KeyFrame, RebinAppliesPoseTransform)
@@ -220,7 +209,6 @@ TEST(KeyFrame, RebinEmptyCloudYieldsNoPartials)
     KeyFrame kf(1, 0.0, Eigen::Affine3f::Identity(), {}, 0);
     EXPECT_FALSE(kf.hasCloud());
     kf.rebin(lat, Eigen::Affine3f::Identity());
-    EXPECT_TRUE(kf.empty());
     EXPECT_EQ(kf.partials().size(), 0u);
 }
 
@@ -233,7 +221,6 @@ TEST(KeyFrame, PartialsMutableAccessorReflectsInConst)
     const KeyFrame &ckf = kf;
     EXPECT_EQ(ckf.partials().size(), 1u);
     EXPECT_EQ(ckf.partials().at(Lattice::key(2, 2)).N, 1u);
-    EXPECT_FALSE(ckf.empty());
 }
 
 // --- retained-cloud lifecycle -----------------------------------------------

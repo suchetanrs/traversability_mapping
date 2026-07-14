@@ -83,35 +83,11 @@ namespace traversability_mapping
         }
     }
 
-    void addToLayer(grid_map::GridMap &grid, const std::string &layer,
-                    const grid_map::Position &p, double v)
-    {
-        float &cell = grid.atPosition(layer, p);
-        if (std::isnan(cell)) cell = 0.f;
-        cell += static_cast<float>(v);
-    }
-
     void blankCell(grid_map::GridMap &grid, const std::vector<std::string> &layers,
                    const grid_map::Position &p)
     {
         for (const auto &l : layers)
             grid.atPosition(l, p) = kNaN;
-    }
-
-    bool readCellMoment(const grid_map::GridMap &grid, const Lattice &lattice,
-                        int ci, int cj, NodeMetaData &out)
-    {
-        const grid_map::Position p = cellPos(lattice, ci, cj);
-        if (!grid.isInside(p))
-            return false;
-        const float n = grid.atPosition("N", p);
-        if (std::isnan(n) || n < 1.f)
-            return false;
-        out.N = static_cast<unsigned int>(std::lround(n));
-        out.sx = grid.atPosition("sx", p);   out.sy = grid.atPosition("sy", p);   out.sz = grid.atPosition("sz", p);
-        out.sx2 = grid.atPosition("sx2", p); out.sy2 = grid.atPosition("sy2", p); out.sz2 = grid.atPosition("sz2", p);
-        out.sxy = grid.atPosition("sxy", p); out.sxz = grid.atPosition("sxz", p); out.syz = grid.atPosition("syz", p);
-        return true;
     }
 
     MomentLayers::MomentLayers(grid_map::GridMap &grid)
@@ -175,22 +151,6 @@ namespace traversability_mapping
             keys.push_back(Lattice::key(ci, cj));
         }
         return keys;
-    }
-
-    std::unordered_set<std::uint64_t> dilate(const std::unordered_set<std::uint64_t> &touched,
-                                             int delta)
-    {
-        std::unordered_set<std::uint64_t> out;
-        out.reserve(touched.size() * (2 * delta + 1) * (2 * delta + 1));
-        for (auto id : touched)
-        {
-            int ci, cj;
-            Lattice::unkey(id, ci, cj);
-            for (int di = -delta; di <= delta; ++di)
-                for (int dj = -delta; dj <= delta; ++dj)
-                    out.insert(Lattice::key(ci + di, cj + dj));
-        }
-        return out;
     }
 
     std::vector<std::pair<int, int>> discOffsets(double radius, double res)

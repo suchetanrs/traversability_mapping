@@ -33,6 +33,14 @@ namespace
         }
         return c;
     }
+
+    // Sigma = Q/N - mu mu^T. The library derives this inline where it needs it
+    // (computeGoodness); the tests re-derive it here rather than depend on an accessor.
+    Eigen::Matrix3d covarianceOf(const NodeMetaData &m)
+    {
+        const Eigen::Vector3d mu = m.barycenter();
+        return m.Q() / static_cast<double>(m.N) - mu * mu.transpose();
+    }
 }  // namespace
 
 // --- Seam 1: moment algebra --------------------------------------------------
@@ -56,93 +64,12 @@ TEST(Moments, FuseEqualsCombinedInsert)
     EXPECT_NEAR(fused.sz, combined.sz, 1e-9);
 }
 
-TEST(Moments, RemoveIsInverseOfFuse)
-{
-    NodeMetaData total, part;
-    std::mt19937 rng(7);
-    std::uniform_real_distribution<double> u(-0.1, 0.1);
-    for (int i = 0; i < 50; ++i) total.insert(u(rng), u(rng), u(rng));
-    for (int i = 0; i < 20; ++i) { double x=u(rng),y=u(rng),z=u(rng); total.insert(x,y,z); part.insert(x,y,z); }
-    NodeMetaData backed = total;
-    backed.removeWith(part);
-    // backed should equal total-before-part: re-derive
-    NodeMetaData expect;
-    // recompute expect by replaying first 50 only is messy; instead check
-    // fuse(remove) round trip:
-    NodeMetaData rt = backed;
-    rt.fuseWith(part);
-    EXPECT_EQ(rt.N, total.N);
-    EXPECT_NEAR(rt.sx2, total.sx2, 1e-9);
-    EXPECT_NEAR(rt.syz, total.syz, 1e-9);
-}
-
-TEST(Moments, CovarianceIsTranslationInvariant)
-{
-    // Covariance must not depend on the local origin choice.
-    std::vector<Eigen::Vector3d> pts;
-    std::mt19937 rng(1);
-    std::uniform_real_distribution<double> u(-0.5, 0.5);
-    for (int i = 0; i < 200; ++i) pts.emplace_back(u(rng), u(rng), 0.01 * u(rng));
-
-    NodeMetaData m1, m2;
-    Eigen::Vector3d o2(5.0, -3.0, 2.0);
-    for (const auto &p : pts)
-    {
-        m1.insert(p.x(), p.y(), p.z());
-        Eigen::Vector3d q = p - o2;
-        m2.insert(q.x(), q.y(), q.z());
-    }
-    EXPECT_TRUE(m1.covariance().isApprox(m2.covariance(), 1e-9));
-}
-
-TEST(Moments, CovarianceEigenvaluesRotationInvariant)
-{
-    std::vector<Eigen::Vector3d> pts;
-    std::mt19937 rng(2);
-    std::uniform_real_distribution<double> u(-0.5, 0.5);
-    for (int i = 0; i < 300; ++i) pts.emplace_back(u(rng), u(rng), 0.05 * u(rng));
-
-    NodeMetaData m;
-    for (const auto &p : pts) m.insert(p.x(), p.y(), p.z());
-    Eigen::Vector3d ev_before = m.covariance().selfadjointView<Eigen::Lower>().eigenvalues();
-
-    Eigen::Matrix3d R = Eigen::AngleAxisd(0.7, Eigen::Vector3d(0.2, 0.5, 0.84).normalized()).toRotationMatrix();
-    m.transform(R, Eigen::Vector3d(1.0, 2.0, 3.0));
-    Eigen::Vector3d ev_after = m.covariance().selfadjointView<Eigen::Lower>().eigenvalues();
-
-    EXPECT_TRUE(ev_before.isApprox(ev_after, 1e-7));
-}
-
-TEST(Moments, TransformMatchesDirectPointTransform)
-{
-    std::vector<Eigen::Vector3d> pts;
-    std::mt19937 rng(3);
-    std::uniform_real_distribution<double> u(-0.5, 0.5);
-    for (int i = 0; i < 100; ++i) pts.emplace_back(u(rng), u(rng), u(rng));
-
-    Eigen::Matrix3d R = Eigen::AngleAxisd(0.3, Eigen::Vector3d::UnitX()).toRotationMatrix();
-    Eigen::Vector3d t(0.4, -0.2, 1.1);
-
-    NodeMetaData viaMoments;
-    for (const auto &p : pts) viaMoments.insert(p.x(), p.y(), p.z());
-    viaMoments.transform(R, t);
-
-    NodeMetaData viaPoints;
-    for (const auto &p : pts) { Eigen::Vector3d q = R * p + t; viaPoints.insert(q.x(), q.y(), q.z()); }
-
-    EXPECT_NEAR(viaMoments.sx, viaPoints.sx, 1e-9);
-    EXPECT_NEAR(viaMoments.sx2, viaPoints.sx2, 1e-9);
-    EXPECT_NEAR(viaMoments.sxz, viaPoints.sxz, 1e-9);
-    EXPECT_NEAR(viaMoments.syz, viaPoints.syz, 1e-9);
-}
-
 TEST(Moments, ResetClearsAllMoments)
 {
     NodeMetaData m;
     for (int i = 0; i < 10; ++i) m.insert(0.1 * i, -0.2 * i, 0.3 * i);
-    ASSERT_FALSE(m.empty());
+    ASSERT_EQ(m.N, 10u);
     m.reset();
-    EXPECT_TRUE(m.empty());
     EXPECT_EQ(m.N, 0u);
     EXPECT_EQ(m.sx, 0.0);
     EXPECT_EQ(m.sy, 0.0);
@@ -153,14 +80,6 @@ TEST(Moments, ResetClearsAllMoments)
     EXPECT_EQ(m.sxy, 0.0);
     EXPECT_EQ(m.sxz, 0.0);
     EXPECT_EQ(m.syz, 0.0);
-}
-
-TEST(Moments, EmptyReflectsPointCount)
-{
-    NodeMetaData m;
-    EXPECT_TRUE(m.empty());
-    m.insert(1.0, 2.0, 3.0);
-    EXPECT_FALSE(m.empty());
 }
 
 TEST(Moments, BarycenterIsMeanOfPoints)
@@ -206,7 +125,7 @@ TEST(Moments, ShiftReExpressesAboutNewOrigin)
     b.shift(originB - originA);
 
     EXPECT_TRUE(a.barycenter().isApprox(b.barycenter(), 1e-12));
-    EXPECT_TRUE(a.covariance().isApprox(b.covariance(), 1e-12));
+    EXPECT_TRUE(covarianceOf(a).isApprox(covarianceOf(b), 1e-12));
 }
 
 TEST(Moments, ShiftedCellsFuseAsCombinedInsert)

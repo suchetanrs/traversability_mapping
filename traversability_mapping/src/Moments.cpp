@@ -46,29 +46,10 @@ namespace traversability_mapping
         return S() / static_cast<double>(N);
     }
 
-    Eigen::Matrix3d NodeMetaData::covariance() const
-    {
-        const Eigen::Vector3d mu = barycenter();
-        return Q() / static_cast<double>(N) - mu * mu.transpose();
-    }
-
-    void NodeMetaData::transform(const Eigen::Matrix3d &R, const Eigen::Vector3d &t)
-    {
-        const Eigen::Vector3d s = S();
-        const Eigen::Matrix3d q = Q();
-        const double n = static_cast<double>(N);
-        const Eigen::Vector3d Rs = R * s;
-        const Eigen::Vector3d s2 = Rs + n * t;
-        const Eigen::Matrix3d q2 = R * q * R.transpose()
-                                 + Rs * t.transpose()
-                                 + t * Rs.transpose()
-                                 + n * t * t.transpose();
-        setSQ(s2, q2);
-    }
-
     void NodeMetaData::shift(const Eigen::Vector3d &d)
     {
-        // transform() with an identity rotation, minus the two 3x3 products against it.
+        // A pure translation of the underlying points by d: S -> S + N d, and
+        // Q -> Q + S d^T + d S^T + N d d^T.
         const Eigen::Vector3d s = S();
         const double n = static_cast<double>(N);
         const Eigen::Matrix3d q2 = Q() + s * d.transpose() + d * s.transpose()

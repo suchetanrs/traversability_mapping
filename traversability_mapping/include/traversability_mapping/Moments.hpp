@@ -48,9 +48,6 @@ namespace traversability_mapping
         /// @brief Zero all moments.
         void reset();
 
-        /// @brief True if no points have been accumulated.
-        bool empty() const { return N == 0; }
-
         /// @brief Accumulate one point in this node's local (cell-centred) frame.
         /// @param x,y,z point coordinates in the local frame.
         inline void insert(double x, double y, double z)
@@ -71,16 +68,6 @@ namespace traversability_mapping
             sxy += o.sxy;  sxz += o.sxz;  syz += o.syz;
         }
 
-        /// @brief Exact inverse of fuseWith (back a keyframe out on a PGO update).
-        /// @param o moments to subtract.
-        inline void removeWith(const NodeMetaData &o)
-        {
-            N -= o.N;
-            sx -= o.sx;  sy -= o.sy;  sz -= o.sz;
-            sx2 -= o.sx2;  sy2 -= o.sy2;  sz2 -= o.sz2;
-            sxy -= o.sxy;  sxz -= o.sxz;  syz -= o.syz;
-        }
-
         /// @brief First-moment vector.
         /// @return S = sum(p).
         Eigen::Vector3d S() const;
@@ -94,14 +81,6 @@ namespace traversability_mapping
         /// @brief Centroid in the local frame (add the cell centre for map coords).
         /// @return mean point.
         Eigen::Vector3d barycenter() const;
-
-        /// @brief Origin-invariant covariance.
-        /// @return Sigma = Q/N - mu mu^T.
-        Eigen::Matrix3d covariance() const;
-
-        /// @brief Rigidly transform the underlying points (p -> R p + t), exactly.
-        /// @param R rotation. @param t translation.
-        void transform(const Eigen::Matrix3d &R, const Eigen::Vector3d &t);
 
         /// @brief Re-express the moments about a new origin (new coords = old + d).
         /// @param d origin offset; used to bring cells into a common origin before fusing.

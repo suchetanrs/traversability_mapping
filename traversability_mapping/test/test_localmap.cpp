@@ -148,7 +148,6 @@ protected:
 TEST_F(LocalMapTest, ConstructionExposesIdAndLattice)
 {
     start(true, 42);
-    EXPECT_EQ(map_->mapID(), 42u);
     EXPECT_DOUBLE_EQ(map_->getLattice().x0, 0.0);
     EXPECT_DOUBLE_EQ(map_->getLattice().y0, 0.0);
     EXPECT_DOUBLE_EQ(map_->getLattice().res, 0.25);

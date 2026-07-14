@@ -67,9 +67,6 @@ namespace traversability_mapping
         LocalMap(const LocalMap &) = delete;
         LocalMap &operator=(const LocalMap &) = delete;
 
-        /// @brief This map's id.
-        std::uint64_t mapID() const { return mapID_; }
-
         /// @name Keyframe lifecycle
         /// @{
 
