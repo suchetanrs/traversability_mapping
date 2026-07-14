@@ -20,7 +20,6 @@ find_package(Eigen3 3.1.0 REQUIRED)
 find_package(Boost REQUIRED)
 find_package(OpenMP)
 find_package(PCL REQUIRED)
-find_package(traversability_mapping_common REQUIRED)
 find_package(grid_map_core REQUIRED)
 find_package(yaml-cpp REQUIRED)
 # ROS Packages (optional: only the sensor_msgs buffer needs them; the core builds
@@ -73,7 +72,6 @@ target_link_libraries(traversabilitySystem
     PRIVATE ${PCL_LIBRARIES}
     # PRIVATE ${grid_map_core_LIBRARIES}
     PRIVATE ${YAML_CPP_LIBRARIES}
-    PUBLIC traversability_mapping_common
     PUBLIC grid_map_core::grid_map_core
     PUBLIC ament_index_cpp::ament_index_cpp
     PUBLIC Sophus::Sophus
@@ -189,7 +187,6 @@ ament_export_dependencies(
     Eigen3
     Boost
     PCL
-    traversability_mapping_common
     grid_map_core
     yaml-cpp
     sensor_msgs
