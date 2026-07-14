@@ -19,10 +19,12 @@ traversability/min_vicinity_points: 15
 traversability/min_occupied_fraction: 0.5
 
 # --- Mapping (keyframe retention + worker scheduling) ---
-# LOCAL: clouds are NOT retained. Every scan is binned exactly once (no PGO / re-bin);
-# eviction subtracts the retained per-cell moments, so the cloud is not needed after the
-# first bin. The rolling window is enforced node-side (window_size), NOT here.
-mapping/is_kf_optimization_enabled: false
+# LOCAL: every scan is still binned exactly once (no PGO / re-bin -- the node never
+# re-sends a pose for an existing keyframe), and eviction subtracts the retained per-cell
+# moments, so the map itself does not need the cloud after the first bin. Clouds are kept
+# anyway so publish_local_pointcloud can stitch the window's raw points; memory is bounded
+# by the rolling window (window_size), which is enforced node-side, NOT here.
+mapping/is_kf_optimization_enabled: true
 mapping/num_local_keyframes: 10
 mapping/global_adjustment_sleep: 0
 

@@ -351,7 +351,6 @@ namespace traversability_mapping
     std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> LocalMap::getStitchedPointCloud(
         float voxel_size_x, float voxel_size_y, float voxel_size_z)
     {
-        throw std::runtime_error("This function was not supposed to be executed! getStitchedPointCloud()");
         auto stitched = std::make_shared<pcl::PointCloud<pcl::PointXYZ>>();
         std::vector<std::shared_ptr<KeyFrame>> snapshot;
         {

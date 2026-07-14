@@ -113,7 +113,7 @@ namespace traversability_mapping
             max_d = std::max(max_d, d);
         }
         const double step = max_d - min_d;
-        haz[HAZ_STEP] = std::min(step / ground_clearance, 1.0);
+        haz[HAZ_STEP] = step;
 
         haz[HAZ_OVERALL] = std::max(haz[HAZ_SLOPE],
                                std::max(haz[HAZ_STEP], haz[HAZ_ROUGHNESS]));

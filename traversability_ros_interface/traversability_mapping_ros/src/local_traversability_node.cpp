@@ -45,6 +45,7 @@
 #include <pcl_conversions/pcl_conversions.h>
 
 #include <traversability_msgs/msg/traversability_sparse_update.hpp>
+#include <traversability_msgs/srv/get_global_pointcloud.hpp>
 
 #include "traversability_mapping/System.hpp"
 #include "traversability_mapping/LocalMap.hpp"
@@ -106,7 +107,7 @@ public:
         // --- ROS I/O ---
         // Marry each scan to its pose by stamp. Deep sync queue: binning can briefly block
         // on the map mutex, and a shallow queue would drop scans (= lost keyframes).
-        cloud_sub_.subscribe(this, pointcloud_topic_, rmw_qos_profile_sensor_data);
+        cloud_sub_.subscribe(this, pointcloud_topic_, rmw_qos_profile_default);
         odom_sub_.subscribe(this, odom_topic_, rmw_qos_profile_default);
         sync_ = std::make_shared<Synchronizer>(SyncPolicy(100), cloud_sub_, odom_sub_);
         sync_->registerCallback(std::bind(&LocalTraversabilityNode::scanCallback, this,
@@ -118,6 +119,13 @@ public:
             "local_traversability_occupancy", rclcpp::QoS(1).transient_local());
         sparse_pub_ = create_publisher<traversability_msgs::msg::TraversabilitySparseUpdate>(
             "local_traversability_updates", rclcpp::QoS(10).reliable());
+        window_cloud_pub_ = create_publisher<sensor_msgs::msg::PointCloud2>(
+            "local_kf_pointcloud", rclcpp::QoS(1).transient_local());
+
+        cloud_srv_ = create_service<traversability_msgs::srv::GetGlobalPointcloud>(
+            "publish_local_pointcloud",
+            std::bind(&LocalTraversabilityNode::localCloudService, this,
+                      std::placeholders::_1, std::placeholders::_2));
 
         const double rate = tmap::ParameterHandler::getInstance().getValue<double>("node/publish_rate_hz");
         publish_timer_ = create_wall_timer(
@@ -271,6 +279,34 @@ private:
         sparse_pub_->publish(out);
     }
 
+    // On request, stitch the raw base-frame clouds of the keyframes currently in the
+    // window at their poses and publish them (map frame). This is the window's input
+    // points, NOT the fused map: the cells' moments are not reconstructed from it. The
+    // clouds exist only because mapping/is_kf_optimization_enabled is true; with it off
+    // the core drops each cloud after its first bin and this returns empty.
+    void localCloudService(
+        const std::shared_ptr<traversability_msgs::srv::GetGlobalPointcloud::Request> req,
+        std::shared_ptr<traversability_msgs::srv::GetGlobalPointcloud::Response> /*res*/)
+    {
+        auto cloud = system_->getGlobalPointCloud(req->voxel_size_x, req->voxel_size_y, req->voxel_size_z);
+        if (!cloud)
+            return;
+        if (cloud->empty())
+        {
+            RCLCPP_WARN(get_logger(),
+                        "publish_local_pointcloud: no keyframe retained a cloud "
+                        "(mapping/is_kf_optimization_enabled off?); nothing published.");
+            return;
+        }
+        sensor_msgs::msg::PointCloud2 out;
+        pcl::toROSMsg(*cloud, out);
+        out.header.frame_id = map_frame_;
+        out.header.stamp = now();
+        window_cloud_pub_->publish(out);
+        RCLCPP_INFO(get_logger(), "publish_local_pointcloud: %zu points from the window.",
+                    cloud->size());
+    }
+
     // ---- members ------------------------------------------------------------
     std::string pointcloud_topic_, odom_topic_;
     std::string slam_frame_, robot_base_frame_, lidar_frame_, map_frame_;
@@ -304,6 +340,8 @@ private:
     rclcpp::Publisher<grid_map_msgs::msg::GridMap>::SharedPtr gridmap_pub_;
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr occupancy_pub_;
     rclcpp::Publisher<traversability_msgs::msg::TraversabilitySparseUpdate>::SharedPtr sparse_pub_;
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr window_cloud_pub_;
+    rclcpp::Service<traversability_msgs::srv::GetGlobalPointcloud>::SharedPtr cloud_srv_;
     rclcpp::TimerBase::SharedPtr publish_timer_;
     rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr param_cb_handle_;
 };

@@ -22,16 +22,16 @@
 
   local_traversability_node:
     ros__parameters:
-      pointcloud_topic_name: "lidar/points"
+      pointcloud_topic_name: "rgb_camera/points"
       odom_topic_name: "ground_truth_pose"   # pose stream synced per scan; use a continuous frame (odom)
       slam_frame: base_footprint             # == robot_base_frame so Tbs = I (only base<-lidar is needed)
       robot_base_frame: base_footprint
       lidar_frame: lidar_link
       map_frame: map                         # fixed accumulation + published frame (must match odom_topic frame)
-      window_size: 30                         # rolling window: last-N keyframes kept
+      window_size: 50                         # rolling window: last-N keyframes kept
       keyframe_min_displacement_m: 0.05       # scans closer than this to the last keyframe are dropped
-      crop_size_x: 5.0                        # robot-centered published submap (m)
-      crop_size_y: 5.0
+      crop_size_x: 15.0                        # robot-centered published submap (m)
+      crop_size_y: 15.0
 
   traversability_threshold_node:
     ros__parameters:
@@ -45,4 +45,4 @@
       keyframe_publish_rate_hz: 2.0 # Hz.
       per_keyframe_translation_error_m: 0.0
       per_keyframe_yaw_error_deg: 0.0
-      keyframe_min_displacement_m: 0.05
+      keyframe_min_displacement_m: 0.10
