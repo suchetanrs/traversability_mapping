@@ -31,7 +31,7 @@ def generate_launch_description():
 
         declare_ply_file_cmd = DeclareLaunchArgument(
             'ply_file',
-            default_value='/home/suchetan/Downloads/rtabmap_theatre_no_roof.ply',
+            default_value='/root/other_ws/src/traversability_mapping/gt_cinema.ply',
             description='Full path to the input PLY cloud (already expressed in the map frame)')
         ply_file = LaunchConfiguration('ply_file')
 

@@ -10,6 +10,7 @@
 #include "traversability_msgs/msg/key_frame_additions.hpp"
 #include "traversability_msgs/msg/key_frame_updates.hpp"
 
+#include <atomic>
 #include <cmath>
 #include <vector>
 
@@ -60,6 +61,12 @@ public:
         trigger_lc_pgo_service_ = this->create_service<std_srvs::srv::SetBool>(
             "trigger_lc_pgo",
             std::bind(&SLAMKeyFrameSimulator::triggerLoopClosure, this, std::placeholders::_1, std::placeholders::_2));
+
+        // Toggle keyframe mapping on/off at runtime. When disabled, no keyframe
+        // additions/updates are published; TF broadcasting is unaffected.
+        enable_mapping_service_ = this->create_service<std_srvs::srv::SetBool>(
+            "enable_mapping",
+            std::bind(&SLAMKeyFrameSimulator::setMappingEnabled, this, std::placeholders::_1, std::placeholders::_2));
 
         if (pose_type_ == "pose_stamped") {
             pose_subscriber_ = std::make_shared<message_filters::Subscriber<geometry_msgs::msg::PoseStamped>>(this, pose_topic);
@@ -122,6 +129,8 @@ private:
     }
 
     void publishKeyframe(const geometry_msgs::msg::Pose &pose, const sensor_msgs::msg::PointCloud2::ConstSharedPtr &pcl_msg) {
+        if (!mapping_enabled_.load()) return;  // mapping disabled: skip additions (TF still published)
+
         std::chrono::duration<double> elapsed = std::chrono::high_resolution_clock::now() - prev_time;
         if (elapsed.count() < 1.0 / keyframe_publish_rate_hz_) return;
 
@@ -175,6 +184,12 @@ private:
     // so subsequent keyframes start drifting again from zero.
     void triggerLoopClosure(const std::shared_ptr<std_srvs::srv::SetBool::Request> /*request*/,
                             std::shared_ptr<std_srvs::srv::SetBool::Response> response) {
+        if (!mapping_enabled_.load()) {  // mapping disabled: publish no keyframe updates
+            response->success = false;
+            response->message = "Mapping disabled; no keyframe updates published.";
+            RCLCPP_WARN(this->get_logger(), "%s", response->message.c_str());
+            return;
+        }
         traversability_msgs::msg::KeyFrameUpdates updates;
         updates.keyframes.reserve(stored_keyframes_.size());
         for (const auto &stored : stored_keyframes_) {
@@ -216,6 +231,17 @@ private:
         RCLCPP_INFO(this->get_logger(), "Sync time difference (pose - pcl): %.6f seconds",
                     (rclcpp::Time(pose_msg->header.stamp) - rclcpp::Time(pcl_msg->header.stamp)).seconds());
         publishKeyframe(pose_msg->pose, pcl_msg);
+    }
+
+    // Enable (data=true) or disable (data=false) keyframe mapping. Affects only keyframe
+    // additions/updates; TF broadcasting continues regardless.
+    void setMappingEnabled(const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
+                           std::shared_ptr<std_srvs::srv::SetBool::Response> response) {
+        mapping_enabled_.store(request->data);
+        response->success = true;
+        response->message = request->data ? "Keyframe mapping ENABLED."
+                                          : "Keyframe mapping DISABLED (TF still publishing).";
+        RCLCPP_INFO(this->get_logger(), "%s", response->message.c_str());
     }
 
     void broadcastTF(const geometry_msgs::msg::Pose &pose, const rclcpp::Time &stamp) {
@@ -261,6 +287,7 @@ private:
     double min_displacement_m_;
     long unsigned current_kf_id_;
     std::chrono::_V2::system_clock::time_point prev_time;
+    std::atomic<bool> mapping_enabled_{true};  ///< toggled by the enable_mapping service
 
     // Drift accumulators (map frame), reset on loop closure.
     double accumulated_trans_err_x_ = 0.0;
@@ -284,6 +311,7 @@ private:
     rclcpp::Publisher<traversability_msgs::msg::KeyFrameAdditions>::SharedPtr keyframe_addition_publisher_;
     rclcpp::Publisher<traversability_msgs::msg::KeyFrameUpdates>::SharedPtr keyframe_update_publisher_;
     rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr trigger_lc_pgo_service_;
+    rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr enable_mapping_service_;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_subscription_;
     rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr pose_subscription_;
 };

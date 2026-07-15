@@ -18,7 +18,7 @@ ament_target_dependencies(slam_keyframe_simulator rclcpp nav_msgs traversability
 
 # Add the executable
 add_executable(slam_keyframe_pcl_simulator src/slam_keyframe_pcl_simulator.cpp)
-ament_target_dependencies(slam_keyframe_pcl_simulator rclcpp nav_msgs traversability_msgs tf2_ros)
+ament_target_dependencies(slam_keyframe_pcl_simulator rclcpp nav_msgs std_srvs traversability_msgs tf2_ros)
 
 # Add the executable
 add_executable(slam_keyframe_sim_with_drift src/slam_keyframe_sim_with_drift.cpp)

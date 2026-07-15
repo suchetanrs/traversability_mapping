@@ -15,10 +15,12 @@
 
 #include <cstdint>
 #include <functional>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 #include <Eigen/Geometry>
 #include <sophus/se3.hpp>
@@ -57,6 +59,13 @@ namespace traversability_mapping
         /// @brief Set the extrinsics used to prune clouds into the base frame.
         /// @param Tsv slam <- lidar. @param Tbs base <- slam (composes Tbv = Tbs * Tsv).
         void setExtrinsicParameters(const Eigen::Affine3f &Tsv, const Eigen::Affine3f &Tbs);
+
+        /// @brief Configure the obstacle-layer sensor (e.g. a depth camera on its own frame).
+        ///        Distinct from the lidar extrinsic/ranges so obstacle clouds prune with the
+        ///        depth cam's mounting and its own gates. Must be set before addObstacleKeyFrame.
+        /// @param Tb_obs base <- obstacle_sensor (resolved once from the cloud's header frame).
+        /// @param maxRange,minRange base-frame range gates for the obstacle sensor (m).
+        void setObstacleParameters(const Eigen::Affine3f &Tb_obs, double maxRange, double minRange);
 
         /// @brief Set the grid frame id stamped on each map (cosmetic; default "map").
         /// @param mapFrame frame id.
@@ -112,6 +121,25 @@ namespace traversability_mapping
         void informLoopClosure();
         /// @}
 
+        /// @name Obstacle layer (Nav2-style transient obstacles)
+        /// Live sensor clouds added as independent keyframes into the active map, on a
+        /// dedicated id band (INT64_MAX down, ids reused via a free-list) so they never
+        /// collide with the SLAM front-end's low, upward ids. Each is binned once (no PGO);
+        /// the caller ages them out with deleteObstacleKeyFrame after its temporal buffer.
+        /// @{
+        /// @brief Add a transient obstacle keyframe from a live obstacle-sensor cloud.
+        ///        Allocates an obstacle-band id, prunes with the obstacle extrinsic + ranges,
+        ///        and registers it in the active map. The caller then calls updateKeyFrame(id,
+        ///        pose) to supply the map<-base pose and trigger the (only) bin.
+        /// @param timestamp_ns acquisition time (ns). @param sensorPointCloud obstacle-sensor-frame cloud.
+        /// @return the allocated keyframe id, or 0 if params were unset / the cloud pruned empty.
+        std::uint64_t addObstacleKeyFrame(unsigned long long timestamp_ns,
+                                          std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> sensorPointCloud);
+        /// @brief Delete an obstacle keyframe (subtract its moments) and reclaim its id.
+        /// @param kfID obstacle keyframe id previously returned by addObstacleKeyFrame.
+        void deleteObstacleKeyFrame(std::uint64_t kfID);
+        /// @}
+
         /// @name Buffers
         /// @{
         /// @brief Buffer a PCL cloud by timestamp for later fetch-by-time.
@@ -140,8 +168,20 @@ namespace traversability_mapping
     private:
         void addNewKeyFrameToMap(double timestamp, std::uint64_t kfID, std::uint64_t mapID,
                                  const pcl::PointCloud<pcl::PointXYZ> &sensorPointCloud);
+        /// @brief Register an already-pruned base-frame cloud as a keyframe in @p mapID.
+        /// @return true if registered; false on duplicate id / missing map / empty cloud.
+        bool registerKeyFrame(double timestamp, std::uint64_t kfID, std::uint64_t mapID,
+                              std::vector<Eigen::Vector3f> &&cloud_base);
         void setCurrentMap(std::uint64_t mapID);
         std::vector<Eigen::Vector3f> pruneToBase(const pcl::PointCloud<pcl::PointXYZ> &cloud_lidar) const;
+        /// @brief Prune a sensor-frame cloud into the base frame with an explicit extrinsic + gates.
+        /// @param cloud_sensor sensor-frame cloud. @param Tb_sensor base <- sensor.
+        /// @param maxRange,minRange base-frame range gates (m).
+        std::vector<Eigen::Vector3f> prune(const pcl::PointCloud<pcl::PointXYZ> &cloud_sensor,
+                                           const Eigen::Affine3f &Tb_sensor,
+                                           double maxRange, double minRange) const;
+        /// @brief Allocate an obstacle-band id (free-list first, else the next decrement).
+        std::uint64_t allocObstacleId();
         static double nanosecToSec(unsigned long long timestamp_ns);
 
         Lattice lattice_;
@@ -150,6 +190,18 @@ namespace traversability_mapping
         Eigen::Affine3f Tbs_ = Eigen::Affine3f::Identity();
         Eigen::Affine3f Tbv_ = Eigen::Affine3f::Identity();   ///< base <- lidar
         double robot_height_, max_range_base_frame_, min_range_base_frame_;
+
+        /// @name Obstacle layer, guarded by localMapMutex_
+        /// @{
+        Eigen::Affine3f Tb_obs_ = Eigen::Affine3f::Identity();   ///< base <- obstacle sensor
+        double obstacle_max_range_ = 0.0, obstacle_min_range_ = 0.0;
+        bool obstacleParamsSet_ = false;
+        /// Ids handed out top-down from INT64_MAX (stays under addNewKeyFrame's negative-id
+        /// guard, never meets the SLAM band). freeObstacleIds_ recycles ids after deletion.
+        std::uint64_t nextObstacleId_ =
+            static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max());
+        std::vector<std::uint64_t> freeObstacleIds_;
+        /// @}
 
         std::recursive_mutex localMapMutex_;
         std::unordered_map<std::uint64_t, std::shared_ptr<LocalMap>> localMapsSet_;

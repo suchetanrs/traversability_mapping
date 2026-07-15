@@ -12,9 +12,9 @@ tmux select-pane -t 1
 # tmux select-pane -t 2
 # tmux split-window -v
 
-tmux send-keys -t 0 "cd && source ros2_ws/install/setup.bash && ros2 launch vehicle_bringup unirobot.launch.py "
+tmux send-keys -t 0 "cd && source ros2_ws/install/setup.bash && ros2 launch vehicle_bringup unirobot.launch.py world:=cinema_scene_ramp.sdf headless:=false"
 tmux send-keys -t 1 "source ~/other_ws/install/setup.bash && ros2 launch traversability_mapping_ros global_traversability_mapping.launch.py"
-tmux send-keys -t 2 "cd && cd ~/other_ws && colcon build --symlink-install && cd ~/other_ws && colcon build --symlink-install" C-m
+tmux send-keys -t 2 "cd && cd ~/other_ws && colcon build --symlink-install && cd ~/other_ws && colcon build --symlink-install && xterm" C-m
 tmux send-keys -t 3 "source ~/other_ws/install/setup.bash && ros2 launch traversability_mapping_ros rviz.launch.py"
 
 # Attach to the tmux session

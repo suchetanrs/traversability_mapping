@@ -13,6 +13,7 @@
 #include "traversability_mapping/System.hpp"
 #include "traversability_mapping/Parameters.hpp"
 
+#include <cmath>
 #include <iostream>
 #include <limits>
 #include <stdexcept>
@@ -49,6 +50,15 @@ namespace traversability_mapping
         Tbv_ = Tbs_ * Tsv_;  // base <- lidar
     }
 
+    void System::setObstacleParameters(const Eigen::Affine3f &Tb_obs, double maxRange, double minRange)
+    {
+        std::lock_guard<std::recursive_mutex> lock(localMapMutex_);
+        Tb_obs_ = Tb_obs;  // base <- obstacle sensor
+        obstacle_max_range_ = maxRange;
+        obstacle_min_range_ = minRange;
+        obstacleParamsSet_ = true;
+    }
+
     void System::addNewLocalMap(std::uint64_t mapID, std::function<void()> onUpdate)
     {
         std::lock_guard<std::recursive_mutex> lock(localMapMutex_);
@@ -80,47 +90,54 @@ namespace traversability_mapping
         return static_cast<double>(sec) + static_cast<double>(nano) * 1e-9;
     }
 
-    std::vector<Eigen::Vector3f> System::pruneToBase(const pcl::PointCloud<pcl::PointXYZ> &cloud_lidar) const
+    std::vector<Eigen::Vector3f> System::prune(const pcl::PointCloud<pcl::PointXYZ> &cloud_sensor,
+                                               const Eigen::Affine3f &Tb_sensor,
+                                               double maxRange, double minRange) const
     {
         std::vector<Eigen::Vector3f> cloud_base;
-        cloud_base.reserve(cloud_lidar.size());
-        for (const auto &p : cloud_lidar)
+        cloud_base.reserve(cloud_sensor.size());
+        for (const auto &p : cloud_sensor)
         {
+            if (!std::isfinite(p.x) || !std::isfinite(p.y) || !std::isfinite(p.z))
+                continue;  // NaN/Inf return (depth cameras leave these in an unorganized cloud)
             if (p.x == 0.f && p.y == 0.f)
-                continue;  // ego / invalid return (lidar frame)
-            const Eigen::Vector3f p_base = Tbv_ * Eigen::Vector3f(p.x, p.y, p.z);
+                continue;  // ego / invalid return (sensor frame)
+            const Eigen::Vector3f p_base = Tb_sensor * Eigen::Vector3f(p.x, p.y, p.z);
             if (p_base.z() > static_cast<float>(robot_height_))
                 continue;  // ceiling / overhang
             const float range = p_base.norm();
-            if (range > static_cast<float>(max_range_base_frame_) ||
-                range < static_cast<float>(min_range_base_frame_))
+            if (range > static_cast<float>(maxRange) || range < static_cast<float>(minRange))
                 continue;  // out of range
             cloud_base.push_back(p_base);
         }
         return cloud_base;
     }
 
-    void System::addNewKeyFrameToMap(double timestamp, std::uint64_t kfID, std::uint64_t mapID,
-                                  const pcl::PointCloud<pcl::PointXYZ> &sensorPointCloud)
+    std::vector<Eigen::Vector3f> System::pruneToBase(const pcl::PointCloud<pcl::PointXYZ> &cloud_lidar) const
+    {
+        return prune(cloud_lidar, Tbv_, max_range_base_frame_, min_range_base_frame_);
+    }
+
+    bool System::registerKeyFrame(double timestamp, std::uint64_t kfID, std::uint64_t mapID,
+                                  std::vector<Eigen::Vector3f> &&cloud_base)
     {
         std::lock_guard<std::recursive_mutex> lock(localMapMutex_);
         if (keyFramesMap_.count(kfID))
         {
             std::cerr << "[System] keyframe " << kfID << " already added; ignoring." << std::endl;
-            return;
+            return false;
         }
         auto mapIt = localMapsSet_.find(mapID);
         if (mapIt == localMapsSet_.end())
         {
             std::cerr << "[System] map " << mapID << " not initialized; keyframe " << kfID
                       << " dropped." << std::endl;
-            return;
+            return false;
         }
-        std::vector<Eigen::Vector3f> cloud_base = pruneToBase(sensorPointCloud);
         if (cloud_base.empty())
         {
             std::cerr << "[System] keyframe " << kfID << " pruned to empty; not stored." << std::endl;
-            return;
+            return false;
         }
         const std::size_t npts = cloud_base.size();
         auto kf = std::make_shared<KeyFrame>(kfID, timestamp, Eigen::Affine3f::Identity(),
@@ -130,6 +147,13 @@ namespace traversability_mapping
         mapIt->second->addAlreadyDeclaredKF(kf);
         std::cout << "[System] ADD kf " << kfID << " -> map " << mapID << " (" << npts
                   << " base pts; registry now holds " << keyFramesMap_.size() << " kfs)." << std::endl;
+        return true;
+    }
+
+    void System::addNewKeyFrameToMap(double timestamp, std::uint64_t kfID, std::uint64_t mapID,
+                                  const pcl::PointCloud<pcl::PointXYZ> &sensorPointCloud)
+    {
+        registerKeyFrame(timestamp, kfID, mapID, pruneToBase(sensorPointCloud));
     }
 
     void System::addNewKeyFrameWithPCL(unsigned long long timestamp_ns, std::uint64_t kfID,
@@ -263,6 +287,57 @@ namespace traversability_mapping
         auto it = localMapsSet_.find(0);
         if (it != localMapsSet_.end())
             it->second->clearEntireMap();
+    }
+
+    // ---- obstacle layer -----------------------------------------------------
+
+    std::uint64_t System::allocObstacleId()
+    {
+        // Caller holds localMapMutex_.
+        if (!freeObstacleIds_.empty())
+        {
+            const std::uint64_t id = freeObstacleIds_.back();
+            freeObstacleIds_.pop_back();
+            return id;
+        }
+        return nextObstacleId_--;
+    }
+
+    std::uint64_t System::addObstacleKeyFrame(unsigned long long timestamp_ns,
+                                              std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> sensorPointCloud)
+    {
+        std::lock_guard<std::recursive_mutex> lock(localMapMutex_);
+        if (!obstacleParamsSet_)
+        {
+            std::cerr << "[System] obstacle params unset; obstacle keyframe dropped." << std::endl;
+            return 0;
+        }
+        if (!sensorPointCloud)
+            return 0;
+        std::vector<Eigen::Vector3f> cloud_base =
+            prune(*sensorPointCloud, Tb_obs_, obstacle_max_range_, obstacle_min_range_);
+        if (cloud_base.empty())
+            return 0;
+        const std::uint64_t id = allocObstacleId();
+        // Obstacle keyframes always feed the active map (map 0 for now).
+        if (!registerKeyFrame(nanosecToSec(timestamp_ns), id, 0, std::move(cloud_base)))
+        {
+            freeObstacleIds_.push_back(id);  // registration failed; recycle the id
+            return 0;
+        }
+        return id;
+    }
+
+    void System::deleteObstacleKeyFrame(std::uint64_t kfID)
+    {
+        std::lock_guard<std::recursive_mutex> lock(localMapMutex_);
+        if (!allKeyFramesSet_.count(kfID))
+        {
+            std::cerr << "[System] cannot delete unknown obstacle keyframe " << kfID << "." << std::endl;
+            return;
+        }
+        deleteKeyFrame(kfID);              // subtract moments + drop from registry
+        freeObstacleIds_.push_back(kfID);  // reclaim the id for reuse
     }
 
     // ---- buffers ------------------------------------------------------------
