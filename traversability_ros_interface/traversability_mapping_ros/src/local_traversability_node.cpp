@@ -318,7 +318,7 @@ private:
     // LocalMap is layer-agnostic; this subset is owned here on the ROS side.
     const std::vector<std::string> navLayers_ = {
         "normal_x", "normal_y", "normal_z", "slope_haz",
-        "step_haz", "elevation", "roughness_haz", "hazard"};
+        "step_haz", "elevation", "roughness_haz", "hazard", "step_haz_inflated"};
 
     std::shared_ptr<tmap::System> system_;
     std::uint64_t next_id_ = 0;

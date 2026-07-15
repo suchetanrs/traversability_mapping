@@ -23,6 +23,16 @@ traversability/max_slope: 0.4            # rad; slope hazard normaliser
 traversability/min_vicinity_points: 15   # min points in the vicinity to attempt a plane fit
 traversability/min_occupied_fraction: 0.5 # >= this fraction of vicinity cells must be observed
 
+# --- Inflation (Nav2-style buffer around step hazards) ---
+# The step hazard (normalised [0,1]) seeds inflation: any cell at/above the lethal
+# threshold spreads its value outward with an exponential distance decay, written to a
+# separate step_haz_inflated layer (hazard is untouched). Recomputed incrementally with
+# the map over the changed region only. Per-op cost scales with inflation_radius^2.
+inflation/enabled: true
+inflation/inflation_radius: 1.5          # kernel extent (m); cost beyond this is 0
+inflation/cost_scaling_factor: 2.0       # exponential decay rate (1/m); higher = faster falloff
+inflation/lethal_step_threshold: 0.95    # normalised step_haz at/above which a cell seeds inflation
+
 # --- Mapping (keyframe retention + worker scheduling) ---
 # is_kf_optimization_enabled MUST be true for PGO / loop-closure: keyframes retain
 # their pruned base-frame cloud so a corrected pose can re-bin them. false = drop the

@@ -22,6 +22,14 @@ traversability/max_slope: 0.4
 traversability/min_vicinity_points: 15
 traversability/min_occupied_fraction: 0.5
 
+# --- Inflation (Nav2-style buffer around step hazards) ---
+# Step hazard (normalised [0,1]) seeds an exponentially-decaying buffer written to a
+# separate step_haz_inflated layer; hazard is untouched. Incremental with the map.
+inflation/enabled: true
+inflation/inflation_radius: 0.5          # kernel extent (m)
+inflation/cost_scaling_factor: 3.0       # exponential decay rate (1/m)
+inflation/lethal_step_threshold: 0.95    # normalised step_haz that seeds inflation
+
 # --- Mapping (keyframe retention + worker scheduling) ---
 # ONE-SHOT: a single keyframe, binned exactly once. No PGO / re-bin, so the cloud is
 # dropped after the first bin.

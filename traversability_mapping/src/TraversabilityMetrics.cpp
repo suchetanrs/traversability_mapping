@@ -113,7 +113,10 @@ namespace traversability_mapping
             max_d = std::max(max_d, d);
         }
         const double step = max_d - min_d;
-        haz[HAZ_STEP] = step;
+        // Normalise like roughness so HAZ_STEP is a [0,1] cost (and HAZ_OVERALL no
+        // longer mixes raw metres with normalised terms). This is also the field the
+        // inflation layer seeds from.
+        haz[HAZ_STEP] = std::min(step / ground_clearance, 1.0);
 
         haz[HAZ_OVERALL] = std::max(haz[HAZ_SLOPE],
                                std::max(haz[HAZ_STEP], haz[HAZ_ROUGHNESS]));
