@@ -7,7 +7,7 @@
 # The global grid is fixed-frame and grows symmetrically about (grid_center_x,
 # grid_center_y). The lattice (origin + resolution) is set once at startup so
 # absolute cell ids and cell centres are stable across every resize.
-grid/resolution_local_map: 0.10
+grid/resolution_local_map: 0.05
 grid/grid_center_x: 0.0
 grid/grid_center_y: 0.0
 grid/half_size_traversability: 7.5      # initial half-extent of the global grid (m); grows as needed
@@ -20,15 +20,14 @@ grid/extend_length_every_resize_by: 30.0 # how much (m) to grow by when a keyfra
 traversability/robot_radius: 0.20        # robot footprint radius (m)
 traversability/ground_clearance: 0.15
 traversability/max_slope: 0.4            # rad; slope hazard normaliser
-traversability/min_vicinity_points: 15   # min points in the vicinity to attempt a plane fit
-traversability/min_occupied_fraction: 0.5 # >= this fraction of vicinity cells must be observed
+traversability/min_points_per_grid: 3    # each vicinity cell (and the query cell) must carry >= this many points, else the query is a border cell
 
 # --- Inflation (Nav2-style buffer around step hazards) ---
 # The step hazard (normalised [0,1]) seeds inflation: any cell at/above the lethal
 # threshold spreads its value outward with an exponential distance decay, written to a
 # separate step_haz_inflated layer (hazard is untouched). Recomputed incrementally with
 # the map over the changed region only. Per-op cost scales with inflation_radius^2.
-inflation/enabled: true
+inflation/enabled: false
 inflation/inflation_radius: 1.5          # kernel extent (m); cost beyond this is 0
 inflation/cost_scaling_factor: 2.0       # exponential decay rate (1/m); higher = faster falloff
 inflation/lethal_step_threshold: 0.95    # normalised step_haz at/above which a cell seeds inflation

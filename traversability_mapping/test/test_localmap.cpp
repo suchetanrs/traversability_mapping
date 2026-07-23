@@ -61,8 +61,7 @@ grid/extend_length_every_resize_by: 30.0
 traversability/robot_radius: 0.4
 traversability/ground_clearance: 0.15
 traversability/max_slope: 0.4
-traversability/min_vicinity_points: 15
-traversability/min_occupied_fraction: 0.5
+traversability/min_points_per_grid: 5
 mapping/is_kf_optimization_enabled: true
 mapping/num_local_keyframes: 10
 mapping/global_adjustment_sleep: 0
