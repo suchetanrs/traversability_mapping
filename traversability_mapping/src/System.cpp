@@ -223,12 +223,6 @@ namespace traversability_mapping
         std::cout << "[System] UPDATE kf " << kfID << ": pose queued for rebin." << std::endl;
     }
 
-    void System::updateKeyFrame(std::uint64_t kfID, const Sophus::SE3f &pose_map_base,
-                                std::uint64_t numConnections)
-    {
-        updateKeyFrame(kfID, Eigen::Affine3f(pose_map_base.matrix()), numConnections);
-    }
-
     void System::updateKeyFrame(std::uint64_t kfID, const Eigen::Affine3d &pose_map_base,
                                 std::uint64_t numConnections)
     {

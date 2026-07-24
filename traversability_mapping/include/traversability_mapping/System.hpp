@@ -23,7 +23,6 @@
 #include <vector>
 
 #include <Eigen/Geometry>
-#include <sophus/se3.hpp>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 
@@ -95,14 +94,11 @@ namespace traversability_mapping
         /// @}
 
         /// @name Pose updates (PGO)
-        /// O(1) reception, latest-wins, never blocks. Sophus / double overloads forward
+        /// O(1) reception, latest-wins, never blocks.
         /// to the Affine3f form.
         /// @{
         /// @param kfID keyframe id. @param pose_map_base new pose (map <- base). @param numConnections unused.
         void updateKeyFrame(std::uint64_t kfID, const Eigen::Affine3f &pose_map_base,
-                            std::uint64_t numConnections = 0);
-        /// @param kfID keyframe id. @param pose_map_base new pose (map <- base). @param numConnections unused.
-        void updateKeyFrame(std::uint64_t kfID, const Sophus::SE3f &pose_map_base,
                             std::uint64_t numConnections = 0);
         /// @param kfID keyframe id. @param pose_map_base new pose (map <- base). @param numConnections unused.
         void updateKeyFrame(std::uint64_t kfID, const Eigen::Affine3d &pose_map_base,
