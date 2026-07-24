@@ -79,6 +79,12 @@ class ParameterHandler
         parameter_map_[parameterKey] = value;
     }
 
+    /// @brief Set an EXISTING parameter to a new value, preserving its stored type.
+    /// @param parameterKey key to update (must already exist).
+    /// @param value new value; its held type must match the stored type.
+    /// @throws std::runtime_error if the key is absent or the type does not match.
+    void setParameter(const std::string& parameterKey, const boost::any& value);
+
     /// @brief Introspection hook for the ROS bridge. @return every currently-stored key.
     std::vector<std::string> keys() const;
     /// @brief Stored type of a parameter; the bridge dispatches on this.

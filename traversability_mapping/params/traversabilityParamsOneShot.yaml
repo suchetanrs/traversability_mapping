@@ -41,11 +41,11 @@ mapping/global_adjustment_sleep: 0
 # pruning in System::pruneToBase is disabled -- every point is ingested unchanged.
 # (Range is measured from the map origin; the normal 10 m cap would keep only a small
 # disc around it, and the height cull would clip the map by absolute z.)
-ingestion/robot_height: 1.0e9            # disable ceiling/overhang cull (absolute z)
-ingestion/max_range_base_frame: 1.0e9    # disable far-range cull (keep the whole footprint)
-ingestion/min_range_base_frame: 0.0      # disable near-range cull
-ingestion/use_pointcloud_buffer: false
-ingestion/use_ros_buffer: false
+pointcloud/robot_height: 1.0e9            # disable ceiling/overhang cull (absolute z)
+pointcloud/max_range_base_frame: 1.0e9    # disable far-range cull (keep the whole footprint)
+pointcloud/min_range_base_frame: 0.0      # disable near-range cull
+pointcloud/use_pointcloud_buffer: false
+pointcloud/use_ros_buffer: false
 
 # --- Publishing (node) ---
 node/publish_rate_hz: 1.0                # unused by the one-shot node (it latches on the single bin)

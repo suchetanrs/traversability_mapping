@@ -1,6 +1,6 @@
 # Parameters are prefixed by DOMAIN (what they configure), not by which class reads
 # them: grid/ (global grid geometry), traversability/ (per-cell hazard metric),
-# mapping/ (keyframe retention + worker scheduling), ingestion/ (cloud filtering +
+# mapping/ (keyframe retention + worker scheduling), pointcloud/ (cloud filtering +
 # buffering), node/ (the ROS adapter).
 
 # --- Global grid geometry ---
@@ -41,11 +41,11 @@ mapping/num_local_keyframes: 10          # last-N keyframes serviced by the fast
 mapping/global_adjustment_sleep: 0       # ms between per-keyframe passes in the slow global worker
 
 # --- Ingestion (cloud filtering + buffering) ---
-ingestion/robot_height: 3.5              # points more than this above the base are dropped (ceilings/overhangs)
-ingestion/max_range_base_frame: 6.0    # points further than this from the base are dropped (m)
-ingestion/min_range_base_frame: 1.0      # points closer than this to the base are dropped (m, ego-filter)
-ingestion/use_pointcloud_buffer: false   # buffer clouds and fetch by timestamp (SLAM-announces-by-ts path)
-ingestion/use_ros_buffer: false          # when buffering, use the sensor_msgs buffer instead of the PCL one
+pointcloud/robot_height: 3.5              # points more than this above the base are dropped (ceilings/overhangs)
+pointcloud/max_range_base_frame: 6.0    # points further than this from the base are dropped (m)
+pointcloud/min_range_base_frame: 1.0      # points closer than this to the base are dropped (m, ego-filter)
+pointcloud/use_pointcloud_buffer: false   # buffer clouds and fetch by timestamp (SLAM-announces-by-ts path)
+pointcloud/use_ros_buffer: false          # when buffering, use the sensor_msgs buffer instead of the PCL one
 
 # --- Publishing (node) ---
 node/publish_rate_hz: 1.0                # whole-map publish cadence, decoupled from ingestion
