@@ -31,13 +31,9 @@ find_package(ament_index_cpp REQUIRED)
 set(SOURCE_FILES
     src/Parameters.cpp
     src/Helpers.cpp
-    src/HashGrid.cpp
-    src/TraversabilityGrid.cpp
+    src/Moments.cpp
+    src/TraversabilityMetrics.cpp
     src/KeyFrame.cpp
-    src/LocalMap.cpp
-    src/PointCloudBuffer.cpp
-    src/PointCloudBufferROS.cpp
-    src/System.cpp
 )
 
 add_library(traversabilitySystem SHARED ${SOURCE_FILES})
@@ -95,12 +91,13 @@ configure_package_config_file(
 )
 
 # Add executable
-add_executable(traversabilityMapping src/main.cpp)
+# add_executable(traversabilityMapping src/main.cpp)
 
-# Link the executable with the traversabilitySystem library
-target_link_libraries(traversabilityMapping traversabilitySystem)
+# # Link the executable with the traversabilitySystem library
+# target_link_libraries(traversabilityMapping traversabilitySystem)
 
-install(TARGETS traversabilitySystem traversabilityMapping
+install(TARGETS traversabilitySystem 
+# traversabilityMapping
     EXPORT export_${PROJECT_NAME}
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
@@ -125,6 +122,20 @@ install(FILES
 install(DIRECTORY include/ DESTINATION include)
 install(DIRECTORY params/ DESTINATION params)
 install(DIRECTORY params/ DESTINATION share/${PROJECT_NAME}/params/)
+
+# --- Tests (moment core + metrics; no ROS needed) ---
+# Linking traversabilitySystem gives the moment/metric symbols and, transitively,
+# grid_map_core's include dir + the Eigen-plugin compile definition it injects
+# (both are needed together, otherwise Eigen can't find the plugin header).
+if(BUILD_TESTING)
+    find_package(ament_cmake_gtest REQUIRED)
+    ament_add_gtest(test_moments test/test_moments.cpp)
+    target_include_directories(test_moments PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${EIGEN3_INCLUDE_DIR}
+    )
+    target_link_libraries(test_moments traversabilitySystem)
+endif()
 
 ament_export_include_directories(include)
 ament_export_libraries(traversabilitySystem)
