@@ -1,3 +1,5 @@
+#include <atomic>
+
 #include "rclcpp/rclcpp.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
@@ -6,6 +8,7 @@
 #include "message_filters/sync_policies/approximate_time.h"
 #include "message_filters/synchronizer.h"
 #include "tf2_ros/transform_broadcaster.h"
+#include "std_srvs/srv/set_bool.hpp"
 #include "traversability_msgs/msg/key_frame_additions.hpp"
 
 class SLAMKeyFrameSimulator : public rclcpp::Node {
@@ -30,6 +33,12 @@ public:
         tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
         keyframe_addition_publisher_ = this->create_publisher<traversability_msgs::msg::KeyFrameAdditions>("traversability_keyframe_additions", 10);
 
+        // Toggle keyframe mapping on/off at runtime. When disabled, no keyframe
+        // additions/updates are published; TF broadcasting is unaffected.
+        enable_mapping_service_ = this->create_service<std_srvs::srv::SetBool>(
+            "enable_mapping",
+            std::bind(&SLAMKeyFrameSimulator::setMappingEnabled, this, std::placeholders::_1, std::placeholders::_2));
+
         if (pose_type_ == "pose_stamped") {
             pose_subscriber_ = std::make_shared<message_filters::Subscriber<geometry_msgs::msg::PoseStamped>>(this, pose_topic);
             pose_sync_ = std::make_shared<message_filters::Synchronizer<PoseSyncPolicy>>(PoseSyncPolicy(10), *pose_subscriber_, *pcl_subscriber_);
@@ -53,6 +62,8 @@ private:
     using PoseSyncPolicy = message_filters::sync_policies::ApproximateTime<geometry_msgs::msg::PoseStamped, sensor_msgs::msg::PointCloud2>;
 
     void publishKeyframe(const geometry_msgs::msg::Pose &pose, const sensor_msgs::msg::PointCloud2::ConstSharedPtr &pcl_msg) {
+        if (!mapping_enabled_.load()) return;  // mapping disabled: skip additions/updates (TF still published)
+
         std::chrono::duration<double> elapsed = std::chrono::high_resolution_clock::now() - prev_time;
         if (elapsed.count() < 1.0 / keyframe_publish_rate_hz_) return;
 
@@ -84,6 +95,17 @@ private:
         RCLCPP_INFO(this->get_logger(), "Sync time difference (pose - pcl): %.6f seconds",
                     (rclcpp::Time(pose_msg->header.stamp) - rclcpp::Time(pcl_msg->header.stamp)).seconds());
         publishKeyframe(pose_msg->pose, pcl_msg);
+    }
+
+    // Enable (data=true) or disable (data=false) keyframe mapping. Affects only keyframe
+    // additions/updates; TF broadcasting continues regardless.
+    void setMappingEnabled(const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
+                           std::shared_ptr<std_srvs::srv::SetBool::Response> response) {
+        mapping_enabled_.store(request->data);
+        response->success = true;
+        response->message = request->data ? "Keyframe mapping ENABLED."
+                                          : "Keyframe mapping DISABLED (TF still publishing).";
+        RCLCPP_INFO(this->get_logger(), "%s", response->message.c_str());
     }
 
     void broadcastTF(const geometry_msgs::msg::Pose &pose, const rclcpp::Time &stamp) {
@@ -126,6 +148,7 @@ private:
     double keyframe_publish_rate_hz_;
     long unsigned current_kf_id_;
     std::chrono::_V2::system_clock::time_point prev_time;
+    std::atomic<bool> mapping_enabled_{true};  ///< toggled by the enable_mapping service
 
     std::shared_ptr<message_filters::Subscriber<nav_msgs::msg::Odometry>> odom_subscriber_;
     std::shared_ptr<message_filters::Subscriber<geometry_msgs::msg::PoseStamped>> pose_subscriber_;
@@ -136,6 +159,7 @@ private:
     rclcpp::Publisher<traversability_msgs::msg::KeyFrameAdditions>::SharedPtr keyframe_addition_publisher_;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_subscription_;
     rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr pose_subscription_;
+    rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr enable_mapping_service_;
 };
 
 int main(int argc, char **argv) {
