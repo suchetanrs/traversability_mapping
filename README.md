@@ -22,7 +22,7 @@ Once you are inside the gz-sim-environment docker, run the following:
 
 ```git clone https://github.com/suchetanrs/traversability_mapping```
 
-```cd .. && rosdep update && rosdep install --from-paths src --ignore-src -r -y --skip-keys sophus```
+```cd .. && rosdep update && rosdep install --from-paths src --ignore-src -r -y```
 
 ```colcon build --symlink-install```
 
@@ -38,10 +38,10 @@ Once you are inside the gz-sim-environment docker, run the following:
 
 ### Method 2: Launch manually
 
-To launch the global traversability mapping, run ```ros2 launch traversability_mapping_ros global_gt_traversability_mapping.launch.py```
+To launch the global traversability mapping, run ```ros2 launch traversability_mapping_ros global_traversability_mapping.launch.py```
 
 To launch the local traversability mapping, run
-```ros2 launch traversability_mapping_ros global_traversability_mapping.launch.py```
+```ros2 launch traversability_mapping_ros local_traversability_mapping.launch.py```
 
 You can now visualize the gridmap and the occupancy map via RViz. To launch rviz run 
 ```ros2 launch traversability_mapping_ros rviz.launch.py```
