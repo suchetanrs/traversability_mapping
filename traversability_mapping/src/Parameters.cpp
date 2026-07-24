@@ -63,14 +63,25 @@ ParameterHandler::ParameterHandler(std::string yaml_file_path)
     parameter_map_["inflation/lethal_step_threshold"] = loaded_node["inflation/lethal_step_threshold"].as<double>();
 
     // --- Ingestion (cloud filtering + buffering) ---
-    parameter_map_["ingestion/robot_height"] = loaded_node["ingestion/robot_height"].as<double>();
-    parameter_map_["ingestion/max_range_base_frame"] = loaded_node["ingestion/max_range_base_frame"].as<double>();
-    parameter_map_["ingestion/min_range_base_frame"] = loaded_node["ingestion/min_range_base_frame"].as<double>();
-    parameter_map_["ingestion/use_pointcloud_buffer"] = loaded_node["ingestion/use_pointcloud_buffer"].as<bool>();
-    parameter_map_["ingestion/use_ros_buffer"] = loaded_node["ingestion/use_ros_buffer"].as<bool>();
+    parameter_map_["pointcloud/robot_height"] = loaded_node["pointcloud/robot_height"].as<double>();
+    parameter_map_["pointcloud/max_range_base_frame"] = loaded_node["pointcloud/max_range_base_frame"].as<double>();
+    parameter_map_["pointcloud/min_range_base_frame"] = loaded_node["pointcloud/min_range_base_frame"].as<double>();
+    parameter_map_["pointcloud/use_pointcloud_buffer"] = loaded_node["pointcloud/use_pointcloud_buffer"].as<bool>();
+    parameter_map_["pointcloud/use_ros_buffer"] = loaded_node["pointcloud/use_ros_buffer"].as<bool>();
 
     // --- Publishing (node) ---
     parameter_map_["node/publish_rate_hz"] = loaded_node["node/publish_rate_hz"].as<double>();
+}
+
+void ParameterHandler::setParameter(const std::string& parameterKey, const boost::any& value)
+{
+    std::lock_guard<std::mutex> lock(mapMutex_);
+    auto it = parameter_map_.find(parameterKey);
+    if (it == parameter_map_.end())
+        throw std::runtime_error("Parameter " + parameterKey + " is not found in the map");
+    if (it->second.type() != value.type())
+        throw std::runtime_error("Parameter " + parameterKey + " set with a value of a different type");
+    it->second = value;
 }
 
 std::vector<std::string> ParameterHandler::keys() const

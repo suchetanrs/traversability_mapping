@@ -29,12 +29,12 @@ namespace traversability_mapping
         const double res = parameterInstance.getValue<double>("grid/resolution_local_map");
         lattice_ = Lattice(cx, cy, res);
 
-        robot_height_ = parameterInstance.getValue<double>("ingestion/robot_height");
-        max_range_base_frame_ = parameterInstance.getValue<double>("ingestion/max_range_base_frame");
-        min_range_base_frame_ = parameterInstance.getValue<double>("ingestion/min_range_base_frame");
+        robot_height_ = parameterInstance.getValue<double>("pointcloud/robot_height");
+        max_range_base_frame_ = parameterInstance.getValue<double>("pointcloud/max_range_base_frame");
+        min_range_base_frame_ = parameterInstance.getValue<double>("pointcloud/min_range_base_frame");
 
-        usePointCloudBuffer_ = parameterInstance.getValue<bool>("ingestion/use_pointcloud_buffer");
-        useROSBuffer_ = parameterInstance.getValue<bool>("ingestion/use_ros_buffer");
+        usePointCloudBuffer_ = parameterInstance.getValue<bool>("pointcloud/use_pointcloud_buffer");
+        useROSBuffer_ = parameterInstance.getValue<bool>("pointcloud/use_ros_buffer");
         if (usePointCloudBuffer_)
         {
             pointCloudBuffer_ = std::make_shared<PointCloudBuffer>();

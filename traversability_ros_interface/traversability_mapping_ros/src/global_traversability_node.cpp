@@ -114,7 +114,7 @@ public:
             std::bind(&GlobalTraversabilityNode::updatesCallback, this, std::placeholders::_1));
 
         // Optional raw-cloud buffering path (SLAM that announces keyframes by ts).
-        if (tmap::ParameterHandler::getInstance().getValue<bool>("ingestion/use_pointcloud_buffer"))
+        if (tmap::ParameterHandler::getInstance().getValue<bool>("pointcloud/use_pointcloud_buffer"))
         {
             cloud_sub_ = create_subscription<sensor_msgs::msg::PointCloud2>(
                 pointcloud_topic_, rclcpp::SensorDataQoS(),

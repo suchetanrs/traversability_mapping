@@ -37,11 +37,11 @@ mapping/global_adjustment_sleep: 0
 
 # --- Ingestion (cloud filtering + buffering) ---
 # LOCAL: cap the lidar range to the local grid extent so scans never overshoot the map.
-ingestion/robot_height: 3.5
-ingestion/max_range_base_frame: 6.0     # <= grid/half_size_traversability
-ingestion/min_range_base_frame: 1.0
-ingestion/use_pointcloud_buffer: false
-ingestion/use_ros_buffer: false
+pointcloud/robot_height: 3.5
+pointcloud/max_range_base_frame: 6.0     # <= grid/half_size_traversability
+pointcloud/min_range_base_frame: 1.0
+pointcloud/use_pointcloud_buffer: false
+pointcloud/use_ros_buffer: false
 
 # --- Publishing (node) ---
 node/publish_rate_hz: 10.0               # nav cadence for the cropped costmap

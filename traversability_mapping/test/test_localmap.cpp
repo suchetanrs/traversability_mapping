@@ -69,11 +69,11 @@ inflation/enabled: false
 inflation/inflation_radius: 0.5
 inflation/cost_scaling_factor: 3.0
 inflation/lethal_step_threshold: 0.95
-ingestion/robot_height: 3.5
-ingestion/max_range_base_frame: 300.0
-ingestion/min_range_base_frame: 1.0
-ingestion/use_pointcloud_buffer: false
-ingestion/use_ros_buffer: false
+pointcloud/robot_height: 3.5
+pointcloud/max_range_base_frame: 300.0
+pointcloud/min_range_base_frame: 1.0
+pointcloud/use_pointcloud_buffer: false
+pointcloud/use_ros_buffer: false
 node/publish_rate_hz: 1.0
 )yaml";
 }  // namespace
