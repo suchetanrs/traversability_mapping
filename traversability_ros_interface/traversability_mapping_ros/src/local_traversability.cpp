@@ -10,17 +10,24 @@
  * per-keyframe-then-fused.
  *
  * Pipeline (additions, GT-driven):
- *   KeyFrameAdditions -> transform cloud to map -> filter -> bin into
- *   cell-local moments on the absolute lattice -> ADD into the grid moment
- *   layers -> recompute hazards over the dilated dirty set. A timer publishes
- *   two subscription-gated outputs: (1) a SPARSE update to nav (only the cells
- *   touched since the last tick, just the nav_layers_, keyed by absolute lattice
- *   id; first publish / any (re)connect sends a full snapshot), and (2) the full
- *   nav grid_map for visualization. KeyFrameUpdates (PGO) subtract the old
- *   contribution, transform it, and re-add (frozen partition).
+ *   KeyFrameAdditions -> filter + transform cloud to the robot BASE frame ->
+ *   store the pruned base-frame cloud in the keyframe -> the keyframe bins it
+ *   into cell-local moments on the absolute lattice (rebin) -> ADD into the grid
+ *   moment layers -> recompute hazards over the dilated dirty set. A timer
+ *   publishes two subscription-gated outputs: (1) a SPARSE update to nav (only
+ *   the cells touched since the last tick, just the nav_layers_, keyed by
+ *   absolute lattice id; first publish / any (re)connect sends a full snapshot),
+ *   and (2) the full nav grid_map for visualization.
+ *
+ *   KeyFrameUpdates (PGO) carry a corrected pose only: the node subtracts the
+ *   keyframe's previous contribution, re-transforms its stored base-frame cloud
+ *   by the new pose and RE-BINS from scratch (the partition is NOT frozen; cell
+ *   membership is recomputed every update, however small), then re-adds. Hazards
+ *   are recomputed over the dilated union of the cells left and newly occupied.
  */
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
+#include <nav_msgs/msg/occupancy_grid.hpp>
 
 #include <grid_map_core/GridMap.hpp>
 #include <grid_map_core/iterators/GridMapIterator.hpp>
@@ -49,6 +56,8 @@
 #include <unordered_set>
 #include <vector>
 #include <memory>
+#include <utility>
+#include <chrono>
 #include <cmath>
 
 namespace tmap = traversability_mapping;
@@ -110,7 +119,7 @@ public:
         // receives; edit this list (entries must exist in layers_) to add/remove
         // a nav layer without touching the internal map.
         nav_layers_ = {"normal_x", "normal_y", "normal_z", "slope_haz",
-                       "step_haz", "elevation", "roughness_haz"};
+                       "step_haz", "elevation", "roughness_haz", "hazard"};
         const double half = parameterInstance.getValue<double>("half_size_traversability");
         gridMap_ = freshMap(half, half);
 
@@ -125,6 +134,10 @@ public:
         // Full nav grid_map, for visualization only (RViz grid_map plugin).
         gridmap_pub_ = create_publisher<grid_map_msgs::msg::GridMap>(
             "global_traversability_gridmap", rclcpp::QoS(1).transient_local());
+
+        // Flattened occupancy view of the hazard layer, for costmap/RViz.
+        occupancy_pub_ = create_publisher<nav_msgs::msg::OccupancyGrid>(
+            "global_traversability_occupancy", rclcpp::QoS(1).transient_local());
 
         // Sparse updates for navigation. Reliable, ordered, volatile: deltas must
         // arrive in order and must not be replayed stale (transient_local would
@@ -270,64 +283,82 @@ private:
         return out;
     }
 
+    // Recompute one query cell's derived (nav) layers from the FUSED moments in
+    // its vicinity. Reads only moment layers (never written here) + neighbour
+    // cells; writes only THIS cell's derived layers. Because distinct cells write
+    // disjoint elements and the moment layers are read-only during recompute,
+    // this is safe to run concurrently across cells. Returns true iff the cell's
+    // nav layers were (re)written (values or NaN) -> caller flags it for nav.
+    bool recomputeCell(std::uint64_t id)
+    {
+        int ci, cj;
+        tmap::Lattice::unkey(id, ci, cj);
+        const grid_map::Position qp = cellPos(ci, cj);
+        if (!gridMap_.isInside(qp))
+            return false;
+
+        tmap::NodeMetaData qd;
+        if (!readCellMoment(ci, cj, qd))
+            return false;  // query cell unobserved -> nothing to write
+
+        tmap::CellMoment query{qd, Eigen::Vector3d(qp.x(), qp.y(), 0.0)};
+        std::vector<tmap::CellMoment> occupied;
+        int total = 0;
+        for (int i = ci - delta_ind_; i <= ci + delta_ind_; ++i)
+            for (int j = cj - delta_ind_; j <= cj + delta_ind_; ++j)
+            {
+                ++total;
+                tmap::NodeMetaData d;
+                if (readCellMoment(i, j, d))
+                {
+                    const Eigen::Vector2d c2 = lattice_.centerOf(i, j);
+                    occupied.push_back({d, Eigen::Vector3d(c2.x(), c2.y(), 0.0)});
+                }
+            }
+
+        const auto haz = tmap::computeGoodness(query, occupied, total, ground_clearance_,
+                                               max_slope_, min_vicinity_points_, min_occupied_fraction_);
+
+        if (!std::isnan(haz[tmap::HAZ_ELEVATION]))
+            gridMap_.atPosition("elevation", qp) = static_cast<float>(haz[tmap::HAZ_ELEVATION]);
+
+        if (std::isnan(haz[tmap::HAZ_OVERALL]))
+        {
+            gridMap_.atPosition("hazard", qp) = std::numeric_limits<float>::quiet_NaN();
+            gridMap_.atPosition("slope_haz", qp) = std::numeric_limits<float>::quiet_NaN();
+            gridMap_.atPosition("step_haz", qp) = std::numeric_limits<float>::quiet_NaN();
+            gridMap_.atPosition("roughness_haz", qp) = std::numeric_limits<float>::quiet_NaN();
+            gridMap_.atPosition("normal_x", qp) = std::numeric_limits<float>::quiet_NaN();
+            gridMap_.atPosition("normal_y", qp) = std::numeric_limits<float>::quiet_NaN();
+            gridMap_.atPosition("normal_z", qp) = std::numeric_limits<float>::quiet_NaN();
+            return true;
+        }
+        gridMap_.atPosition("hazard", qp) = static_cast<float>(haz[tmap::HAZ_OVERALL]);
+        gridMap_.atPosition("slope_haz", qp) = static_cast<float>(haz[tmap::HAZ_SLOPE]);
+        gridMap_.atPosition("step_haz", qp) = static_cast<float>(haz[tmap::HAZ_STEP]);
+        gridMap_.atPosition("roughness_haz", qp) = static_cast<float>(haz[tmap::HAZ_ROUGHNESS]);
+        gridMap_.atPosition("normal_x", qp) = static_cast<float>(haz[tmap::HAZ_NORMAL_X]);
+        gridMap_.atPosition("normal_y", qp) = static_cast<float>(haz[tmap::HAZ_NORMAL_Y]);
+        gridMap_.atPosition("normal_z", qp) = static_cast<float>(haz[tmap::HAZ_NORMAL_Z]);
+        return true;
+    }
+
+    // Recompute the dirty set in parallel (one cell per task; disjoint writes).
+    // dirty_for_nav_ is not thread-safe, so flags are gathered per cell and
+    // merged serially afterwards.
     void recomputeDirty(const std::unordered_set<std::uint64_t> &dirty)
     {
-        for (auto id : dirty)
-        {
-            int ci, cj;
-            tmap::Lattice::unkey(id, ci, cj);
-            const grid_map::Position qp = cellPos(ci, cj);
-            if (!gridMap_.isInside(qp))
-                continue;
+        const std::vector<std::uint64_t> cells(dirty.begin(), dirty.end());
+        const std::size_t n = cells.size();
+        std::vector<char> wrote(n, 0);
 
-            tmap::NodeMetaData qd;
-            if (!readCellMoment(ci, cj, qd))
-                continue;  // query cell unobserved -> nothing to write
+        #pragma omp parallel for schedule(dynamic, 64)
+        for (std::size_t k = 0; k < n; ++k)
+            wrote[k] = recomputeCell(cells[k]) ? 1 : 0;
 
-            // From here the cell's nav layers are (re)written (values or NaN),
-            // so flag it for the next sparse update to nav.
-            dirty_for_nav_.insert(id);
-
-            tmap::CellMoment query{qd, Eigen::Vector3d(qp.x(), qp.y(), 0.0)};
-            std::vector<tmap::CellMoment> occupied;
-            int total = 0;
-            for (int i = ci - delta_ind_; i <= ci + delta_ind_; ++i)
-                for (int j = cj - delta_ind_; j <= cj + delta_ind_; ++j)
-                {
-                    ++total;
-                    tmap::NodeMetaData d;
-                    if (readCellMoment(i, j, d))
-                    {
-                        const Eigen::Vector2d c2 = lattice_.centerOf(i, j);
-                        occupied.push_back({d, Eigen::Vector3d(c2.x(), c2.y(), 0.0)});
-                    }
-                }
-
-            const auto haz = tmap::computeGoodness(query, occupied, total, ground_clearance_,
-                                                   max_slope_, min_vicinity_points_, min_occupied_fraction_);
-
-            if (!std::isnan(haz[tmap::HAZ_ELEVATION]))
-                gridMap_.atPosition("elevation", qp) = static_cast<float>(haz[tmap::HAZ_ELEVATION]);
-
-            if (std::isnan(haz[tmap::HAZ_OVERALL]))
-            {
-                gridMap_.atPosition("hazard", qp) = std::numeric_limits<float>::quiet_NaN();
-                gridMap_.atPosition("slope_haz", qp) = std::numeric_limits<float>::quiet_NaN();
-                gridMap_.atPosition("step_haz", qp) = std::numeric_limits<float>::quiet_NaN();
-                gridMap_.atPosition("roughness_haz", qp) = std::numeric_limits<float>::quiet_NaN();
-                gridMap_.atPosition("normal_x", qp) = std::numeric_limits<float>::quiet_NaN();
-                gridMap_.atPosition("normal_y", qp) = std::numeric_limits<float>::quiet_NaN();
-                gridMap_.atPosition("normal_z", qp) = std::numeric_limits<float>::quiet_NaN();
-                continue;
-            }
-            gridMap_.atPosition("hazard", qp) = static_cast<float>(haz[tmap::HAZ_OVERALL]);
-            gridMap_.atPosition("slope_haz", qp) = static_cast<float>(haz[tmap::HAZ_SLOPE]);
-            gridMap_.atPosition("step_haz", qp) = static_cast<float>(haz[tmap::HAZ_STEP]);
-            gridMap_.atPosition("roughness_haz", qp) = static_cast<float>(haz[tmap::HAZ_ROUGHNESS]);
-            gridMap_.atPosition("normal_x", qp) = static_cast<float>(haz[tmap::HAZ_NORMAL_X]);
-            gridMap_.atPosition("normal_y", qp) = static_cast<float>(haz[tmap::HAZ_NORMAL_Y]);
-            gridMap_.atPosition("normal_z", qp) = static_cast<float>(haz[tmap::HAZ_NORMAL_Z]);
-        }
+        for (std::size_t k = 0; k < n; ++k)
+            if (wrote[k])
+                dirty_for_nav_.insert(cells[k]);
     }
 
     // ---- callbacks ----------------------------------------------------------
@@ -342,33 +373,45 @@ private:
     void additionsCallback(const traversability_msgs::msg::KeyFrameAdditions::SharedPtr msg)
     {
         for (const auto &kf : msg->keyframes)
-            processAddition(kf);
+            processKeyframe(kf, /*isUpdate=*/false);
     }
 
-    void processAddition(const traversability_msgs::msg::KeyFrame &kf_msg)
+    void updatesCallback(const traversability_msgs::msg::KeyFrameUpdates::SharedPtr msg)
     {
-        if (keyframes_.count(kf_msg.kf_id))
+        // PGO pose corrections. Pose-only: re-bin the stored cloud at the new
+        // pose. (Exercised once a real SLAM provides updates; GT emits none.)
+        RCLCPP_WARN(get_logger(), "[UPDATE] batch received: %zu keyframe(s) to re-bin.",
+                    msg->keyframes.size());
+        for (size_t i = 0; i < msg->keyframes.size(); ++i)
         {
-            RCLCPP_WARN(get_logger(), "Duplicate keyframe id %lu ignored.", (unsigned long)kf_msg.kf_id);
-            return;
+            const auto &kf = msg->keyframes[i];
+            RCLCPP_WARN(get_logger(), "[UPDATE] (%zu/%zu) processing keyframe id %lu.",
+                        i + 1, msg->keyframes.size(), (unsigned long)kf.kf_id);
+            processKeyframe(kf, /*isUpdate=*/true);
+            // Run the full publishing routine after EACH keyframe so RViz shows the
+            // map shift/correct in real time (full grid_map + occupancy + sparse),
+            // instead of waiting for the 1 Hz timer.
+            publish();
         }
+    }
 
-        const Eigen::Affine3f Tmb = poseToAffine(kf_msg.kf_pose);
-        const Eigen::Affine3f Tmv = Tmb * Tbv_;  // map <- lidar
-
+    // Filter the lidar cloud (ego return, ceiling/overhang, range) and express
+    // the survivors in the robot BASE frame. The base frame is rigidly attached
+    // to the robot, so this pruned cloud stays valid across any pose correction
+    // and is what the keyframe re-bins from. All three gates are pose-invariant.
+    std::vector<Eigen::Vector3f> pruneToBase(const sensor_msgs::msg::PointCloud2 &ros_cloud) const
+    {
         pcl::PointCloud<pcl::PointXYZ> cloud_lidar;
         pcl::PCLPointCloud2 pcl_pc2;
-        pcl_conversions::toPCL(kf_msg.kf_pointcloud, pcl_pc2);
+        pcl_conversions::toPCL(ros_cloud, pcl_pc2);
         pcl::fromPCLPointCloud2(pcl_pc2, cloud_lidar);
 
-        // Pass 1: filter (ego + height) and transform to map; track AABB.
-        std::vector<Eigen::Vector3f> map_pts;
-        map_pts.reserve(cloud_lidar.size());
-        double minx = 1e18, maxx = -1e18, miny = 1e18, maxy = -1e18;
+        std::vector<Eigen::Vector3f> cloud_base;
+        cloud_base.reserve(cloud_lidar.size());
         for (const auto &p : cloud_lidar)
         {
             if (p.x == 0.f && p.y == 0.f)
-                continue;  // ego / invalid return
+                continue;  // ego / invalid return (lidar frame)
             const Eigen::Vector3f p_base = Tbv_ * Eigen::Vector3f(p.x, p.y, p.z);
             if (p_base.z() > static_cast<float>(robot_height_))
                 continue;  // ceiling / overhang
@@ -376,74 +419,104 @@ private:
             if (range > static_cast<float>(max_range_base_frame_) ||
                 range < static_cast<float>(min_range_base_frame_))
                 continue;  // out of range
-            const Eigen::Vector3f p_map = Tmb * p_base;
-            map_pts.push_back(p_map);
-            minx = std::min(minx, (double)p_map.x()); maxx = std::max(maxx, (double)p_map.x());
-            miny = std::min(miny, (double)p_map.y()); maxy = std::max(maxy, (double)p_map.y());
+            cloud_base.push_back(p_base);
         }
-        if (map_pts.empty())
+        return cloud_base;
+    }
+
+    // Grow the grid (if needed) so every cell the keyframe contributes to fits.
+    // AABB is taken from the partials' cell centres; growToInclude's one-cell
+    // margin covers the <=1/2-res gap between a cell centre and its points.
+    void growToIncludeCells(const std::unordered_map<std::uint64_t, tmap::NodeMetaData> &partials)
+    {
+        if (partials.empty())
             return;
-
-        growToInclude(minx, maxx, miny, maxy);
-
-        // Pass 2: bin into cell-local moments held by the keyframe.
-        auto kf = std::make_shared<tmap::KeyFrame>(kf_msg.kf_id, Tmb);
-        for (const auto &p_map : map_pts)
+        double minx = 1e18, maxx = -1e18, miny = 1e18, maxy = -1e18;
+        for (const auto &kv : partials)
         {
             int ci, cj;
-            lattice_.cellOf(p_map.x(), p_map.y(), ci, cj);
+            tmap::Lattice::unkey(kv.first, ci, cj);
             const Eigen::Vector2d c = lattice_.centerOf(ci, cj);
-            kf->addPoint(tmap::Lattice::key(ci, cj),
-                         p_map.x() - c.x(), p_map.y() - c.y(), p_map.z());  // z about 0
+            minx = std::min(minx, c.x()); maxx = std::max(maxx, c.x());
+            miny = std::min(miny, c.y()); maxy = std::max(maxy, c.y());
+        }
+        growToInclude(minx, maxx, miny, maxy);
+    }
+
+    // Shared addition/update path. Additions create a keyframe from the pruned
+    // base-frame cloud; updates back out the old contribution first. Both then
+    // re-bin from the stored cloud at the current pose and re-add. Hazards are
+    // recomputed over the dilated union of cells left and newly occupied.
+    void processKeyframe(const traversability_msgs::msg::KeyFrame &kf_msg, bool isUpdate)
+    {
+        const auto t_start = std::chrono::steady_clock::now();
+        const char *tag = isUpdate ? "UPDATE" : "ADD";
+        const Eigen::Affine3f Tmb = poseToAffine(kf_msg.kf_pose);  // map <- base
+
+        std::shared_ptr<tmap::KeyFrame> kf;
+        std::unordered_set<std::uint64_t> touched;  // M_old (subtracted) U M_new (added)
+        size_t n_subtracted = 0;
+
+        if (isUpdate)
+        {
+            auto it = keyframes_.find(kf_msg.kf_id);
+            if (it == keyframes_.end())
+            {
+                RCLCPP_WARN(get_logger(), "[%s] keyframe id %lu unknown; ignored.",
+                            tag, (unsigned long)kf_msg.kf_id);
+                return;
+            }
+            kf = it->second;
+            // Back out the OLD contribution. Must read partials_ BEFORE rebin
+            // clears it. Old cells are always already inside the map, so this is
+            // safe before any grow.
+            for (const auto &kv : kf->partials())
+            {
+                addPartialToGrid(kv.first, kv.second, -1.0);
+                touched.insert(kv.first);
+            }
+            n_subtracted = kf->partials().size();
+            kf->setPose(Tmb);
+        }
+        else
+        {
+            if (keyframes_.count(kf_msg.kf_id))
+            {
+                RCLCPP_WARN(get_logger(), "[%s] keyframe id %lu duplicate; ignored.",
+                            tag, (unsigned long)kf_msg.kf_id);
+                return;
+            }
+            std::vector<Eigen::Vector3f> cloud_base = pruneToBase(kf_msg.kf_pointcloud);
+            if (cloud_base.empty())
+            {
+                RCLCPP_WARN(get_logger(), "[%s] keyframe id %lu pruned to empty; not stored.",
+                            tag, (unsigned long)kf_msg.kf_id);
+                return;
+            }
+            kf = std::make_shared<tmap::KeyFrame>(kf_msg.kf_id, Tmb, std::move(cloud_base));
+            keyframes_[kf_msg.kf_id] = kf;
         }
 
-        // Fuse the keyframe's partials into the global moment layers.
-        std::unordered_set<std::uint64_t> touched;
+        // (Re)bin the stored base-frame cloud at the current pose, grow to fit,
+        // then add the fresh contribution.
+        kf->rebin(lattice_);
+        growToIncludeCells(kf->partials());
         for (const auto &kv : kf->partials())
         {
             addPartialToGrid(kv.first, kv.second, +1.0);
             touched.insert(kv.first);
         }
-        keyframes_[kf_msg.kf_id] = kf;
+        const size_t n_added = kf->partials().size();
 
         recomputeDirty(dilate(touched));
-    }
 
-    void updatesCallback(const traversability_msgs::msg::KeyFrameUpdates::SharedPtr msg)
-    {
-        // PGO pose corrections. Frozen partition: each partial is transformed in
-        // place about its own cell centre, subtracted then re-added; the cell
-        // membership never changes. (Exercised once a real SLAM provides updates.)
-        std::unordered_set<std::uint64_t> touched;
-        for (const auto &kf_msg : msg->keyframes)
-        {
-            auto it = keyframes_.find(kf_msg.kf_id);
-            if (it == keyframes_.end())
-                continue;
-            auto &kf = it->second;
-
-            const Eigen::Affine3f newPose = poseToAffine(kf_msg.kf_pose);
-            const Eigen::Affine3f delta = newPose * kf->pose().inverse();  // map-frame delta T_d
-            const Eigen::Matrix3d Rd = delta.linear().cast<double>();
-            const Eigen::Vector3d td = delta.translation().cast<double>();
-
-            for (auto &kv : kf->partials())
-            {
-                int ci, cj;
-                tmap::Lattice::unkey(kv.first, ci, cj);
-                const Eigen::Vector2d c = lattice_.centerOf(ci, cj);
-                const Eigen::Vector3d c3(c.x(), c.y(), 0.0);
-
-                addPartialToGrid(kv.first, kv.second, -1.0);                 // remove old
-                const Eigen::Vector3d t_eff = Rd * c3 + td - c3;             // delta about cell centre
-                kv.second.transform(Rd, t_eff);                             // transform partial
-                addPartialToGrid(kv.first, kv.second, +1.0);                 // re-add transformed
-                touched.insert(kv.first);
-            }
-            kf->setPose(newPose);
-        }
-        if (!touched.empty())
-            recomputeDirty(dilate(touched));
+        const double ms = std::chrono::duration<double, std::milli>(
+                              std::chrono::steady_clock::now() - t_start).count();
+        RCLCPP_WARN(get_logger(),
+                    "[%s] keyframe id %lu done in %.2f ms (subtracted %zu, added %zu, "
+                    "touched %zu cells). Total keyframes: %zu.",
+                    tag, (unsigned long)kf_msg.kf_id, ms, n_subtracted, n_added,
+                    touched.size(), keyframes_.size());
     }
 
     // ---- publish ------------------------------------------------------------
@@ -496,6 +569,7 @@ private:
     void publish()
     {
         publishFullMap();
+        publishOccupancyMap();
         publishSparse();
     }
 
@@ -508,6 +582,20 @@ private:
         gm->header.frame_id = map_frame_;
         gm->header.stamp = now();
         gridmap_pub_->publish(*gm);
+    }
+
+    // Flattened 2D occupancy view of the "hazard" layer, for consumers that want
+    // a plain nav_msgs/OccupancyGrid (e.g. costmap/RViz). hazard is in [0,1] ->
+    // [0,100]; unobserved cells (NaN) map to -1 (unknown). Subscriber-gated.
+    void publishOccupancyMap()
+    {
+        if (occupancy_pub_->get_subscription_count() == 0)
+            return;
+        nav_msgs::msg::OccupancyGrid og;
+        grid_map::GridMapRosConverter::toOccupancyGrid(gridMap_, "hazard", 0.0, 1.0, og);
+        og.header.frame_id = map_frame_;
+        og.header.stamp = now();
+        occupancy_pub_->publish(og);
     }
 
     void publishSparse()
@@ -566,6 +654,7 @@ private:
     rclcpp::Subscription<traversability_msgs::msg::KeyFrameAdditions>::SharedPtr additions_sub_;
     rclcpp::Subscription<traversability_msgs::msg::KeyFrameUpdates>::SharedPtr updates_sub_;
     rclcpp::Publisher<grid_map_msgs::msg::GridMap>::SharedPtr gridmap_pub_;          // full map, viz only
+    rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr occupancy_pub_;       // flattened hazard, viz/costmap
     rclcpp::Publisher<traversability_msgs::msg::TraversabilitySparseUpdate>::SharedPtr sparse_pub_;  // sparse updates, nav
     rclcpp::TimerBase::SharedPtr publish_timer_;
 };

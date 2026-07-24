@@ -14,6 +14,7 @@
   <exec_depend>traversability_msgs</exec_depend>
   <depend>traversability_mapping</depend>
   <depend>grid_map</depend>
+  <depend>nav_msgs</depend>
 
   <export>
     <build_type>ament_cmake</build_type>

@@ -7,17 +7,17 @@
       use_lidar_pointcloud: false
       publish_traversability_grid: true
       is_kf_optimization_enabled: false
-      slam_frame: zed_camera_center
-      robot_base_frame: zed_camera_center
-      lidar_frame: zed_left_camera_frame
+      slam_frame: base_footprint
+      robot_base_frame: base_footprint
+      lidar_frame: lidar_link
 
   local_traversability_node:
     ros__parameters:
       additions_topic_name: "traversability_keyframe_additions"
       updates_topic_name: "traversability_keyframe_updates"
-      slam_frame: zed_camera_center
-      robot_base_frame: zed_camera_center
-      lidar_frame: zed_left_camera_frame
+      slam_frame: base_footprint
+      robot_base_frame: base_footprint
+      lidar_frame: lidar_link
       map_frame: map
 
   traversability_threshold_node:
@@ -26,7 +26,9 @@
   
   slam_keyframe_pcl_simulator:
     ros__parameters:
-      pose_type: "pose_stamped"
-      odom_topic: "/zed/zed_node/pose"
-      pcl_topic: "/zed/zed_node/point_cloud/cloud_registered"
+      pose_type: "odom"
+      odom_topic: "ground_truth_pose"
+      pcl_topic: "lidar/points"
       keyframe_publish_rate_hz: 2.5 # Hz.
+      per_keyframe_translation_error_m: 0.0
+      per_keyframe_yaw_error_deg: 0.0

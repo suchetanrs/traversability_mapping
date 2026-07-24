@@ -18,6 +18,7 @@ endif()
 find_package(Sophus REQUIRED)
 find_package(Eigen3 3.1.0 REQUIRED)
 find_package(Boost REQUIRED)
+find_package(OpenMP)
 find_package(PCL REQUIRED)
 find_package(traversability_mapping_common REQUIRED)
 find_package(grid_map_core REQUIRED)
@@ -74,6 +75,10 @@ target_link_libraries(traversabilitySystem
     PUBLIC ament_index_cpp::ament_index_cpp
     PUBLIC Sophus::Sophus
 )
+
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(traversabilitySystem PRIVATE OpenMP::OpenMP_CXX)
+endif()
 
 # Generate and install CMake configuration file
 include(CMakePackageConfigHelpers)

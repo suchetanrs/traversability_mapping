@@ -12,9 +12,9 @@ extend_length_every_resize_by: 30.0 # how much (m) to grow by when a keyframe ne
 security_distance: 0.40   # max(robot_length, robot_width); sets the plane-fit vicinity radius
 ground_clearance: 0.15
 max_slope: 0.4            # rad; slope hazard normaliser
-robot_height: 1.5         # points more than this above the base are dropped (ceilings/overhangs)
-max_range_base_frame: 3.0  # points further than this from the base are dropped (m)
-min_range_base_frame: 0.15   # points closer than this to the base are dropped (m, ego-filter)
+robot_height: 3.5         # points more than this above the base are dropped (ceilings/overhangs)
+max_range_base_frame: 300.0  # points further than this from the base are dropped (m)
+min_range_base_frame: 1.0   # points closer than this to the base are dropped (m, ego-filter)
 
 # --- Plane-fit gates ---
 min_vicinity_points: 15      # min points in the vicinity to attempt a plane fit

@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>traversability_grid_utils</name>
+  <version>0.0.1</version>
+  <description>
+    Utilities to reconstruct and introspect a global traversability grid_map from
+    sparse patch updates (traversability_msgs/TraversabilitySparseUpdate)
+  </description>
+  <maintainer email="suchetan@clutterbot.com">Suchetan Saravanan</maintainer>
+  <license>GPL v3.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>traversability_msgs</depend>
+  <depend>grid_map_core</depend>
+  <depend>grid_map_ros</depend>
+  <depend>eigen</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
