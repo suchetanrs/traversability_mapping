@@ -15,7 +15,6 @@ endif()
 # SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O1 -march=native")
 # SET(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O1 -march=native")
 
-find_package(Sophus REQUIRED)
 find_package(Eigen3 3.1.0 REQUIRED)
 find_package(Boost REQUIRED)
 find_package(OpenMP)
@@ -74,7 +73,6 @@ target_link_libraries(traversabilitySystem
     PRIVATE ${YAML_CPP_LIBRARIES}
     PUBLIC grid_map_core::grid_map_core
     PUBLIC ament_index_cpp::ament_index_cpp
-    PUBLIC Sophus::Sophus
 )
 
 if(OpenMP_CXX_FOUND)
@@ -183,7 +181,6 @@ endif()
 ament_export_include_directories(include)
 ament_export_libraries(traversabilitySystem)
 ament_export_dependencies(
-    Sophus
     Eigen3
     Boost
     PCL

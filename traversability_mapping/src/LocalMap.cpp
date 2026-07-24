@@ -374,7 +374,6 @@ namespace traversability_mapping
 
     void LocalMap::clearEntireMap()
     {
-        throw std::runtime_error("This function was not supposed to be executed! getStitchedPointCloud()");
         std::lock_guard<std::mutex> lock(masterGridMapMutex_);
         // Record every currently-occupied cell as changed (it is about to be blanked).
         for (auto k : allOccupiedKeys(gridMap_, lattice_))
