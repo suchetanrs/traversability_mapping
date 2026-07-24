@@ -18,11 +18,11 @@
 #include <chrono>
 #include <iostream>
 #include <mutex>
+
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
-#include "traversability_mapping/Helpers.hpp"
 
-using namespace std::chrono_literals;
+#include "traversability_mapping/Helpers.hpp"
 
 namespace traversability_mapping
 {

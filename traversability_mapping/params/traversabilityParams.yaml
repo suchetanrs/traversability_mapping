@@ -1,9 +1,3 @@
-# IMPORTANT: Parameters is_kf_optimization_enabled and SLAM_System is reset in the traversability_node.cpp when running through ROS and not directly with ORB-SLAM3.
-# The updated parameters for this is taken from traversability_ros_params.yaml
-
-# Choose from ORB3, ISAE
-SLAM_System: "ORB3"
-
 # --- Gridmap related ---
 half_size_local_map: 20.0 # size of the entire local map. The individual maps will be stitched in this space.
 grid_center_x: 0.0

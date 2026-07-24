@@ -27,7 +27,7 @@ namespace traversability_mapping
         std::lock_guard<std::recursive_mutex> lock(bufferMutex_);
         auto pair = std::make_pair(timestamp, pointCloud);
         buffer_.push_back(pair);
-        if(abs(buffer_.front().first - buffer_.back().first) > 25.0)
+        if(std::abs(buffer_.front().first - buffer_.back().first) > 25.0)
         {
             deletePointsBefore(timestamp - 5.0);
         }
@@ -68,12 +68,5 @@ namespace traversability_mapping
         {
             buffer_.pop_front();
         }
-
-        // buffer_.erase(std::remove_if(buffer_.begin(), buffer_.end(),
-        //                              [&query_time](const auto &entry)
-        //                              {
-        //                                  return entry.first < query_time;
-        //                              }),
-        //               buffer_.end());
     }
 }

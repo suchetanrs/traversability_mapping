@@ -18,12 +18,12 @@
 #include <chrono>
 #include <iostream>
 #include <mutex>
+
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
+
 #include "traversability_mapping/Helpers.hpp"
 #include "traversability_mapping_common/type_conversion.hpp"
-
-using namespace std::chrono_literals;
 
 namespace traversability_mapping
 {
@@ -48,4 +48,4 @@ namespace traversability_mapping
     };
 }
 
-#endif // POINTCLOUDBUFFER_HPP_
+#endif // POINTCLOUDBUFFERROS_HPP_

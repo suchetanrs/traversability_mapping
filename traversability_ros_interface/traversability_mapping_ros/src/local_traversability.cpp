@@ -57,7 +57,7 @@ public:
         this->get_parameter("parameter_file_path", parameter_file_path_);
         RCLCPP_INFO_STREAM(this->get_logger(), "Parameter file path: " << parameter_file_path_);
 
-        ParameterHandler::getInstance(parameter_file_path_);
+        traversability_mapping::ParameterHandler::getInstance(parameter_file_path_);
 
         pcl_subscriber_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
             pointcloud_topic_name_, 1, std::bind(&LocalTraversabilityNode::pointCloudCallback, this, std::placeholders::_1));
@@ -106,7 +106,7 @@ private:
         try
         {
             // transformStamped = tf_buffer_ptr_->lookupTransform("odom", static_cast<std::string>(this->get_namespace()).substr(1) + "/map", tf2::TimePointZero);
-            transformStamped = tf_buffer_ptr_->lookupTransform("odom", slam_frame_, tf2::TimePointZero);
+            transformStamped = tf_buffer_ptr_->lookupTransform("map", slam_frame_, tf2::TimePointZero);
         }
         catch (tf2::TransformException &ex)
         {
@@ -141,6 +141,10 @@ private:
             if (publish_local_gridmap_)
             {
                 auto message = *grid_map::GridMapRosConverter::toMessage(*pGridMap_);
+                message.info.pose.position.x = transformStamped.transform.translation.x - parameterInstance.getValue<double>("half_size_traversability");
+                message.info.pose.position.y = transformStamped.transform.translation.y - parameterInstance.getValue<double>("half_size_traversability");
+                message.header.frame_id = "odom";
+                message.header.stamp = msg->header.stamp;
                 traversabilityPub_->publish(message);
             }
             keyframe_->clearStrayValuesInGrid();

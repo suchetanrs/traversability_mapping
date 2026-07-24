@@ -31,17 +31,6 @@ namespace traversability_mapping
           Tsv_(Tsv),
           Tsb_(Tbs.inverse())
     {
-        // TODO: Make this a parameter
-        // auto translation = Eigen::Translation3f(
-        //     static_cast<float>(0.527),
-        //     static_cast<float>(0.0),
-        //     static_cast<float>(0.662));
-        // auto quaternion = Eigen::Quaternion<float>(
-        //     static_cast<float>(0.924), // w
-        //     static_cast<float>(0.0),   // x
-        //     static_cast<float>(0.381), // y
-        //     static_cast<float>(0.0));  // z
-        // Tsv_ = translation * quaternion;
         numConnections_ = 0;
     }
 

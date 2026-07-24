@@ -316,7 +316,7 @@ namespace traversability_mapping
                 }
                 auto kfPtr = mLocalKeyFrames_.back();
                 mLocalKeyFrames_.pop_back();
-                if (mLocalKeyFrames_.size() > parameterInstance.getValue<double>("num_local_keyframes"))
+                if (mLocalKeyFrames_.size() > static_cast<size_t>(parameterInstance.getValue<int>("num_local_keyframes")))
                 {
                     // Remove the oldest element
                     mLocalKeyFrames_.pop_front();
@@ -479,14 +479,7 @@ namespace traversability_mapping
 
                 // std::cout << "NEW CONVERSION!" << std::endl;
 
-                if (parameterInstance.getValue<std::string>("SLAM_System") == "ORB3")
-                {
-                    kfPtrToUpdate->setPose(typeConversion_->se3ToAffine<Eigen::Affine3f>(kfPoseToUpdate.pose, true));
-                }
-                else if (parameterInstance.getValue<std::string>("SLAM_System") == "ISAE")
-                {
-                    kfPtrToUpdate->setPose(typeConversion_->se3ToAffine<Eigen::Affine3f>(kfPoseToUpdate.pose, false));
-                }
+                kfPtrToUpdate->setPose(typeConversion_->se3ToAffine<Eigen::Affine3f>(kfPoseToUpdate.pose, false));
             }
         }
     }
