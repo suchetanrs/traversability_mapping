@@ -275,17 +275,16 @@ TEST(Goodness, EmptyQueryReturnsAllNaN)
     EXPECT_TRUE(std::isnan(haz[tmap::HAZ_SLOPE]));
 }
 
-TEST(Goodness, ElevationAvailableEvenWhenGated)
+TEST(Goodness, ElevationGatedWhenBorder)
 {
-    // Elevation comes from the query cell's own centroid and must be reported
-    // even when the vicinity gates reject the cell (BORDER == 1).
+    // Elevation is written only past the fit gate, so a rejected (border) cell
+    // reports NaN elevation just like the other hazards.
     Lattice lat(0.0, 0.0, 0.25);
     auto cells = sampleField(lat, 0, 0, [](double, double) { return 2.0; });
     std::vector<CellMoment> sparse = {cells[4], cells[0]};  // 22% occupied < 50%
     auto haz = computeGoodness(cells[4], sparse, 9, 0.15, 0.4, 15);
     EXPECT_EQ(haz[tmap::HAZ_BORDER], 1.0);
-    EXPECT_FALSE(std::isnan(haz[tmap::HAZ_ELEVATION]));
-    EXPECT_NEAR(haz[tmap::HAZ_ELEVATION], 2.0, 1e-2);
+    EXPECT_TRUE(std::isnan(haz[tmap::HAZ_ELEVATION]));
 }
 
 TEST(Goodness, InsufficientVicinityPointsGate)
@@ -299,8 +298,8 @@ TEST(Goodness, InsufficientVicinityPointsGate)
     // border_haz scales the query's own count against the demand (20 / 100000).
     EXPECT_NEAR(haz[tmap::HAZ_BORDER], 20.0 / 100000.0, 1e-9);
     EXPECT_TRUE(std::isnan(haz[tmap::HAZ_OVERALL]));
-    // Elevation is still available (set before the gates).
-    EXPECT_FALSE(std::isnan(haz[tmap::HAZ_ELEVATION]));
+    // Elevation is gated with the fit, so it is NaN here too.
+    EXPECT_TRUE(std::isnan(haz[tmap::HAZ_ELEVATION]));
 }
 
 TEST(Goodness, FlatNormalPointsUp)

@@ -64,8 +64,9 @@ namespace traversability_mapping
      *                            the saturation count for HAZ_BORDER.
      * @return the ::HAZ_COUNT hazard values. HAZ_BORDER is the query cell's density
      *         completeness min(N / min_points_per_grid, 1): 1.0 == enough data, a
-     *         fraction when sparse, NaN when the query cell is unobserved. The fitted
-     *         metrics are NaN whenever the vicinity fails the point-count gate.
+     *         fraction when sparse, NaN when the query cell is unobserved. Every other
+     *         component (elevation and the fitted metrics) is NaN whenever the vicinity
+     *         fails the point-count gate.
      */
     std::array<double, HAZ_COUNT> computeGoodness(
         const CellMoment &query,

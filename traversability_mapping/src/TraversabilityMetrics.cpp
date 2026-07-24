@@ -34,11 +34,6 @@ namespace traversability_mapping
         if (query.data.N < 1)
             return haz;
 
-        // Elevation is the query cell's own centroid height (map frame). It is
-        // available whenever the cell has points, independent of the gates.
-        haz[HAZ_ELEVATION] = query.data.sz / static_cast<double>(query.data.N)
-                             + query.center.z();
-
         // border_haz reports the query cell's point-density completeness: it scales
         // linearly from 0 (empty) up to 1.0 once the cell carries the required minimum,
         // then saturates. Note the polarity: 1.0 means the cell HAS enough data, not
@@ -64,6 +59,11 @@ namespace traversability_mapping
         }
         if (border)
             return haz;
+
+        // Elevation is the query cell's own centroid height (map frame). Written only
+        // past the gate, so a border cell reports no elevation (like the other hazards).
+        haz[HAZ_ELEVATION] = query.data.sz / static_cast<double>(query.data.N)
+                             + query.center.z();
 
         // Fuse the vicinity moments, re-expressing each cell about the query
         // cell centre (common origin) so the raw moments add cleanly.
