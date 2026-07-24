@@ -57,6 +57,12 @@ ParameterHandler::ParameterHandler(std::string yaml_file_path)
     parameter_map_["mapping/num_local_keyframes"] = loaded_node["mapping/num_local_keyframes"].as<int>();
     parameter_map_["mapping/global_adjustment_sleep"] = loaded_node["mapping/global_adjustment_sleep"].as<int>();
 
+    // --- Inflation (Nav2-style step-hazard buffer) ---
+    parameter_map_["inflation/enabled"] = loaded_node["inflation/enabled"].as<bool>();
+    parameter_map_["inflation/inflation_radius"] = loaded_node["inflation/inflation_radius"].as<double>();
+    parameter_map_["inflation/cost_scaling_factor"] = loaded_node["inflation/cost_scaling_factor"].as<double>();
+    parameter_map_["inflation/lethal_step_threshold"] = loaded_node["inflation/lethal_step_threshold"].as<double>();
+
     // --- Ingestion (cloud filtering + buffering) ---
     parameter_map_["ingestion/robot_height"] = loaded_node["ingestion/robot_height"].as<double>();
     parameter_map_["ingestion/max_range_base_frame"] = loaded_node["ingestion/max_range_base_frame"].as<double>();

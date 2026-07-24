@@ -66,6 +66,10 @@ traversability/min_occupied_fraction: 0.5
 mapping/is_kf_optimization_enabled: true
 mapping/num_local_keyframes: 10
 mapping/global_adjustment_sleep: 0
+inflation/enabled: false
+inflation/inflation_radius: 0.5
+inflation/cost_scaling_factor: 3.0
+inflation/lethal_step_threshold: 0.95
 ingestion/robot_height: 3.5
 ingestion/max_range_base_frame: 300.0
 ingestion/min_range_base_frame: 1.0

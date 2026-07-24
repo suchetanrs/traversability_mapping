@@ -147,6 +147,12 @@ namespace traversability_mapping
         /// @brief Recompute every cell in @p dirty, recording those that changed.
         /// @param dirty cell ids to recompute.
         void recomputeDirty(const std::unordered_set<std::uint64_t> &dirty);
+        /// @brief Nav2-style inflation of the step hazard over @p dirty dilated by the
+        ///        inflation radius: each observed cell gets max over its kernel of a
+        ///        seed's (step_haz >= threshold) value times an exponential distance decay.
+        ///        Reads step_haz, writes step_haz_inflated; changed cells are recorded.
+        /// @param dirty cells just recomputed (the inflation window is this set dilated).
+        void inflateDirty(const std::unordered_set<std::uint64_t> &dirty);
         /// @}
 
         /// @brief Per-keyframe op: subtract old, rebin at @p pose, add, recompute hazards.
@@ -175,6 +181,18 @@ namespace traversability_mapping
         std::vector<std::pair<int, int>> discOffsets_;       ///< footprint as cell offsets; the fit vicinity
         int globalSleepMs_;
         bool kfOptimizationEnabled_;
+
+        /// @name Step-hazard inflation (Nav2-style), config set once in the ctor
+        /// @{
+        bool inflationEnabled_ = false;
+        double inflationRadius_;        ///< kernel extent (m)
+        double costScalingFactor_;      ///< exponential decay rate (1/m)
+        double lethalStepThreshold_;    ///< normalised step_haz at/above which a cell seeds inflation
+        /// (di, dj, decay) offsets within inflationRadius_; decay = exp(-costScaling*dist_m).
+        struct InflationTap { int di, dj; float decay; };
+        std::vector<InflationTap> inflationKernel_;
+        std::vector<std::pair<int, int>> inflationOffsets_;  ///< kernel footprint, for the window dilation
+        /// @}
         std::function<void()> onUpdate_;        ///< fired after each grid-changing keyframe op
         std::vector<std::string> layers_;       ///< all internal layers (moments + derived)
         /// @}

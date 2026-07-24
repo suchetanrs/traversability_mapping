@@ -159,7 +159,7 @@ private:
     // The grid layers published in the debug grid_map (occupancy uses "hazard").
     const std::vector<std::string> navLayers_ = {
         "normal_x", "normal_y", "normal_z", "slope_haz",
-        "step_haz", "elevation", "roughness_haz", "hazard"};
+        "step_haz", "elevation", "roughness_haz", "hazard", "step_haz_inflated"};
 
     std::shared_ptr<tmap::System> system_;
     rclcpp::Publisher<grid_map_msgs::msg::GridMap>::SharedPtr gridmap_pub_;

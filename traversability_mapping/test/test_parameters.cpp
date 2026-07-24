@@ -40,6 +40,10 @@ traversability/min_occupied_fraction: 0.5
 mapping/is_kf_optimization_enabled: true
 mapping/num_local_keyframes: 10
 mapping/global_adjustment_sleep: 0
+inflation/enabled: false
+inflation/inflation_radius: 0.5
+inflation/cost_scaling_factor: 3.0
+inflation/lethal_step_threshold: 0.95
 node/publish_rate_hz: 1.0
 )yaml";
 
@@ -53,7 +57,7 @@ node/publish_rate_hz: 1.0
         return path;
     }
 
-    // The 19 keys the YAML / constructor define.
+    // The 23 keys the YAML / constructor define.
     const std::set<std::string> kExpectedKeys = {
         "grid/resolution_local_map", "grid/grid_center_x", "grid/grid_center_y",
         "ingestion/robot_height", "ingestion/max_range_base_frame", "ingestion/min_range_base_frame",
@@ -62,7 +66,9 @@ node/publish_rate_hz: 1.0
         "traversability/robot_radius", "traversability/ground_clearance", "traversability/max_slope",
         "traversability/min_vicinity_points", "traversability/min_occupied_fraction",
         "mapping/is_kf_optimization_enabled", "mapping/num_local_keyframes",
-        "mapping/global_adjustment_sleep", "node/publish_rate_hz"};
+        "mapping/global_adjustment_sleep",
+        "inflation/enabled", "inflation/inflation_radius", "inflation/cost_scaling_factor",
+        "inflation/lethal_step_threshold", "node/publish_rate_hz"};
 }  // namespace
 
 // --- Loading + typed get ----------------------------------------------------

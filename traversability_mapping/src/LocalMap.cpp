@@ -49,9 +49,27 @@ namespace traversability_mapping
         globalSleepMs_ = parameterInstance.getValue<int>("mapping/global_adjustment_sleep");
         kfOptimizationEnabled_ = parameterInstance.getValue<bool>("mapping/is_kf_optimization_enabled");
 
+        // Step-hazard inflation (Nav2-style). Kernel is precomputed once: the disc of
+        // offsets within inflationRadius_, each carrying an exponential distance decay.
+        inflationEnabled_ = parameterInstance.getValue<bool>("inflation/enabled");
+        inflationRadius_ = parameterInstance.getValue<double>("inflation/inflation_radius");
+        costScalingFactor_ = parameterInstance.getValue<double>("inflation/cost_scaling_factor");
+        lethalStepThreshold_ = parameterInstance.getValue<double>("inflation/lethal_step_threshold");
+        if (inflationEnabled_)
+        {
+            inflationOffsets_ = discOffsets(inflationRadius_, res_);
+            inflationKernel_.reserve(inflationOffsets_.size());
+            for (const auto &o : inflationOffsets_)
+            {
+                const double dist_m = std::hypot(o.first, o.second) * res_;
+                const float decay = static_cast<float>(std::exp(-costScalingFactor_ * dist_m));
+                inflationKernel_.push_back({o.first, o.second, decay});
+            }
+        }
+
         layers_ = {"N", "sx", "sy", "sz", "sx2", "sy2", "sz2", "sxy", "sxz", "syz",
                    "hazard", "elevation", "slope_haz", "step_haz", "roughness_haz",
-                   "normal_x", "normal_y", "normal_z"};
+                   "normal_x", "normal_y", "normal_z", "step_haz_inflated"};
 
         const double half = parameterInstance.getValue<double>("grid/half_size_traversability");
         gridMap_ = makeGridMap(layers_, frameId_, lattice_, res_, half, half);
@@ -172,6 +190,50 @@ namespace traversability_mapping
         for (auto id : dirty)
             if (recomputeCell(id, layers))
                 changedCells_.insert(id);
+        if (inflationEnabled_)
+            inflateDirty(dirty);
+    }
+
+    void LocalMap::inflateDirty(const std::unordered_set<std::uint64_t> &dirty)
+    {
+        // Cells whose inflated value can have changed = the recomputed set dilated by the
+        // inflation radius (a seed at the edge of `dirty` reaches this far). Correct on both
+        // add and delete: the removed/added seed is in `dirty`, so every cell it can affect
+        // is covered and re-derived purely from the current step_haz field.
+        const std::unordered_set<std::uint64_t> window = dilate(dirty, inflationOffsets_);
+        grid_map::Matrix &N = gridMap_["N"];
+        grid_map::Matrix &step = gridMap_["step_haz"];
+        grid_map::Matrix &infl = gridMap_["step_haz_inflated"];
+        const float lethal = static_cast<float>(lethalStepThreshold_);
+
+        for (auto id : window)
+        {
+            int ci, cj;
+            Lattice::unkey(id, ci, cj);
+            grid_map::Index wi;
+            if (!gridMap_.getIndex(cellPos(lattice_, ci, cj), wi))
+                continue;
+            if (!(N(wi(0), wi(1)) >= 1.f))
+                continue;  // observed cells only (occupiedCellKeys keys off N>=1)
+
+            float best = 0.f;
+            for (const auto &k : inflationKernel_)
+            {
+                grid_map::Index sidx;
+                if (!gridMap_.getIndex(cellPos(lattice_, ci + k.di, cj + k.dj), sidx))
+                    continue;
+                const float sv = step(sidx(0), sidx(1));
+                if (sv >= lethal)                       // NaN compares false -> not a seed
+                    best = std::max(best, sv * k.decay);
+            }
+
+            float &cur = infl(wi(0), wi(1));
+            if (!(cur == best))  // includes the NaN->value first write
+            {
+                cur = best;
+                changedCells_.insert(id);
+            }
+        }
     }
 
     // ---- per-keyframe
