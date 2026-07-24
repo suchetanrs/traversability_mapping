@@ -99,7 +99,7 @@ private:
             auto Tmv = Tms_ * Tsv_;
             auto Tmb = Tms_ * Tbs_.inverse();
             pcl::PointCloud<pcl::PointXYZ> pointCloudCorrected_;
-            traversability_mapping::doTransformPCL(pointcloudInput, pointCloudCorrected_, Tmv);
+            pcl::transformPointCloud(pointcloudInput, pointCloudCorrected_, Tmv);
 
             keyframe_->computeLocalTraversability(pointCloudCorrected_, Tmb); // Assuming keyframe_ is a shared pointer to your KeyFrame object
 

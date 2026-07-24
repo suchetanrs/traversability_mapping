@@ -10,6 +10,7 @@
  * License along with this library.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
+
 #include <traversability_mapping/Parameters.hpp>
 
 namespace traversability_mapping
@@ -34,30 +35,55 @@ ParameterHandler::ParameterHandler(std::string yaml_file_path)
     }
     YAML::Node loaded_node = YAML::LoadFile(yaml_path);
 
-    // --- Global grid / fixed lattice ---
-    parameter_map_["resolution_local_map"] = loaded_node["resolution_local_map"].as<double>();
-    parameter_map_["grid_center_x"] = loaded_node["grid_center_x"].as<double>();
-    parameter_map_["grid_center_y"] = loaded_node["grid_center_y"].as<double>();
-    parameter_map_["half_size_traversability"] = loaded_node["half_size_traversability"].as<double>();
-    parameter_map_["extend_length_every_resize_by"] = loaded_node["extend_length_every_resize_by"].as<double>();
+    // The key string is the single source of
+    // truth shared by the YAML, this map, every getValue, and the ROS param.
 
-    // --- Traversability ---
-    parameter_map_["security_distance"] = loaded_node["security_distance"].as<double>();
-    parameter_map_["ground_clearance"] = loaded_node["ground_clearance"].as<double>();
-    parameter_map_["max_slope"] = loaded_node["max_slope"].as<double>();
-    parameter_map_["robot_height"] = loaded_node["robot_height"].as<double>();
-    parameter_map_["max_range_base_frame"] = loaded_node["max_range_base_frame"].as<double>();
-    parameter_map_["min_range_base_frame"] = loaded_node["min_range_base_frame"].as<double>();
+    // --- Global grid geometry ---
+    parameter_map_["grid/resolution_local_map"] = loaded_node["grid/resolution_local_map"].as<double>();
+    parameter_map_["grid/grid_center_x"] = loaded_node["grid/grid_center_x"].as<double>();
+    parameter_map_["grid/grid_center_y"] = loaded_node["grid/grid_center_y"].as<double>();
+    parameter_map_["grid/half_size_traversability"] = loaded_node["grid/half_size_traversability"].as<double>();
+    parameter_map_["grid/extend_length_every_resize_by"] = loaded_node["grid/extend_length_every_resize_by"].as<double>();
 
-    // --- Plane-fit gates ---
-    parameter_map_["min_vicinity_points"] = loaded_node["min_vicinity_points"].as<int>();
-    parameter_map_["min_occupied_fraction"] = loaded_node["min_occupied_fraction"].as<double>();
+    // --- Traversability (per-cell hazard metric) ---
+    parameter_map_["traversability/robot_radius"] = loaded_node["traversability/robot_radius"].as<double>();
+    parameter_map_["traversability/ground_clearance"] = loaded_node["traversability/ground_clearance"].as<double>();
+    parameter_map_["traversability/max_slope"] = loaded_node["traversability/max_slope"].as<double>();
+    parameter_map_["traversability/min_vicinity_points"] = loaded_node["traversability/min_vicinity_points"].as<int>();
+    parameter_map_["traversability/min_occupied_fraction"] = loaded_node["traversability/min_occupied_fraction"].as<double>();
 
-    // --- Publishing ---
-    parameter_map_["publish_rate_hz"] = loaded_node["publish_rate_hz"].as<double>();
+    // --- Mapping (keyframe retention + worker scheduling) ---
+    parameter_map_["mapping/is_kf_optimization_enabled"] = loaded_node["mapping/is_kf_optimization_enabled"].as<bool>();
+    parameter_map_["mapping/num_local_keyframes"] = loaded_node["mapping/num_local_keyframes"].as<int>();
+    parameter_map_["mapping/global_adjustment_sleep"] = loaded_node["mapping/global_adjustment_sleep"].as<int>();
 
-    // --- Mapping (cloud retention; used once true re-binning lands) ---
-    parameter_map_["is_kf_optimization_enabled"] = loaded_node["is_kf_optimization_enabled"].as<bool>();
+    // --- Ingestion (cloud filtering + buffering) ---
+    parameter_map_["ingestion/robot_height"] = loaded_node["ingestion/robot_height"].as<double>();
+    parameter_map_["ingestion/max_range_base_frame"] = loaded_node["ingestion/max_range_base_frame"].as<double>();
+    parameter_map_["ingestion/min_range_base_frame"] = loaded_node["ingestion/min_range_base_frame"].as<double>();
+    parameter_map_["ingestion/use_pointcloud_buffer"] = loaded_node["ingestion/use_pointcloud_buffer"].as<bool>();
+    parameter_map_["ingestion/use_ros_buffer"] = loaded_node["ingestion/use_ros_buffer"].as<bool>();
+
+    // --- Publishing (node) ---
+    parameter_map_["node/publish_rate_hz"] = loaded_node["node/publish_rate_hz"].as<double>();
 }
 
+std::vector<std::string> ParameterHandler::keys() const
+{
+    std::lock_guard<std::mutex> lock(mapMutex_);
+    std::vector<std::string> out;
+    out.reserve(parameter_map_.size());
+    for (const auto &kv : parameter_map_)
+        out.push_back(kv.first);
+    return out;
+}
+
+const std::type_info& ParameterHandler::typeOf(const std::string& parameterKey) const
+{
+    std::lock_guard<std::mutex> lock(mapMutex_);
+    auto it = parameter_map_.find(parameterKey);
+    if (it == parameter_map_.end())
+        throw std::runtime_error("Parameter " + parameterKey + " is not found in the map");
+    return it->second.type();
+}
 } // namespace traversability_mapping

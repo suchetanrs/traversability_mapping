@@ -10,68 +10,103 @@
  * License along with this library.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
+
 #ifndef KEYFRAME_HPP_
 #define KEYFRAME_HPP_
 
-// Lean, ROS-free keyframe record for the moment-fused global map.
-//
-// A keyframe owns:
-//   * its latest (post-PGO) pose (map <- base_footprint),
-//   * its pruned raw cloud in the ROBOT BASE frame (pose-invariant, rigidly
-//     attached to the robot, so it stays valid across any pose correction),
-//   * the per-cell moments it currently contributes to the global grid, keyed by
-//     ABSOLUTE lattice cell id.
-//
-// The partition is NOT frozen. On a PGO pose correction the node re-transforms
-// the stored base-frame cloud by the new pose and RE-BINS from scratch via
-// rebin(): the cell membership is recomputed each time (handles both relabel and
-// split exactly), regardless of how small the pose change is. The partials' keys
-// ARE the "list of cells it wrote to" (set M) and are used by the node to
-// subtract the keyframe's previous contribution before re-adding the new one.
-//
-// The node owns the global grid_map and performs all grid arithmetic; the
-// keyframe never touches the grid directly. The keyframe is kept PCL-free
-// (Eigen only) so it can be unit-tested in isolation.
 
 #include <cstdint>
 #include <unordered_map>
 #include <vector>
+#include <mutex>
 #include <Eigen/Geometry>
 
 #include "traversability_mapping/Moments.hpp"
 
 namespace traversability_mapping
 {
+    /**
+     * @brief A single keyframe: its pose, its retained base-frame cloud, and its
+     *        per-cell moment contribution to the global grid.
+     *
+     * The partition is not frozen: on a PGO pose correction the stored base-frame cloud
+     * is re-transformed and re-binned from scratch via rebin(). The owner (System /
+     * LocalMap) performs all grid arithmetic; the keyframe never touches the grid and is
+     * kept PCL-free (Eigen only) so it can be unit-tested in isolation.
+     */
     class KeyFrame
     {
     public:
-        /// `cloud_base` is the already-pruned cloud expressed in the robot base
-        /// frame; it is moved in and retained for re-binning under PGO.
-        KeyFrame(std::uint64_t id, const Eigen::Affine3f &Tm_base,
-                 std::vector<Eigen::Vector3f> &&cloud_base);
+        /// @brief Primary constructor.
+        /// @param kfID unique keyframe id. @param timestamp acquisition time (s).
+        /// @param Tm_base initial pose (map <- base_footprint).
+        /// @param cloudBase already-pruned base-frame cloud, moved in and retained for re-binning.
+        /// @param parentMapID map this keyframe currently belongs to.
+        KeyFrame(std::uint64_t kfID, double timestamp, const Eigen::Affine3f &Tm_base,
+                 std::vector<Eigen::Vector3f> &&cloudBase, std::uint64_t parentMapID = 0);
 
-        std::uint64_t id() const { return id_; }
+        /// @brief Convenience overload (timestamp = 0, parentMapID = 0); prefer the primary ctor.
+        /// @param kfID unique keyframe id. @param Tm_base initial pose. @param cloudBase base-frame cloud.
+        KeyFrame(std::uint64_t kfID, const Eigen::Affine3f &Tm_base,
+                 std::vector<Eigen::Vector3f> &&cloudBase);
 
-        const Eigen::Affine3f &pose() const { return pose_; }
-        /// Cheap, non-blocking. Does NOT re-bin; call rebin() explicitly after.
+        /// @brief Unique keyframe id.
+        const std::uint64_t &getKfID() const { return kfID_; }
+        /// @brief Acquisition time (seconds).
+        const double &getTimestamp() const { return timestamp_; }
+
+        /// @brief Record a new parent map id (moving partials between grids is the caller's job).
+        /// @param parentMapID new owning map id.
+        void setMap(std::uint64_t parentMapID) { parentMapID_ = parentMapID; }
+
+        /// @brief Store the newest pose and flag the keyframe as needing a rebin.
+        /// @param p new pose (map <- base_footprint). Non-blocking, thread-safe against getPendingPose.
         void setPose(const Eigen::Affine3f &p);
 
-        /// (Re)compute this keyframe's contribution: transform the stored
-        /// base-frame cloud by the current pose, bin into cell-local moments on
-        /// `lattice` (origin at each cell's centre, z about 0), and REPLACE the
-        /// partials. Clears any previous partials first.
-        void rebin(const Lattice &lattice);
+        /// @brief Consume the pending pose, if any.
+        /// @param out [out] receives the pending pose when true.
+        /// @return true if a pose was pending (flag cleared); false otherwise.
+        bool getPendingPose(Eigen::Affine3f &out);
 
+        /// @brief Latest known pose (map <- base_footprint).
+        /// @return a non-blocking copy of the pose.
+        Eigen::Affine3f getPose() const;
+
+        /// @brief Re-bin the base-frame cloud at @p pose into cell-local moments, replacing the partials.
+        /// @param lattice cell lattice to bin onto. @param pose pose to transform the cloud by.
+        void rebin(const Lattice &lattice, const Eigen::Affine3f &pose);
+
+        /// @brief Mutable per-cell moments (cellId -> cell-local moments).
         std::unordered_map<std::uint64_t, NodeMetaData> &partials() { return partials_; }
+        /// @brief Read-only per-cell moments.
         const std::unordered_map<std::uint64_t, NodeMetaData> &partials() const { return partials_; }
 
-        bool empty() const { return partials_.empty(); }
+        /// @brief Retained pruned cloud in the robot base frame (empty once dropped).
+        const std::vector<Eigen::Vector3f> &cloudBase() const { return cloudBase_; }
+
+        /// @brief Whether the base-frame cloud is still retained (false disables re-binning).
+        bool hasCloud() const { return !cloudBase_.empty(); }
+        /// @brief Drop the retained cloud to reclaim memory (the keyframe can no longer be re-binned).
+        void dropCloud() { cloudBase_.clear(); cloudBase_.shrink_to_fit(); }
 
     private:
-        std::uint64_t id_;
-        Eigen::Affine3f pose_;                                       ///< map <- base_footprint
-        std::vector<Eigen::Vector3f> cloud_base_;                    ///< pruned cloud, base frame
+        /// @name Set once in the constructor; read-only afterwards (no locking needed).
+        /// @{
+        std::uint64_t kfID_;
+        double timestamp_ = 0.0;
+        std::uint64_t parentMapID_ = 0;
+        std::vector<Eigen::Vector3f> cloudBase_;                     ///< pruned cloud, base frame
         std::unordered_map<std::uint64_t, NodeMetaData> partials_;   ///< cellId -> cell-local moments
+        /// @}
+
+        /// @name Pose state machine, guarded by poseMutex_.
+        /// latestPose_ and hasPending_ are written together in setPose and consumed
+        /// together in getPendingPose; "has a pending pose" IS the "needs rebin" signal.
+        /// @{
+        mutable std::mutex poseMutex_;
+        Eigen::Affine3f latestPose_;                                 ///< map <- base_footprint
+        bool hasPending_ = false;                                    ///< latestPose_ awaits a rebin
+        /// @}
     };
 }  // namespace traversability_mapping
 

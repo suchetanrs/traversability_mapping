@@ -24,7 +24,7 @@ find_package(traversability_msgs REQUIRED)
 find_package(Sophus REQUIRED)
 find_package(Eigen3 3.1.0 REQUIRED)
 find_package(traversability_mapping REQUIRED)
-find_package(traversability_mapping_common REQUIRED)
+find_package(message_filters REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(grid_map_core REQUIRED)
 find_package(grid_map_ros REQUIRED)
@@ -36,6 +36,7 @@ find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(PCL REQUIRED)
 find_package(pcl_ros REQUIRED)
+find_package(pcl_conversions REQUIRED)
 find_package(OpenMP)
 ADD_DEFINITIONS("-DWITH_ROS2_SENSOR_MSGS")
 
@@ -47,7 +48,7 @@ set(dependencies
     Sophus
     Eigen3
     traversability_mapping
-    traversability_mapping_common
+    message_filters
     sensor_msgs
     grid_map_core
     grid_map_ros
@@ -59,12 +60,12 @@ set(dependencies
     tf2_geometry_msgs
     PCL
     pcl_ros
+    pcl_conversions
 )
 
 include_directories(
     ${Sophus_INCLUDE_DIRS}
     ${EIGEN3_INCLUDE_DIR}
-    ${traversability_mapping_common_INCLUDE_DIRS}
     ${traversability_mapping_INCLUDE_DIRS}
     ${sensor_msgs_INCLUDE_DIRS}
     ${grid_map_core_INCLUDE_DIRS}
@@ -76,40 +77,49 @@ include_directories(
 # Add executable
 # add_executable(traversability_node src/traversability_node.cpp)
 # ament_target_dependencies(traversability_node ${dependencies})
-# target_link_libraries(traversability_node ${PCL_LIBRARIES} ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem traversability_mapping_common)
+# target_link_libraries(traversability_node ${PCL_LIBRARIES} ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem)
 
 # # Add executable
 # add_executable(multi_map_merge src/multi_map_merge.cpp)
 # ament_target_dependencies(multi_map_merge ${dependencies})
-# target_link_libraries(multi_map_merge ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem traversability_mapping_common)
+# target_link_libraries(multi_map_merge ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem)
 
-# Add executable
-add_executable(local_traversability src/local_traversability.cpp)
+# Add executable (thin adapter node + ROS<->plain-data conversions)
+add_executable(global_traversability src/global_traversability_node.cpp src/conversions.cpp)
+ament_target_dependencies(global_traversability ${dependencies})
+target_link_libraries(global_traversability ${PCL_LIBRARIES} ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem)
+
+# Add executable (local, robot-centered rolling-window variant; same core + conversions)
+add_executable(local_traversability src/local_traversability_node.cpp src/conversions.cpp)
 ament_target_dependencies(local_traversability ${dependencies})
-target_link_libraries(local_traversability ${PCL_LIBRARIES} ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem traversability_mapping_common)
-if(OpenMP_CXX_FOUND)
-    target_link_libraries(local_traversability OpenMP::OpenMP_CXX)
-endif()
+target_link_libraries(local_traversability ${PCL_LIBRARIES} ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem)
+
+# Add executable (one-shot: a single static PLY cloud -> one keyframe -> latched map)
+add_executable(one_shot_traversability src/one_shot_traversability_node.cpp)
+ament_target_dependencies(one_shot_traversability ${dependencies})
+target_link_libraries(one_shot_traversability ${PCL_LIBRARIES} ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem)
 
 # # Add executable
 # add_executable(threshold_occupancy src/threshold_occupancy.cpp)
 # ament_target_dependencies(threshold_occupancy ${dependencies})
-# target_link_libraries(threshold_occupancy ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem traversability_mapping_common)
+# target_link_libraries(threshold_occupancy ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem)
 
 # # Add executable
 # add_executable(virtual_boundary_maker src/virtual_boundary_maker.cpp)
 # ament_target_dependencies(virtual_boundary_maker ${dependencies})
-# target_link_libraries(virtual_boundary_maker ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem traversability_mapping_common)
+# target_link_libraries(virtual_boundary_maker ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem)
 
 # # Add executable
 # add_executable(one_shot_traversability src/one_shot_traversability.cpp)
 # ament_target_dependencies(one_shot_traversability ${dependencies})
-# target_link_libraries(one_shot_traversability ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem traversability_mapping_common)
+# target_link_libraries(one_shot_traversability ${Sophus_LIBRARIES} ${EIGEN3_LIBS} ${grid_map_core_LIBRARIES} ${YAML_CPP_LIBRARIES} traversabilitySystem)
 
 # Install executable 
 install(TARGETS
-    # traversability_node multi_map_merge threshold_occupancy virtual_boundary_maker one_shot_traversability
+    # traversability_node multi_map_merge threshold_occupancy virtual_boundary_maker
+    global_traversability
     local_traversability
+    one_shot_traversability
     DESTINATION lib/${PROJECT_NAME}
 )
 

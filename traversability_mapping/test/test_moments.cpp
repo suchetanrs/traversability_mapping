@@ -33,6 +33,14 @@ namespace
         }
         return c;
     }
+
+    // Sigma = Q/N - mu mu^T. The library derives this inline where it needs it
+    // (computeGoodness); the tests re-derive it here rather than depend on an accessor.
+    Eigen::Matrix3d covarianceOf(const NodeMetaData &m)
+    {
+        const Eigen::Vector3d mu = m.barycenter();
+        return m.Q() / static_cast<double>(m.N) - mu * mu.transpose();
+    }
 }  // namespace
 
 // --- Seam 1: moment algebra --------------------------------------------------
@@ -56,84 +64,103 @@ TEST(Moments, FuseEqualsCombinedInsert)
     EXPECT_NEAR(fused.sz, combined.sz, 1e-9);
 }
 
-TEST(Moments, RemoveIsInverseOfFuse)
+TEST(Moments, ResetClearsAllMoments)
 {
-    NodeMetaData total, part;
-    std::mt19937 rng(7);
-    std::uniform_real_distribution<double> u(-0.1, 0.1);
-    for (int i = 0; i < 50; ++i) total.insert(u(rng), u(rng), u(rng));
-    for (int i = 0; i < 20; ++i) { double x=u(rng),y=u(rng),z=u(rng); total.insert(x,y,z); part.insert(x,y,z); }
-    NodeMetaData backed = total;
-    backed.removeWith(part);
-    // backed should equal total-before-part: re-derive
-    NodeMetaData expect;
-    // recompute expect by replaying first 50 only is messy; instead check
-    // fuse(remove) round trip:
-    NodeMetaData rt = backed;
-    rt.fuseWith(part);
-    EXPECT_EQ(rt.N, total.N);
-    EXPECT_NEAR(rt.sx2, total.sx2, 1e-9);
-    EXPECT_NEAR(rt.syz, total.syz, 1e-9);
+    NodeMetaData m;
+    for (int i = 0; i < 10; ++i) m.insert(0.1 * i, -0.2 * i, 0.3 * i);
+    ASSERT_EQ(m.N, 10u);
+    m.reset();
+    EXPECT_EQ(m.N, 0u);
+    EXPECT_EQ(m.sx, 0.0);
+    EXPECT_EQ(m.sy, 0.0);
+    EXPECT_EQ(m.sz, 0.0);
+    EXPECT_EQ(m.sx2, 0.0);
+    EXPECT_EQ(m.sy2, 0.0);
+    EXPECT_EQ(m.sz2, 0.0);
+    EXPECT_EQ(m.sxy, 0.0);
+    EXPECT_EQ(m.sxz, 0.0);
+    EXPECT_EQ(m.syz, 0.0);
 }
 
-TEST(Moments, CovarianceIsTranslationInvariant)
+TEST(Moments, BarycenterIsMeanOfPoints)
 {
-    // Covariance must not depend on the local origin choice.
     std::vector<Eigen::Vector3d> pts;
-    std::mt19937 rng(1);
+    std::mt19937 rng(13);
     std::uniform_real_distribution<double> u(-0.5, 0.5);
-    for (int i = 0; i < 200; ++i) pts.emplace_back(u(rng), u(rng), 0.01 * u(rng));
+    Eigen::Vector3d sum = Eigen::Vector3d::Zero();
+    NodeMetaData m;
+    for (int i = 0; i < 100; ++i)
+    {
+        Eigen::Vector3d p(u(rng), u(rng), u(rng));
+        m.insert(p.x(), p.y(), p.z());
+        sum += p;
+    }
+    Eigen::Vector3d expected = sum / 100.0;
+    EXPECT_TRUE(m.barycenter().isApprox(expected, 1e-12));
+}
 
-    NodeMetaData m1, m2;
-    Eigen::Vector3d o2(5.0, -3.0, 2.0);
+TEST(Moments, ShiftReExpressesAboutNewOrigin)
+{
+    // Two cells store the same points about DIFFERENT local origins. After
+    // shifting cell B into cell A's origin, the two must describe the same
+    // points: barycenters coincide (in A's frame) and covariance is unchanged.
+    std::vector<Eigen::Vector3d> pts;
+    std::mt19937 rng(17);
+    std::uniform_real_distribution<double> u(-0.3, 0.3);
+    for (int i = 0; i < 150; ++i) pts.emplace_back(u(rng), u(rng), u(rng));
+
+    const Eigen::Vector3d originA(1.0, 2.0, 0.0);
+    const Eigen::Vector3d originB(1.25, 2.0, 0.0);  // one cell over in x
+
+    NodeMetaData a, b;
     for (const auto &p : pts)
     {
-        m1.insert(p.x(), p.y(), p.z());
-        Eigen::Vector3d q = p - o2;
-        m2.insert(q.x(), q.y(), q.z());
+        Eigen::Vector3d qa = p - originA;
+        Eigen::Vector3d qb = p - originB;
+        a.insert(qa.x(), qa.y(), qa.z());
+        b.insert(qb.x(), qb.y(), qb.z());
     }
-    EXPECT_TRUE(m1.covariance().isApprox(m2.covariance(), 1e-9));
+
+    // Bring b from its own origin into a's origin: local coords gain (originB - originA).
+    b.shift(originB - originA);
+
+    EXPECT_TRUE(a.barycenter().isApprox(b.barycenter(), 1e-12));
+    EXPECT_TRUE(covarianceOf(a).isApprox(covarianceOf(b), 1e-12));
 }
 
-TEST(Moments, CovarianceEigenvaluesRotationInvariant)
+TEST(Moments, ShiftedCellsFuseAsCombinedInsert)
 {
-    std::vector<Eigen::Vector3d> pts;
-    std::mt19937 rng(2);
-    std::uniform_real_distribution<double> u(-0.5, 0.5);
-    for (int i = 0; i < 300; ++i) pts.emplace_back(u(rng), u(rng), 0.05 * u(rng));
+    // The reason shift exists: fuse neighbouring cells (each about their own
+    // centre) by re-expressing them about a common origin first. The result
+    // must equal inserting all points directly about that common origin.
+    std::vector<Eigen::Vector3d> ptsA, ptsB;
+    std::mt19937 rng(19);
+    std::uniform_real_distribution<double> u(-0.3, 0.3);
+    for (int i = 0; i < 60; ++i) ptsA.emplace_back(u(rng), u(rng), u(rng));
+    for (int i = 0; i < 40; ++i) ptsB.emplace_back(2.0 + u(rng), u(rng), u(rng));
 
-    NodeMetaData m;
-    for (const auto &p : pts) m.insert(p.x(), p.y(), p.z());
-    Eigen::Vector3d ev_before = m.covariance().selfadjointView<Eigen::Lower>().eigenvalues();
+    const Eigen::Vector3d originA(0.0, 0.0, 0.0);
+    const Eigen::Vector3d originB(2.0, 0.0, 0.0);
 
-    Eigen::Matrix3d R = Eigen::AngleAxisd(0.7, Eigen::Vector3d(0.2, 0.5, 0.84).normalized()).toRotationMatrix();
-    m.transform(R, Eigen::Vector3d(1.0, 2.0, 3.0));
-    Eigen::Vector3d ev_after = m.covariance().selfadjointView<Eigen::Lower>().eigenvalues();
+    NodeMetaData a, b;
+    for (const auto &p : ptsA) { Eigen::Vector3d q = p - originA; a.insert(q.x(), q.y(), q.z()); }
+    for (const auto &p : ptsB) { Eigen::Vector3d q = p - originB; b.insert(q.x(), q.y(), q.z()); }
 
-    EXPECT_TRUE(ev_before.isApprox(ev_after, 1e-7));
-}
+    // Fuse about A's origin.
+    b.shift(originB - originA);
+    NodeMetaData fused = a;
+    fused.fuseWith(b);
 
-TEST(Moments, TransformMatchesDirectPointTransform)
-{
-    std::vector<Eigen::Vector3d> pts;
-    std::mt19937 rng(3);
-    std::uniform_real_distribution<double> u(-0.5, 0.5);
-    for (int i = 0; i < 100; ++i) pts.emplace_back(u(rng), u(rng), u(rng));
+    NodeMetaData combined;
+    for (const auto &p : ptsA) { Eigen::Vector3d q = p - originA; combined.insert(q.x(), q.y(), q.z()); }
+    for (const auto &p : ptsB) { Eigen::Vector3d q = p - originA; combined.insert(q.x(), q.y(), q.z()); }
 
-    Eigen::Matrix3d R = Eigen::AngleAxisd(0.3, Eigen::Vector3d::UnitX()).toRotationMatrix();
-    Eigen::Vector3d t(0.4, -0.2, 1.1);
-
-    NodeMetaData viaMoments;
-    for (const auto &p : pts) viaMoments.insert(p.x(), p.y(), p.z());
-    viaMoments.transform(R, t);
-
-    NodeMetaData viaPoints;
-    for (const auto &p : pts) { Eigen::Vector3d q = R * p + t; viaPoints.insert(q.x(), q.y(), q.z()); }
-
-    EXPECT_NEAR(viaMoments.sx, viaPoints.sx, 1e-9);
-    EXPECT_NEAR(viaMoments.sx2, viaPoints.sx2, 1e-9);
-    EXPECT_NEAR(viaMoments.sxz, viaPoints.sxz, 1e-9);
-    EXPECT_NEAR(viaMoments.syz, viaPoints.syz, 1e-9);
+    EXPECT_EQ(fused.N, combined.N);
+    EXPECT_NEAR(fused.sx, combined.sx, 1e-9);
+    EXPECT_NEAR(fused.sx2, combined.sx2, 1e-9);
+    EXPECT_NEAR(fused.sxy, combined.sxy, 1e-9);
+    EXPECT_NEAR(fused.sxz, combined.sxz, 1e-9);
+    EXPECT_TRUE(fused.barycenter().isApprox(combined.barycenter(), 1e-9));
 }
 
 // --- Seam 2: PCA hazards -----------------------------------------------------
@@ -231,6 +258,108 @@ TEST(Goodness, FusionUsesAllPointsAcrossKeyframes)
     double slope_rad = hz[tmap::HAZ_SLOPE] * 0.4;
     EXPECT_NEAR(slope_rad, 15.0 * M_PI / 180.0, 2.0 * M_PI / 180.0);
     EXPECT_EQ(fused[4].data.N, kfA[4].data.N + kfB[4].data.N);
+}
+
+TEST(Goodness, EmptyQueryReturnsAllNaN)
+{
+    // A query cell with no points cannot produce any hazard.
+    Lattice lat(0.0, 0.0, 0.25);
+    auto cells = sampleField(lat, 0, 0, [](double, double) { return 0.0; });
+    CellMoment emptyQuery;
+    emptyQuery.center = Eigen::Vector3d(0.0, 0.0, 0.0);  // data.N == 0
+    auto haz = computeGoodness(emptyQuery, cells, 9, 0.15, 0.4, 15, 0.5);
+    EXPECT_TRUE(std::isnan(haz[tmap::HAZ_OVERALL]));
+    EXPECT_TRUE(std::isnan(haz[tmap::HAZ_ELEVATION]));
+    EXPECT_TRUE(std::isnan(haz[tmap::HAZ_BORDER]));
+    EXPECT_TRUE(std::isnan(haz[tmap::HAZ_SLOPE]));
+}
+
+TEST(Goodness, ElevationAvailableEvenWhenGated)
+{
+    // Elevation comes from the query cell's own centroid and must be reported
+    // even when the vicinity gates reject the cell (BORDER == 1).
+    Lattice lat(0.0, 0.0, 0.25);
+    auto cells = sampleField(lat, 0, 0, [](double, double) { return 2.0; });
+    std::vector<CellMoment> sparse = {cells[4], cells[0]};  // 22% occupied < 50%
+    auto haz = computeGoodness(cells[4], sparse, 9, 0.15, 0.4, 15, 0.5);
+    EXPECT_EQ(haz[tmap::HAZ_BORDER], 1.0);
+    EXPECT_FALSE(std::isnan(haz[tmap::HAZ_ELEVATION]));
+    EXPECT_NEAR(haz[tmap::HAZ_ELEVATION], 2.0, 1e-2);
+}
+
+TEST(Goodness, InsufficientVicinityPointsGate)
+{
+    // Occupied-fraction gate passes (all 9 cells present) but the point budget
+    // is too small to fit a plane -> gate 2 rejects with BORDER == 1.
+    Lattice lat(0.0, 0.0, 0.25);
+    auto cells = sampleField(lat, 0, 0, [](double, double) { return 0.0; });
+    // 9 cells * 20 pts = 180 points; demand far more than that.
+    auto haz = computeGoodness(cells[4], cells, 9, 0.15, 0.4, /*min_vicinity_points=*/100000, 0.5);
+    EXPECT_EQ(haz[tmap::HAZ_BORDER], 1.0);
+    EXPECT_TRUE(std::isnan(haz[tmap::HAZ_OVERALL]));
+    // Elevation is still available (set before the gates).
+    EXPECT_FALSE(std::isnan(haz[tmap::HAZ_ELEVATION]));
+}
+
+TEST(Goodness, FlatNormalPointsUp)
+{
+    Lattice lat(0.0, 0.0, 0.25);
+    auto cells = sampleField(lat, 0, 0, [](double, double) { return 1.0; });
+    auto haz = computeGoodness(cells[4], cells, 9, 0.15, 0.4, 15, 0.5);
+    Eigen::Vector3d n(haz[tmap::HAZ_NORMAL_X], haz[tmap::HAZ_NORMAL_Y], haz[tmap::HAZ_NORMAL_Z]);
+    EXPECT_NEAR(n.norm(), 1.0, 1e-6);          // unit normal
+    EXPECT_GT(n.z(), 0.0);                      // sign-corrected to point up
+    EXPECT_TRUE(n.isApprox(Eigen::Vector3d::UnitZ(), 1e-2));
+}
+
+TEST(Goodness, RampNormalMatchesSlope)
+{
+    // For z = m*x the upward unit normal is (-m, 0, 1)/sqrt(1+m^2), i.e.
+    // n.z() = cos(angle), n.x() = -sin(angle).
+    Lattice lat(0.0, 0.0, 0.25);
+    const double angle = 20.0 * M_PI / 180.0;
+    const double m = std::tan(angle);
+    auto cells = sampleField(lat, 0, 0, [m](double x, double) { return m * x; });
+    auto haz = computeGoodness(cells[4], cells, 9, 0.15, 0.4, 15, 0.5);
+    Eigen::Vector3d n(haz[tmap::HAZ_NORMAL_X], haz[tmap::HAZ_NORMAL_Y], haz[tmap::HAZ_NORMAL_Z]);
+    EXPECT_NEAR(n.norm(), 1.0, 1e-6);
+    EXPECT_NEAR(n.z(), std::cos(angle), 1e-2);
+    EXPECT_NEAR(n.x(), -std::sin(angle), 2e-2);
+    EXPECT_NEAR(n.y(), 0.0, 1e-2);
+}
+
+TEST(Goodness, SteepSlopeClampsToOne)
+{
+    // slope / max_slope > 1 must saturate at 1.0, not exceed it.
+    Lattice lat(0.0, 0.0, 0.25);
+    const double m = std::tan(20.0 * M_PI / 180.0);
+    auto cells = sampleField(lat, 0, 0, [m](double x, double) { return m * x; });
+    auto haz = computeGoodness(cells[4], cells, 9, 0.15, /*max_slope=*/0.05, 15, 0.5);
+    EXPECT_EQ(haz[tmap::HAZ_SLOPE], 1.0);
+}
+
+TEST(Goodness, StepDiscontinuityProducesStep)
+{
+    // A height discontinuity across the vicinity must surface as a step hazard
+    // well above the flat-ground baseline.
+    Lattice lat(0.0, 0.0, 0.25);
+    auto flat = sampleField(lat, 0, 0, [](double, double) { return 0.0; });
+    auto stepped = sampleField(lat, 0, 0, [](double x, double) { return x < 0.0 ? 0.0 : 0.4; });
+    auto hf = computeGoodness(flat[4], flat, 9, 0.15, 0.4, 15, 0.5);
+    auto hs = computeGoodness(stepped[4], stepped, 9, 0.15, 0.4, 15, 0.5);
+    EXPECT_GT(hs[tmap::HAZ_STEP], hf[tmap::HAZ_STEP]);
+    EXPECT_GT(hs[tmap::HAZ_STEP], 0.3);
+}
+
+TEST(Goodness, OverallIsMaxOfComponentHazards)
+{
+    Lattice lat(0.0, 0.0, 0.25);
+    const double m = std::tan(10.0 * M_PI / 180.0);
+    auto cells = sampleField(lat, 0, 0, [m](double x, double) { return m * x; }, 0.02);
+    auto haz = computeGoodness(cells[4], cells, 9, 0.15, 0.4, 15, 0.5);
+    const double expected = std::max(haz[tmap::HAZ_SLOPE],
+                              std::max(haz[tmap::HAZ_STEP], haz[tmap::HAZ_ROUGHNESS]));
+    EXPECT_EQ(haz[tmap::HAZ_OVERALL], expected);
 }
 
 // --- Lattice -----------------------------------------------------------------

@@ -1,0 +1,44 @@
+# One-shot traversability core params. A single pre-built reconstructed cloud (a PLY
+# map, already in the map frame) is ingested as ONE keyframe at identity pose and binned
+# exactly once (see one_shot_traversability_node). Same schema as traversabilityParams.yaml;
+# differences from the streaming (global/local) files are called out inline.
+
+# --- Grid geometry ---
+grid/resolution_local_map: 0.05          # 5 cm cells
+grid/grid_center_x: 0.0
+grid/grid_center_y: 0.0
+grid/half_size_traversability: 40.0      # initial half-extent (m); the grid auto-grows to fit the whole cloud
+grid/extend_length_every_resize_by: 40.0
+
+# --- Traversability (per-cell hazard metric) ---
+# The plane fit for a cell uses the disc of cells the robot footprint covers. At
+# resolution = 0.05 a 0.20 m radius is 4 cells, i.e. 49 cells per fit. The previous value
+# here was deliberately shrunk to force a 3x3 (9-cell) window purely to keep the one-shot
+# pass cheap; that traded the real footprint for speed. Shrink it again if the pass is too
+# slow, but know that it no longer matches the robot.
+traversability/robot_radius: 0.20        # robot footprint radius (m)
+traversability/ground_clearance: 0.15
+traversability/max_slope: 0.4
+traversability/min_vicinity_points: 15
+traversability/min_occupied_fraction: 0.5
+
+# --- Mapping (keyframe retention + worker scheduling) ---
+# ONE-SHOT: a single keyframe, binned exactly once. No PGO / re-bin, so the cloud is
+# dropped after the first bin.
+mapping/is_kf_optimization_enabled: false
+mapping/num_local_keyframes: 1
+mapping/global_adjustment_sleep: 0
+
+# --- Ingestion (cloud filtering) ---
+# ONE-SHOT: the cloud is already a full map in the map frame, so ALL of the per-scan
+# pruning in System::pruneToBase is disabled -- every point is ingested unchanged.
+# (Range is measured from the map origin; the normal 10 m cap would keep only a small
+# disc around it, and the height cull would clip the map by absolute z.)
+ingestion/robot_height: 1.0e9            # disable ceiling/overhang cull (absolute z)
+ingestion/max_range_base_frame: 1.0e9    # disable far-range cull (keep the whole footprint)
+ingestion/min_range_base_frame: 0.0      # disable near-range cull
+ingestion/use_pointcloud_buffer: false
+ingestion/use_ros_buffer: false
+
+# --- Publishing (node) ---
+node/publish_rate_hz: 1.0                # unused by the one-shot node (it latches on the single bin)

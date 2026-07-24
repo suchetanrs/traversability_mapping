@@ -20,21 +20,24 @@ find_package(Eigen3 3.1.0 REQUIRED)
 find_package(Boost REQUIRED)
 find_package(OpenMP)
 find_package(PCL REQUIRED)
-find_package(traversability_mapping_common REQUIRED)
 find_package(grid_map_core REQUIRED)
 find_package(yaml-cpp REQUIRED)
-# ROS Packages
+# ROS Packages (optional: only the sensor_msgs buffer needs them; the core builds
+# fully without ROS when sensor_msgs is absent)
 find_package(sensor_msgs)
-find_package(nav_msgs)
 find_package(ament_cmake REQUIRED)
 find_package(ament_index_cpp REQUIRED)
 # Create library target
 set(SOURCE_FILES
     src/Parameters.cpp
-    src/Helpers.cpp
     src/Moments.cpp
     src/TraversabilityMetrics.cpp
+    src/Helpers.cpp
     src/KeyFrame.cpp
+    src/LocalMap.cpp
+    src/System.cpp
+    src/PointCloudBuffer.cpp
+    src/PointCloudBufferROS.cpp
 )
 
 add_library(traversabilitySystem SHARED ${SOURCE_FILES})
@@ -55,11 +58,10 @@ target_include_directories(traversabilitySystem
 if(sensor_msgs_FOUND)
     ADD_DEFINITIONS("-DWITH_ROS2_SENSOR_MSGS")
     target_include_directories(traversabilitySystem
-        PUBLIC 
+        PUBLIC
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
             $<INSTALL_INTERFACE:include>
             ${sensor_msgs_INCLUDE_DIRS}
-            ${nav_msgs_INCLUDE_DIRS}
     )
 endif(sensor_msgs_FOUND)
 
@@ -70,7 +72,6 @@ target_link_libraries(traversabilitySystem
     PRIVATE ${PCL_LIBRARIES}
     # PRIVATE ${grid_map_core_LIBRARIES}
     PRIVATE ${YAML_CPP_LIBRARIES}
-    PUBLIC traversability_mapping_common
     PUBLIC grid_map_core::grid_map_core
     PUBLIC ament_index_cpp::ament_index_cpp
     PUBLIC Sophus::Sophus
@@ -140,6 +141,43 @@ if(BUILD_TESTING)
         ${EIGEN3_INCLUDE_DIR}
     )
     target_link_libraries(test_moments traversabilitySystem)
+
+    # ParameterHandler unit tests (ROS-free: yaml-cpp + boost come via the lib).
+    ament_add_gtest(test_parameters test/test_parameters.cpp)
+    target_include_directories(test_parameters PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${Boost_INCLUDE_DIRS}
+        ${YAML_CPP_INCLUDE_DIRS}
+    )
+    target_link_libraries(test_parameters traversabilitySystem)
+
+    # KeyFrame unit tests (ROS-free / Eigen-only: pose state machine + rebinning).
+    ament_add_gtest(test_keyframe test/test_keyframe.cpp)
+    target_include_directories(test_keyframe PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${EIGEN3_INCLUDE_DIR}
+    )
+    target_link_libraries(test_keyframe traversabilitySystem)
+
+    # Helpers unit tests (generic grid/lattice utilities; needs grid_map_core, which
+    # traversabilitySystem links transitively).
+    ament_add_gtest(test_helpers test/test_helpers.cpp)
+    target_include_directories(test_helpers PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${EIGEN3_INCLUDE_DIR}
+    )
+    target_link_libraries(test_helpers traversabilitySystem)
+
+    # LocalMap unit tests (grid arithmetic + worker orchestration; needs grid_map_core
+    # + PCL + Eigen, all transitive through traversabilitySystem).
+    ament_add_gtest(test_localmap test/test_localmap.cpp)
+    target_include_directories(test_localmap PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${EIGEN3_INCLUDE_DIR}
+        ${Boost_INCLUDE_DIRS}
+        ${YAML_CPP_INCLUDE_DIRS}
+    )
+    target_link_libraries(test_localmap traversabilitySystem)
 endif()
 
 ament_export_include_directories(include)
@@ -149,10 +187,8 @@ ament_export_dependencies(
     Eigen3
     Boost
     PCL
-    traversability_mapping_common
     grid_map_core
     yaml-cpp
     sensor_msgs
-    nav_msgs
 )
 ament_package()

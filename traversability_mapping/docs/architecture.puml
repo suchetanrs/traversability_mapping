@@ -1,0 +1,146 @@
+@startuml traversability_mapping_core
+title Traversability Mapping — ROS-independent core
+
+' ── rendering ────────────────────────────────────────────────
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam roundcorner 8
+skinparam classAttributeIconSize 0
+skinparam ArrowColor #4A6FA5
+skinparam class {
+    BorderColor #4A6FA5
+    BackgroundColor #F3F7FF
+    ArrowColor #4A6FA5
+    AttributeFontColor #333333
+}
+hide empty members
+
+' ── orchestration ────────────────────────────────────────────
+class System <<orchestrator / facade>> #E8F0FF {
+    +addNewKeyFrameWithPCL(ts, kfID, mapID, cloud)
+    +updateKeyFrame(kfID, pose_map_base)
+    +deleteKeyFrame(kfID)
+    +addNewLocalMap(mapID, onUpdate)
+    +getGlobalPointCloud(vx, vy, vz)
+    -pruneToBase(cloud_lidar)
+    __
+    -Lattice lattice_
+    -map<mapID, LocalMap> localMapsSet_
+    -map<kfID, KeyFrame> keyFramesMap_  «authoritative»
+    -Affine3f Tbv_  «base <- lidar»
+}
+
+' ── per-submap ───────────────────────────────────────────────
+class LocalMap <<per-submap · 2 worker threads>> #E8F0FF {
+    +setKeyFramePose(kf, pose)  «queue lock only»
+    +detachKeyFrame(id) : KeyFrame
+    +clearEntireMap()
+    +takeChangedCells() : cellIds
+    +getGridMap() : GridMap
+    -recomputeKeyFrame(kf, pose)  «subtract->rebin->add»
+    -recomputeDirty(dirty)
+    __
+    -GridMap gridMap_
+    -set<cellId> changedCells_
+    -deque<KeyFrame> localQueue_
+    -thread localThread_, globalThread_
+}
+
+' ── domain (no ROS / grid_map / PCL) ─────────────────────────
+class KeyFrame <<domain · PCL-free>> #EAFAF0 {
+    +setPose(p)  «non-blocking»
+    +getPendingPose(out) : bool
+    +rebin(lattice, pose)  «cloud -> moments»
+    +partials() : map<cellId, NodeMetaData>
+    +dropCloud()
+    __
+    -vector<Vec3f> cloudBase_  «base frame»
+    -Affine3f latestPose_
+}
+
+class NodeMetaData <<raw additive moments>> #EAFAF0 {
+    +uint N
+    +S() : Vec3d
+    +Q() : Mat3d
+    +fuseWith(o)    «+ contribution»
+    +removeWith(o)  «exact inverse»
+    +covariance() : Mat3d
+    +transform(R, t)
+    +shift(d)
+}
+
+class Lattice <<fixed absolute grid>> #EAFAF0 {
+    +double x0, y0, res
+    +cellOf(x, y, ci, cj)
+    +centerOf(ci, cj) : Vec2d
+    +{static} key(ci, cj) : cellId
+    +{static} unkey(k, ci, cj)
+}
+
+class CellMoment #EAFAF0 {
+    +NodeMetaData data
+    +Vec3d center  «map frame»
+}
+
+' ── stateless algorithms ─────────────────────────────────────
+class TraversabilityMetrics <<stateless algorithm>> {
+    +{static} computeGoodness(query, occupied, ...) : Hazard[9]
+}
+
+enum Hazard {
+    OVERALL
+    SLOPE
+    STEP
+    ROUGHNESS
+    ELEVATION
+    NORMAL_X / Y / Z
+}
+
+class Helpers <<free functions>> {
+    +makeGridMap(...) : GridMap
+    +growGridToInclude(...)
+    +readCellMoment(...) : bool
+    +dilate(touched, delta) : cells
+}
+
+' ── infra ────────────────────────────────────────────────────
+class PointCloudBuffer <<timestamp ring buffer>> {
+    +addPointCloud(cloud, ts)
+    +getClosestPointCloud(t) : cloud
+}
+
+class ParameterHandler <<YAML singleton>> {
+    +{static} getInstance(path) : ParameterHandler
+    +getValue<T>(key) : T
+    +keys() : string[]
+}
+
+' ── relationships ────────────────────────────────────────────
+' composition (owned lifetime)
+System "1" *-- "0..N" LocalMap  : owns
+System "1" *-- "0..N" KeyFrame  : registry
+System "1" o-- "1"    PointCloudBuffer : buffers
+KeyFrame "1" *-- "0..N" NodeMetaData : partials
+CellMoment *-- NodeMetaData
+
+' aggregation (shared view — enables re-parenting)
+LocalMap "1" o-- "0..N" KeyFrame : shared view
+
+' dependency (uses)
+KeyFrame ..> Lattice : rebin
+LocalMap ..> Lattice : bins onto
+LocalMap ..> TraversabilityMetrics : per cell
+LocalMap ..> Helpers : grid utils
+TraversabilityMetrics ..> CellMoment : fits over
+TraversabilityMetrics ..> Hazard
+System ..> ParameterHandler : config
+LocalMap ..> ParameterHandler : config
+
+legend right
+  |= arrow |= meaning |
+  | <b>*--</b> | composition (owned lifetime) |
+  | <b>o--</b> | aggregation (shared view) |
+  | <b>..></b> | dependency (uses) |
+endlegend
+
+@enduml
