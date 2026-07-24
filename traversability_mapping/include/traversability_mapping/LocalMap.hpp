@@ -175,8 +175,8 @@ namespace traversability_mapping
         Lattice lattice_;
         std::string frameId_;
         double res_;
-        double groundClearance_, maxSlope_, minOccupiedFraction_;
-        unsigned int minVicinityPoints_;
+        double groundClearance_, maxSlope_;
+        unsigned int minPointsPerGrid_;
         double robotRadius_;                                 ///< footprint radius (m)
         std::vector<std::pair<int, int>> discOffsets_;       ///< footprint as cell offsets; the fit vicinity
         int globalSleepMs_;

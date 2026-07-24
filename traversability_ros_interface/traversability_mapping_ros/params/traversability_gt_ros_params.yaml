@@ -21,7 +21,7 @@
       map_frame: map
       # Nav2-style obstacle layer: live clouds (e.g. a depth cam) as transient keyframes
       # fused into the global map and wiped after their temporal buffer elapses.
-      enable_obstacle_layer: true
+      enable_obstacle_layer: false
       obstacle_pointcloud_topic: "rgb_camera/points"   # independent of pointcloud_topic_name
       obstacle_temporal_buffer_s: 5.0                 # seconds each obstacle keyframe persists
       obstacle_add_rate_hz: 3.0                        # max rate obstacle clouds become keyframes

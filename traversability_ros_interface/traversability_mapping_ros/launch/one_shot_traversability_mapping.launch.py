@@ -31,7 +31,10 @@ def generate_launch_description():
 
         declare_ply_file_cmd = DeclareLaunchArgument(
             'ply_file',
-            default_value='/root/other_ws/src/traversability_mapping/gt_cinema.ply',
+            # default_value='/root/other_ws/benchmarking/cinema_scene_ramp_lidar.ply',
+            # default_value='/root/other_ws/benchmarking/full_global_cloud_recorded_data.ply',
+            default_value='/root/other_ws/benchmarking/pcl_mesh_gt.ply',
+            # default_value='/root/other_ws/benchmarking/pcl_all_surfaces_full_gt.ply',
             description='Full path to the input PLY cloud (already expressed in the map frame)')
         ply_file = LaunchConfiguration('ply_file')
 

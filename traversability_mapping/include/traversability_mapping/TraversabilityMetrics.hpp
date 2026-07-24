@@ -55,13 +55,18 @@ namespace traversability_mapping
      * @param occupied            occupied cells in the vicinity window (must include the
      *                            query) — these are the neighbours fused for the fit.
      * @param vicinity_cell_count total cells in the window incl. empty ones, for the
-     *                            occupied-fraction gate.
+     *                            border gate.
      * @param ground_clearance    normaliser for the roughness and step hazards (m).
      * @param max_slope           normaliser for the slope hazard (rad).
-     * @param min_vicinity_points minimum fused point count required to attempt the fit.
-     * @param min_occupied_fraction minimum occupied fraction of the window required.
-     * @return the ::HAZ_COUNT hazard values; NaN entries with a non-zero HAZ_BORDER when
-     *         the cell is rejected by a gate.
+     * @param min_points_per_grid minimum point count each vicinity cell (and the query
+     *                            cell) must carry for the geometric fit; any short or
+     *                            missing cell leaves the fitted metrics NaN. It is also
+     *                            the saturation count for HAZ_BORDER.
+     * @return the ::HAZ_COUNT hazard values. HAZ_BORDER is the query cell's density
+     *         completeness min(N / min_points_per_grid, 1): 1.0 == enough data, a
+     *         fraction when sparse, NaN when the query cell is unobserved. Every other
+     *         component (elevation and the fitted metrics) is NaN whenever the vicinity
+     *         fails the point-count gate.
      */
     std::array<double, HAZ_COUNT> computeGoodness(
         const CellMoment &query,
@@ -69,8 +74,7 @@ namespace traversability_mapping
         int vicinity_cell_count,
         double ground_clearance,
         double max_slope,
-        unsigned int min_vicinity_points,
-        double min_occupied_fraction);
+        unsigned int min_points_per_grid);
 
 }  // namespace traversability_mapping
 

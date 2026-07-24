@@ -35,8 +35,7 @@ grid/extend_length_every_resize_by: 30.0
 traversability/robot_radius: 0.4
 traversability/ground_clearance: 0.15
 traversability/max_slope: 0.4
-traversability/min_vicinity_points: 15
-traversability/min_occupied_fraction: 0.5
+traversability/min_points_per_grid: 5
 mapping/is_kf_optimization_enabled: true
 mapping/num_local_keyframes: 10
 mapping/global_adjustment_sleep: 0
@@ -57,14 +56,14 @@ node/publish_rate_hz: 1.0
         return path;
     }
 
-    // The 23 keys the YAML / constructor define.
+    // The 22 keys the YAML / constructor define.
     const std::set<std::string> kExpectedKeys = {
         "grid/resolution_local_map", "grid/grid_center_x", "grid/grid_center_y",
         "ingestion/robot_height", "ingestion/max_range_base_frame", "ingestion/min_range_base_frame",
         "ingestion/use_pointcloud_buffer", "ingestion/use_ros_buffer",
         "grid/half_size_traversability", "grid/extend_length_every_resize_by",
         "traversability/robot_radius", "traversability/ground_clearance", "traversability/max_slope",
-        "traversability/min_vicinity_points", "traversability/min_occupied_fraction",
+        "traversability/min_points_per_grid",
         "mapping/is_kf_optimization_enabled", "mapping/num_local_keyframes",
         "mapping/global_adjustment_sleep",
         "inflation/enabled", "inflation/inflation_radius", "inflation/cost_scaling_factor",
@@ -81,7 +80,7 @@ TEST(Parameters, LoadsTypedValuesFromYaml)
     EXPECT_DOUBLE_EQ(ph.getValue<double>("grid/grid_center_y"), -2.5);
     EXPECT_DOUBLE_EQ(ph.getValue<double>("traversability/max_slope"), 0.4);
     EXPECT_DOUBLE_EQ(ph.getValue<double>("node/publish_rate_hz"), 1.0);
-    EXPECT_EQ(ph.getValue<int>("traversability/min_vicinity_points"), 15);
+    EXPECT_EQ(ph.getValue<int>("traversability/min_points_per_grid"), 5);
     EXPECT_EQ(ph.getValue<int>("mapping/num_local_keyframes"), 10);
     EXPECT_EQ(ph.getValue<int>("mapping/global_adjustment_sleep"), 0);
     EXPECT_TRUE(ph.getValue<bool>("ingestion/use_pointcloud_buffer"));
@@ -136,7 +135,7 @@ TEST(Parameters, TypeOfReportsStoredType)
 {
     ParameterHandler ph(writeTempYaml());
     EXPECT_TRUE(ph.typeOf("grid/grid_center_x") == typeid(double));
-    EXPECT_TRUE(ph.typeOf("traversability/min_vicinity_points") == typeid(int));
+    EXPECT_TRUE(ph.typeOf("traversability/min_points_per_grid") == typeid(int));
     EXPECT_TRUE(ph.typeOf("ingestion/use_pointcloud_buffer") == typeid(bool));
 }
 

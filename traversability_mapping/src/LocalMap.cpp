@@ -40,8 +40,7 @@ namespace traversability_mapping
     {
         groundClearance_ = parameterInstance.getValue<double>("traversability/ground_clearance");
         maxSlope_ = parameterInstance.getValue<double>("traversability/max_slope");
-        minOccupiedFraction_ = parameterInstance.getValue<double>("traversability/min_occupied_fraction");
-        minVicinityPoints_ = static_cast<unsigned int>(parameterInstance.getValue<int>("traversability/min_vicinity_points"));
+        minPointsPerGrid_ = static_cast<unsigned int>(parameterInstance.getValue<int>("traversability/min_points_per_grid"));
         robotRadius_ = parameterInstance.getValue<double>("traversability/robot_radius");
         // The vicinity IS the robot footprint: the cells a robot centred on the query cell
         // would cover. Same disc drives the fit and the dirty-set dilation.
@@ -68,7 +67,7 @@ namespace traversability_mapping
         }
 
         layers_ = {"N", "sx", "sy", "sz", "sx2", "sy2", "sz2", "sxy", "sxz", "syz",
-                   "hazard", "elevation", "slope_haz", "step_haz", "roughness_haz",
+                   "hazard", "elevation", "slope_haz", "step_haz", "roughness_haz", "border_haz",
                    "normal_x", "normal_y", "normal_z", "step_haz_inflated"};
 
         const double half = parameterInstance.getValue<double>("grid/half_size_traversability");
@@ -154,11 +153,12 @@ namespace traversability_mapping
                 occupied.push_back({d, Eigen::Vector3d(c2.x(), c2.y(), 0.0)});
             }
         }
-        // Denominator of the occupied-fraction gate: cells under the footprint, not a square.
+        // Cells under the footprint (not a square); every one must be observed with
+        // enough points or the query is a border cell.
         const int total = static_cast<int>(discOffsets_.size());
 
         const auto haz = computeGoodness(query, occupied, total, groundClearance_,
-                                         maxSlope_, minVicinityPoints_, minOccupiedFraction_);
+                                         maxSlope_, minPointsPerGrid_);
 
         if (!std::isnan(haz[HAZ_ELEVATION]))
             gridMap_.atPosition("elevation", qp) = static_cast<float>(haz[HAZ_ELEVATION]);
@@ -169,6 +169,9 @@ namespace traversability_mapping
             gridMap_.atPosition("slope_haz", qp) = kNaN;
             gridMap_.atPosition("step_haz", qp) = kNaN;
             gridMap_.atPosition("roughness_haz", qp) = kNaN;
+            // border_haz is the query cell's density completeness, valid even when the
+            // fit is gated out (NaN only when the cell itself is unobserved).
+            gridMap_.atPosition("border_haz", qp) = static_cast<float>(haz[HAZ_BORDER]);
             gridMap_.atPosition("normal_x", qp) = kNaN;
             gridMap_.atPosition("normal_y", qp) = kNaN;
             gridMap_.atPosition("normal_z", qp) = kNaN;
@@ -178,6 +181,7 @@ namespace traversability_mapping
         gridMap_.atPosition("slope_haz", qp) = static_cast<float>(haz[HAZ_SLOPE]);
         gridMap_.atPosition("step_haz", qp) = static_cast<float>(haz[HAZ_STEP]);
         gridMap_.atPosition("roughness_haz", qp) = static_cast<float>(haz[HAZ_ROUGHNESS]);
+        gridMap_.atPosition("border_haz", qp) = static_cast<float>(haz[HAZ_BORDER]);
         gridMap_.atPosition("normal_x", qp) = static_cast<float>(haz[HAZ_NORMAL_X]);
         gridMap_.atPosition("normal_y", qp) = static_cast<float>(haz[HAZ_NORMAL_Y]);
         gridMap_.atPosition("normal_z", qp) = static_cast<float>(haz[HAZ_NORMAL_Z]);

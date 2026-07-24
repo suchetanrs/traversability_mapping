@@ -16,6 +16,7 @@
  *                subscriber is present (debug); full snapshot on (re)connect.
  */
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -136,6 +137,8 @@ public:
             "global_traversability_gridmap", rclcpp::QoS(1).transient_local());
         occupancy_pub_ = create_publisher<nav_msgs::msg::OccupancyGrid>(
             "global_traversability_occupancy", rclcpp::QoS(1).transient_local());
+        completeness_pub_ = create_publisher<nav_msgs::msg::OccupancyGrid>(
+            "global_traversability_completeness", rclcpp::QoS(1).transient_local());
         sparse_pub_ = create_publisher<traversability_msgs::msg::TraversabilitySparseUpdate>(
             "global_traversability_updates", rclcpp::QoS(10).reliable());
         global_cloud_pub_ = create_publisher<sensor_msgs::msg::PointCloud2>(
@@ -296,6 +299,7 @@ private:
     {
         publishFullMap();
         publishOccupancy();
+        publishCompleteness();
     }
 
     void publishSparse()
@@ -374,6 +378,86 @@ private:
         occupancy_pub_->publish(og);
     }
 
+    void publishCompleteness()
+    {
+        if (completeness_pub_->get_subscription_count() == 0)
+            return;
+        auto lm = system_->getLocalMap();
+        if (!lm)
+            return;
+        nav_msgs::msg::OccupancyGrid fine;
+        {
+            std::lock_guard<std::mutex> lock(lm->getGridMapMutex());
+            // Scratch orientation: completeness (border_haz) 0..1 -> 0..100, NaN -> -1.
+            grid_map::GridMapRosConverter::toOccupancyGrid(lm->getGridMap(), "border_haz", 0.0, 1.0, fine);
+        }
+
+        // Downsample to a coarser publish resolution. Each coarse cell takes the MINIMUM
+        // completeness of the fine cells it covers (a block is only as "done" as its
+        // least-complete part). Unobserved fine cells (-1) carry no value and are skipped,
+        // so a coarse cell is unobserved only when every fine cell under it is. The origin
+        // is shared, so coarse cell (0,0) starts at the fine grid's lower-left corner.
+        constexpr double kPublishRes = 0.25;   // target completeness-grid resolution (m)
+        nav_msgs::msg::OccupancyGrid og = fine;   // carries header, origin, orientation
+        int f = static_cast<int>(std::lround(kPublishRes / fine.info.resolution));
+        if (f < 1)
+            f = 1;
+        if (f > 1)
+        {
+            const unsigned fw = fine.info.width, fh = fine.info.height;
+            const unsigned cw = (fw + f - 1) / f, ch = (fh + f - 1) / f;
+            og.info.resolution = fine.info.resolution * f;
+            og.info.width = cw;
+            og.info.height = ch;
+            og.data.assign(static_cast<std::size_t>(cw) * ch, -1);
+            for (unsigned cy = 0; cy < ch; ++cy)
+                for (unsigned cx = 0; cx < cw; ++cx)
+                {
+                    int best = 101;   // sentinel above any valid completeness (0..100)
+                    for (int dy = 0; dy < f; ++dy)
+                        for (int dx = 0; dx < f; ++dx)
+                        {
+                            const unsigned fx = cx * f + dx, fy = cy * f + dy;
+                            if (fx >= fw || fy >= fh)
+                                continue;   // partial edge block
+                            const int v = fine.data[static_cast<std::size_t>(fy) * fw + fx];
+                            if (v >= 0 && v < best)
+                                best = v;
+                        }
+                    og.data[static_cast<std::size_t>(cy) * cw + cx] =
+                        (best <= 100) ? static_cast<std::int8_t>(best)
+                                      : static_cast<std::int8_t>(-1);
+                }
+        }
+
+        // Re-map the completeness into RViz's COSTMAP palette special bands so the map
+        // reads as a done/not-done heat:
+        //   fully complete (==100) -> green   (101..127 flat-green band)
+        //   partial (0..99)        -> red->yellow gradient (byte 128 red .. 254 yellow)
+        //   unobserved (-1)        -> transparent (byte 255)
+        // These bytes are out of the OccupancyGrid 0..100 spec on purpose; RViz indexes
+        // its 256-entry palette by the raw (unsigned) byte, so writing 128..254 as
+        // negative int8 lands there. Requires the display's Color Scheme = costmap.
+        constexpr int kComplete = 113;   // middle of the 101..127 green band
+        for (auto &d : og.data)
+        {
+            if (d < 0)
+                continue;                // -1 unobserved -> 255 transparent
+            const double c = static_cast<double>(d) / 100.0;   // completeness in [0,1]
+            const int byte = (d >= 100)
+                                 ? kComplete
+                                 : 128 + static_cast<int>(std::lround(c * (254 - 128)));
+            d = static_cast<std::int8_t>(byte);   // 128..254 wrap to negative int8
+        }
+
+        // Lift the grid 0.1 m so it renders above the hazard occupancy (avoids z-fighting).
+        og.info.origin.position.z += 0.1;
+
+        og.header.frame_id = map_frame_;
+        og.header.stamp = now();
+        completeness_pub_->publish(og);
+    }
+
     void globalCloudService(
         const std::shared_ptr<traversability_msgs::srv::GetGlobalPointcloud::Request> req,
         std::shared_ptr<traversability_msgs::srv::GetGlobalPointcloud::Response> /*res*/)
@@ -406,7 +490,7 @@ private:
     // The grid layers this adapter publishes (sparse update + debug grid_map). The
     // core LocalMap is layer-agnostic; this subset is owned here on the ROS side.
     const std::vector<std::string> navLayers_ = {
-        "normal_x", "normal_y", "normal_z", "slope_haz",
+        "normal_x", "normal_y", "normal_z", "slope_haz", "border_haz",
         "step_haz", "elevation", "roughness_haz", "hazard", "step_haz_inflated"};
 
     std::shared_ptr<tmap::System> system_;
@@ -420,6 +504,7 @@ private:
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr obstacle_sub_;
     rclcpp::Publisher<grid_map_msgs::msg::GridMap>::SharedPtr gridmap_pub_;
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr occupancy_pub_;
+    rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr completeness_pub_;
     rclcpp::Publisher<traversability_msgs::msg::TraversabilitySparseUpdate>::SharedPtr sparse_pub_;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr global_cloud_pub_;
     rclcpp::Service<traversability_msgs::srv::GetGlobalPointcloud>::SharedPtr cloud_srv_;

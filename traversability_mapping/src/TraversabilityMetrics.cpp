@@ -26,8 +26,7 @@ namespace traversability_mapping
         int vicinity_cell_count,
         double ground_clearance,
         double max_slope,
-        unsigned int min_vicinity_points,
-        double min_occupied_fraction)
+        unsigned int min_points_per_grid)
     {
         std::array<double, HAZ_COUNT> haz;
         haz.fill(std::numeric_limits<double>::quiet_NaN());
@@ -35,28 +34,36 @@ namespace traversability_mapping
         if (query.data.N < 1)
             return haz;
 
-        // Elevation is the query cell's own centroid height (map frame). It is
-        // available whenever the cell has points, independent of the gates.
+        // border_haz reports the query cell's point-density completeness: it scales
+        // linearly from 0 (empty) up to 1.0 once the cell carries the required minimum,
+        // then saturates. Note the polarity: 1.0 means the cell HAS enough data, not
+        // that it is a border. It is set before the gate so it is reported even when the
+        // geometric fit below is rejected.
+        haz[HAZ_BORDER] = std::min(static_cast<double>(query.data.N) /
+                                       static_cast<double>(std::max(1u, min_points_per_grid)),
+                                   1.0);
+
+        // Gate for the geometric fit: the query cell and every cell under its footprint
+        // must each carry at least min_points_per_grid points. A cell missing from
+        // `occupied` is unobserved (zero points) and fails the same test, so any short or
+        // empty cell in the vicinity leaves the fitted metrics NaN (border_haz stands).
+        bool border = query.data.N < min_points_per_grid ||
+                      static_cast<int>(occupied.size()) < vicinity_cell_count;
+        for (const auto &c : occupied)
+        {
+            if (c.data.N < min_points_per_grid)
+            {
+                border = true;
+                break;
+            }
+        }
+        if (border)
+            return haz;
+
+        // Elevation is the query cell's own centroid height (map frame). Written only
+        // past the gate, so a border cell reports no elevation (like the other hazards).
         haz[HAZ_ELEVATION] = query.data.sz / static_cast<double>(query.data.N)
                              + query.center.z();
-
-        // Gate 1: enough of the surrounding cells must be observed, so a lone
-        // dense cell cannot drive a fit while its neighbours are empty.
-        double occupied_fraction;
-        if (vicinity_cell_count > 0)
-        {
-            occupied_fraction = static_cast<double>(occupied.size()) / static_cast<double>(vicinity_cell_count);
-        }
-        else
-        {
-            occupied_fraction = 0.0;
-        }
-
-        if (occupied_fraction < min_occupied_fraction)
-        {
-            haz[HAZ_BORDER] = 1.0;
-            return haz;
-        }
 
         // Fuse the vicinity moments, re-expressing each cell about the query
         // cell centre (common origin) so the raw moments add cleanly.
@@ -69,13 +76,6 @@ namespace traversability_mapping
             m.shift(c.center - query.center);  // re-centre to query origin
             barycenters.push_back(m.barycenter());
             fused.fuseWith(m);
-        }
-
-        // Gate 2: enough points to fit a plane at all.
-        if (fused.N < min_vicinity_points)
-        {
-            haz[HAZ_BORDER] = 1.0;
-            return haz;
         }
 
         const Eigen::Vector3d mu = fused.barycenter();
@@ -120,7 +120,6 @@ namespace traversability_mapping
 
         haz[HAZ_OVERALL] = std::max(haz[HAZ_SLOPE],
                                std::max(haz[HAZ_STEP], haz[HAZ_ROUGHNESS]));
-        haz[HAZ_BORDER] = 0.0;
         return haz;
     }
 

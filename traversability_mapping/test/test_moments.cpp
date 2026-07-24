@@ -196,12 +196,13 @@ TEST(Goodness, FlatGroundIsFlatAndSmooth)
     Lattice lat(0.0, 0.0, 0.25);
     auto cells = sampleField(lat, 0, 0, [](double, double) { return 2.0; });
     CellMoment query = cells[4];  // the centre cell (i=0,j=0 is the 5th of 3x3)
-    auto haz = computeGoodness(query, cells, 9, 0.15, 0.4, 15, 0.5);
+    auto haz = computeGoodness(query, cells, 9, 0.15, 0.4, 15);
     EXPECT_NEAR(haz[tmap::HAZ_SLOPE], 0.0, 1e-3);
     EXPECT_NEAR(haz[tmap::HAZ_ROUGHNESS], 0.0, 1e-3);
     EXPECT_NEAR(haz[tmap::HAZ_STEP], 0.0, 1e-3);
     EXPECT_NEAR(haz[tmap::HAZ_ELEVATION], 2.0, 1e-2);
-    EXPECT_EQ(haz[tmap::HAZ_BORDER], 0.0);
+    // 20 points per cell against min_points_per_grid=15 -> density completeness saturates.
+    EXPECT_EQ(haz[tmap::HAZ_BORDER], 1.0);
 }
 
 TEST(Goodness, RampRecoversSlopeAngle)
@@ -212,7 +213,7 @@ TEST(Goodness, RampRecoversSlopeAngle)
     auto cells = sampleField(lat, 0, 0, [m](double x, double) { return m * x; });
     CellMoment query = cells[4];
     const double max_pitch = 0.4;  // rad
-    auto haz = computeGoodness(query, cells, 9, 0.15, max_pitch, 15, 0.5);
+    auto haz = computeGoodness(query, cells, 9, 0.15, max_pitch, 15);
     double slope_rad = haz[tmap::HAZ_SLOPE] * max_pitch;
     EXPECT_NEAR(slope_rad, angle, 2.0 * M_PI / 180.0);  // within 2 deg
 }
@@ -222,8 +223,8 @@ TEST(Goodness, RoughTerrainHasRoughness)
     Lattice lat(0.0, 0.0, 0.25);
     auto flat = sampleField(lat, 0, 0, [](double, double) { return 0.0; }, 0.0);
     auto rough = sampleField(lat, 0, 0, [](double, double) { return 0.0; }, 0.05);
-    auto hf = computeGoodness(flat[4], flat, 9, 0.15, 0.4, 15, 0.5);
-    auto hr = computeGoodness(rough[4], rough, 9, 0.15, 0.4, 15, 0.5);
+    auto hf = computeGoodness(flat[4], flat, 9, 0.15, 0.4, 15);
+    auto hr = computeGoodness(rough[4], rough, 9, 0.15, 0.4, 15);
     EXPECT_GT(hr[tmap::HAZ_ROUGHNESS], hf[tmap::HAZ_ROUGHNESS]);
 }
 
@@ -233,7 +234,7 @@ TEST(Goodness, OccupiedFractionGateRejectsSparse)
     auto cells = sampleField(lat, 0, 0, [](double, double) { return 0.0; });
     // keep only query + 1 neighbour out of 9 -> 22% occupied < 50%
     std::vector<CellMoment> sparse = {cells[4], cells[0]};
-    auto haz = computeGoodness(cells[4], sparse, 9, 0.15, 0.4, 15, 0.5);
+    auto haz = computeGoodness(cells[4], sparse, 9, 0.15, 0.4, 15);
     EXPECT_EQ(haz[tmap::HAZ_BORDER], 1.0);
     EXPECT_TRUE(std::isnan(haz[tmap::HAZ_OVERALL]));
 }
@@ -254,7 +255,7 @@ TEST(Goodness, FusionUsesAllPointsAcrossKeyframes)
         c.data.fuseWith(kfB[i].data);  // same cell, same centre -> direct sum
         fused.push_back(c);
     }
-    auto hz = computeGoodness(fused[4], fused, 9, 0.15, 0.4, 30, 0.5);
+    auto hz = computeGoodness(fused[4], fused, 9, 0.15, 0.4, 30);
     double slope_rad = hz[tmap::HAZ_SLOPE] * 0.4;
     EXPECT_NEAR(slope_rad, 15.0 * M_PI / 180.0, 2.0 * M_PI / 180.0);
     EXPECT_EQ(fused[4].data.N, kfA[4].data.N + kfB[4].data.N);
@@ -267,45 +268,45 @@ TEST(Goodness, EmptyQueryReturnsAllNaN)
     auto cells = sampleField(lat, 0, 0, [](double, double) { return 0.0; });
     CellMoment emptyQuery;
     emptyQuery.center = Eigen::Vector3d(0.0, 0.0, 0.0);  // data.N == 0
-    auto haz = computeGoodness(emptyQuery, cells, 9, 0.15, 0.4, 15, 0.5);
+    auto haz = computeGoodness(emptyQuery, cells, 9, 0.15, 0.4, 15);
     EXPECT_TRUE(std::isnan(haz[tmap::HAZ_OVERALL]));
     EXPECT_TRUE(std::isnan(haz[tmap::HAZ_ELEVATION]));
     EXPECT_TRUE(std::isnan(haz[tmap::HAZ_BORDER]));
     EXPECT_TRUE(std::isnan(haz[tmap::HAZ_SLOPE]));
 }
 
-TEST(Goodness, ElevationAvailableEvenWhenGated)
+TEST(Goodness, ElevationGatedWhenBorder)
 {
-    // Elevation comes from the query cell's own centroid and must be reported
-    // even when the vicinity gates reject the cell (BORDER == 1).
+    // Elevation is written only past the fit gate, so a rejected (border) cell
+    // reports NaN elevation just like the other hazards.
     Lattice lat(0.0, 0.0, 0.25);
     auto cells = sampleField(lat, 0, 0, [](double, double) { return 2.0; });
     std::vector<CellMoment> sparse = {cells[4], cells[0]};  // 22% occupied < 50%
-    auto haz = computeGoodness(cells[4], sparse, 9, 0.15, 0.4, 15, 0.5);
+    auto haz = computeGoodness(cells[4], sparse, 9, 0.15, 0.4, 15);
     EXPECT_EQ(haz[tmap::HAZ_BORDER], 1.0);
-    EXPECT_FALSE(std::isnan(haz[tmap::HAZ_ELEVATION]));
-    EXPECT_NEAR(haz[tmap::HAZ_ELEVATION], 2.0, 1e-2);
+    EXPECT_TRUE(std::isnan(haz[tmap::HAZ_ELEVATION]));
 }
 
 TEST(Goodness, InsufficientVicinityPointsGate)
 {
-    // Occupied-fraction gate passes (all 9 cells present) but the point budget
-    // is too small to fit a plane -> gate 2 rejects with BORDER == 1.
+    // All 9 cells are present, but the per-cell point count (20) falls short of
+    // the min_points_per_grid demand -> BORDER == 1.
     Lattice lat(0.0, 0.0, 0.25);
     auto cells = sampleField(lat, 0, 0, [](double, double) { return 0.0; });
-    // 9 cells * 20 pts = 180 points; demand far more than that.
-    auto haz = computeGoodness(cells[4], cells, 9, 0.15, 0.4, /*min_vicinity_points=*/100000, 0.5);
-    EXPECT_EQ(haz[tmap::HAZ_BORDER], 1.0);
+    // Each cell holds 20 points; demand far more per grid than that.
+    auto haz = computeGoodness(cells[4], cells, 9, 0.15, 0.4, /*min_points_per_grid=*/100000);
+    // border_haz scales the query's own count against the demand (20 / 100000).
+    EXPECT_NEAR(haz[tmap::HAZ_BORDER], 20.0 / 100000.0, 1e-9);
     EXPECT_TRUE(std::isnan(haz[tmap::HAZ_OVERALL]));
-    // Elevation is still available (set before the gates).
-    EXPECT_FALSE(std::isnan(haz[tmap::HAZ_ELEVATION]));
+    // Elevation is gated with the fit, so it is NaN here too.
+    EXPECT_TRUE(std::isnan(haz[tmap::HAZ_ELEVATION]));
 }
 
 TEST(Goodness, FlatNormalPointsUp)
 {
     Lattice lat(0.0, 0.0, 0.25);
     auto cells = sampleField(lat, 0, 0, [](double, double) { return 1.0; });
-    auto haz = computeGoodness(cells[4], cells, 9, 0.15, 0.4, 15, 0.5);
+    auto haz = computeGoodness(cells[4], cells, 9, 0.15, 0.4, 15);
     Eigen::Vector3d n(haz[tmap::HAZ_NORMAL_X], haz[tmap::HAZ_NORMAL_Y], haz[tmap::HAZ_NORMAL_Z]);
     EXPECT_NEAR(n.norm(), 1.0, 1e-6);          // unit normal
     EXPECT_GT(n.z(), 0.0);                      // sign-corrected to point up
@@ -320,7 +321,7 @@ TEST(Goodness, RampNormalMatchesSlope)
     const double angle = 20.0 * M_PI / 180.0;
     const double m = std::tan(angle);
     auto cells = sampleField(lat, 0, 0, [m](double x, double) { return m * x; });
-    auto haz = computeGoodness(cells[4], cells, 9, 0.15, 0.4, 15, 0.5);
+    auto haz = computeGoodness(cells[4], cells, 9, 0.15, 0.4, 15);
     Eigen::Vector3d n(haz[tmap::HAZ_NORMAL_X], haz[tmap::HAZ_NORMAL_Y], haz[tmap::HAZ_NORMAL_Z]);
     EXPECT_NEAR(n.norm(), 1.0, 1e-6);
     EXPECT_NEAR(n.z(), std::cos(angle), 1e-2);
@@ -334,7 +335,7 @@ TEST(Goodness, SteepSlopeClampsToOne)
     Lattice lat(0.0, 0.0, 0.25);
     const double m = std::tan(20.0 * M_PI / 180.0);
     auto cells = sampleField(lat, 0, 0, [m](double x, double) { return m * x; });
-    auto haz = computeGoodness(cells[4], cells, 9, 0.15, /*max_slope=*/0.05, 15, 0.5);
+    auto haz = computeGoodness(cells[4], cells, 9, 0.15, /*max_slope=*/0.05, 15);
     EXPECT_EQ(haz[tmap::HAZ_SLOPE], 1.0);
 }
 
@@ -345,8 +346,8 @@ TEST(Goodness, StepDiscontinuityProducesStep)
     Lattice lat(0.0, 0.0, 0.25);
     auto flat = sampleField(lat, 0, 0, [](double, double) { return 0.0; });
     auto stepped = sampleField(lat, 0, 0, [](double x, double) { return x < 0.0 ? 0.0 : 0.4; });
-    auto hf = computeGoodness(flat[4], flat, 9, 0.15, 0.4, 15, 0.5);
-    auto hs = computeGoodness(stepped[4], stepped, 9, 0.15, 0.4, 15, 0.5);
+    auto hf = computeGoodness(flat[4], flat, 9, 0.15, 0.4, 15);
+    auto hs = computeGoodness(stepped[4], stepped, 9, 0.15, 0.4, 15);
     EXPECT_GT(hs[tmap::HAZ_STEP], hf[tmap::HAZ_STEP]);
     EXPECT_GT(hs[tmap::HAZ_STEP], 0.3);
 }
@@ -356,7 +357,7 @@ TEST(Goodness, OverallIsMaxOfComponentHazards)
     Lattice lat(0.0, 0.0, 0.25);
     const double m = std::tan(10.0 * M_PI / 180.0);
     auto cells = sampleField(lat, 0, 0, [m](double x, double) { return m * x; }, 0.02);
-    auto haz = computeGoodness(cells[4], cells, 9, 0.15, 0.4, 15, 0.5);
+    auto haz = computeGoodness(cells[4], cells, 9, 0.15, 0.4, 15);
     const double expected = std::max(haz[tmap::HAZ_SLOPE],
                               std::max(haz[tmap::HAZ_STEP], haz[tmap::HAZ_ROUGHNESS]));
     EXPECT_EQ(haz[tmap::HAZ_OVERALL], expected);

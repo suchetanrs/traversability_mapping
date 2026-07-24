@@ -49,8 +49,7 @@ ParameterHandler::ParameterHandler(std::string yaml_file_path)
     parameter_map_["traversability/robot_radius"] = loaded_node["traversability/robot_radius"].as<double>();
     parameter_map_["traversability/ground_clearance"] = loaded_node["traversability/ground_clearance"].as<double>();
     parameter_map_["traversability/max_slope"] = loaded_node["traversability/max_slope"].as<double>();
-    parameter_map_["traversability/min_vicinity_points"] = loaded_node["traversability/min_vicinity_points"].as<int>();
-    parameter_map_["traversability/min_occupied_fraction"] = loaded_node["traversability/min_occupied_fraction"].as<double>();
+    parameter_map_["traversability/min_points_per_grid"] = loaded_node["traversability/min_points_per_grid"].as<int>();
 
     // --- Mapping (keyframe retention + worker scheduling) ---
     parameter_map_["mapping/is_kf_optimization_enabled"] = loaded_node["mapping/is_kf_optimization_enabled"].as<bool>();
