@@ -21,6 +21,7 @@ find_package(OpenMP)
 find_package(PCL REQUIRED)
 find_package(grid_map_core REQUIRED)
 find_package(yaml-cpp REQUIRED)
+find_package(SQLite3 REQUIRED)
 # ROS Packages (optional: only the sensor_msgs buffer needs them; the core builds
 # fully without ROS when sensor_msgs is absent)
 find_package(sensor_msgs)
@@ -35,6 +36,7 @@ set(SOURCE_FILES
     src/KeyFrame.cpp
     src/LocalMap.cpp
     src/System.cpp
+    src/MapDatabase.cpp
     src/PointCloudBuffer.cpp
     src/PointCloudBufferROS.cpp
 )
@@ -71,6 +73,7 @@ target_link_libraries(traversabilitySystem
     PRIVATE ${PCL_LIBRARIES}
     # PRIVATE ${grid_map_core_LIBRARIES}
     PRIVATE ${YAML_CPP_LIBRARIES}
+    PRIVATE SQLite::SQLite3
     PUBLIC grid_map_core::grid_map_core
     PUBLIC ament_index_cpp::ament_index_cpp
 )
@@ -186,6 +189,7 @@ ament_export_dependencies(
     PCL
     grid_map_core
     yaml-cpp
+    SQLite3
     sensor_msgs
 )
 ament_package()

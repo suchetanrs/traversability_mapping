@@ -11,7 +11,9 @@ services:
       - /etc/timezone:/etc/timezone:rw
       - /etc/localtime:/etc/localtime:rw
       #code
-      - ./:/root/
+      - ../../:/root/other_ws/src/traversability_mapping:rw
+      #X11
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
     privileged: true
     network_mode: host
     ipc: host

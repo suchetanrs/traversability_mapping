@@ -327,6 +327,25 @@ namespace traversability_mapping
         keyFramesMap_[kf->getKfID()] = kf;
     }
 
+    void LocalMap::addRestoredKeyFrame(const std::shared_ptr<KeyFrame> &kf)
+    {
+        if (!kf || kf->partials().empty())
+            return;
+        addAlreadyDeclaredKF(kf);
+        // Same as steps 3-4 of recomputeKeyFrame, minus the subtract and the rebin: the
+        // partials came off disk already binned, and without a cloud they can never change.
+        std::unordered_set<std::uint64_t> touched;
+        std::lock_guard<std::mutex> lock(masterGridMapMutex_);
+        growToIncludeCells(kf->partials());
+        const MomentLayers layers(gridMap_);
+        for (const auto &kv : kf->partials())
+        {
+            addPartialToGrid(kv.first, kv.second, +1.0, layers);
+            touched.insert(kv.first);
+        }
+        recomputeDirty(dilate(touched, discOffsets_));
+    }
+
     void LocalMap::setKeyFramePose(const std::shared_ptr<KeyFrame> &kf, const Eigen::Affine3f &pose)
     {
         if (!kf)

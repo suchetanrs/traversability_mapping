@@ -161,6 +161,23 @@ namespace traversability_mapping
             float voxel_size_x, float voxel_size_y, float voxel_size_z);
         /// @}
 
+        /// @name Persistence (SQLite)
+        /// Explicit, on-demand only: nothing is written during mapping.
+        /// @warning Call these while the front-end is quiescent (no keyframes being added
+        ///          or updated); neither takes the maps' grid locks.
+        /// @{
+        /// @brief Write the whole system state to a SQLite file, replacing @p path if present.
+        ///        Stores the lattice, extrinsics and each keyframe's pose + base-frame cloud;
+        ///        the grid and every derived layer are regenerated on load.
+        /// @param path destination .db file. @return true on success.
+        bool saveMap(const std::string &path);
+        /// @brief Restore a file written by saveMap into this (freshly constructed) System,
+        ///        creating the maps it names and replaying every keyframe.
+        /// @param path source .db file. @param onUpdate passed to each recreated map.
+        /// @return true on success.
+        bool loadMap(const std::string &path, std::function<void()> onUpdate = {});
+        /// @}
+
     private:
         void addNewKeyFrameToMap(double timestamp, std::uint64_t kfID, std::uint64_t mapID,
                                  const pcl::PointCloud<pcl::PointXYZ> &sensorPointCloud);

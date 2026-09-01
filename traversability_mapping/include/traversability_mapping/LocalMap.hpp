@@ -74,6 +74,12 @@ namespace traversability_mapping
         /// @param kf keyframe to register; a pose is supplied later via setKeyFramePose.
         void addAlreadyDeclaredKF(const std::shared_ptr<KeyFrame> &kf);
 
+        /// @brief Register a keyframe whose partials were restored from disk and add them
+        ///        straight to the grid. For keyframes loaded without a cloud, which can
+        ///        never be re-binned; a keyframe with a cloud goes through setKeyFramePose.
+        /// @param kf keyframe carrying already-populated partials (no-op if it has none).
+        void addRestoredKeyFrame(const std::shared_ptr<KeyFrame> &kf);
+
         /// @brief Set a keyframe's latest pose and enqueue it for rebin (queue lock only).
         /// @param kf keyframe to update (no-op if null); passed directly to avoid a registry lookup.
         /// @param pose new pose (map <- base_footprint).
